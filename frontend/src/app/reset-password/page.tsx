@@ -17,6 +17,16 @@ function ResetPasswordPageInner() {
 
   const searchParams = useSearchParams();
 
+  const passwordChecks = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /\d/.test(password),
+    special: /[!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|`~]/.test(password),
+  };
+
+  const allChecksPass = Object.values(passwordChecks).every(Boolean);
+
   useEffect(() => {
     console.log('Reset password page loaded at:', window.location.href);
     const queryToken = searchParams.get("token") || searchParams.get("access_token") || searchParams.get("code");
