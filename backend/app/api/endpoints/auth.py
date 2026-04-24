@@ -16,12 +16,14 @@ _IS_PROD = os.getenv("ENVIRONMENT", "development") == "production"
 
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    # SameSite=none required for cross-domain cookie sharing (Vercel + Railway)
+    samesite = "none" if _IS_PROD else "lax"
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         secure=_IS_PROD,
-        samesite="lax",
+        samesite=samesite,
         max_age=3600,
         path="/",
     )
@@ -30,7 +32,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         value=refresh_token,
         httponly=True,
         secure=_IS_PROD,
-        samesite="lax",
+        samesite=samesite,
         max_age=7 * 24 * 3600,
         path="/",
     )
@@ -47,13 +49,15 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
     user: UserResponse
 
 
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("10/minute")
 def login(data: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
-    """Authenticate via Supabase and set HttpOnly auth cookies."""
+    """Authenticate via Supabase, set HttpOnly cookies and return tokens."""
     supabase = get_supabase()
 
     try:
@@ -87,7 +91,11 @@ def login(data: LoginRequest, request: Request, response: Response, db: Session 
 
     _set_auth_cookies(response, auth_response.session.access_token, auth_response.session.refresh_token)
 
-    return LoginResponse(user=UserResponse.model_validate(user))
+    return LoginResponse(
+        access_token=auth_response.session.access_token,
+        refresh_token=auth_response.session.refresh_token,
+        user=UserResponse.model_validate(user),
+    )
 
 
 @router.post("/signup")
@@ -147,7 +155,10 @@ def refresh_token(request: Request, response: Response):
     try:
         auth_response = supabase.auth.refresh_session(token)
         _set_auth_cookies(response, auth_response.session.access_token, auth_response.session.refresh_token)
-        return {"detail": "Token refreshed"}
+        return {
+            "access_token": auth_response.session.access_token,
+            "refresh_token": auth_response.session.refresh_token,
+        }
     except Exception:
         _clear_auth_cookies(response)
         raise HTTPException(status_code=401, detail="Invalid refresh token")

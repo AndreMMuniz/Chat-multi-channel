@@ -31,7 +31,7 @@ export default function LoginPage() {
         setError(data.detail || "Login failed. Check your credentials.");
         return;
       }
-      setAuth(data.user);
+      setAuth(data.access_token, data.refresh_token, data.user);
       router.replace("/");
     } catch {
       setError("Connection error. Check if the server is running.");
