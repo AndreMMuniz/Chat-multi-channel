@@ -16,13 +16,16 @@ export default function ResetPasswordPage() {
 
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get("token");
+  const token = searchParams.get("token") || searchParams.get("access_token") || searchParams.get("code");
 
   useEffect(() => {
+    console.log('Reset password page loaded');
+    console.log('Search params:', Object.fromEntries(searchParams.entries()));
+    console.log('Token:', token);
     if (!token) {
       setError("Invalid reset link. Missing token.");
     }
-  }, [token]);
+  }, [token, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
