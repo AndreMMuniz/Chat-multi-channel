@@ -167,6 +167,11 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center text-sm text-slate-500 mt-6">
+            <Link href="/forgot-password" className="font-semibold text-[#7C4DFF] hover:text-[#632ce5] transition-colors">
+              Forgot password?
+            </Link>
+          </p>
+          <p className="text-center text-sm text-slate-500 mt-2">
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="font-semibold text-[#7C4DFF] hover:text-[#632ce5] transition-colors">
               Request access
