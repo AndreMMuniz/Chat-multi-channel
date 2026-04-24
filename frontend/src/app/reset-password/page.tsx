@@ -16,16 +16,26 @@ export default function ResetPasswordPage() {
 
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get("token") || searchParams.get("access_token") || searchParams.get("code");
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
+    const queryToken = searchParams.get("token") || searchParams.get("access_token") || searchParams.get("code");
+    const hashToken = window.location.hash.startsWith("#token=") ? window.location.hash.substring(7) : null;
+
+    const finalToken = queryToken || hashToken;
+    setToken(finalToken);
+
     console.log('Reset password page loaded');
     console.log('Search params:', Object.fromEntries(searchParams.entries()));
-    console.log('Token:', token);
-    if (!token) {
+    console.log('Hash:', window.location.hash);
+    console.log('Query token:', queryToken);
+    console.log('Hash token:', hashToken);
+    console.log('Final token:', finalToken);
+
+    if (!finalToken) {
       setError("Invalid reset link. Missing token.");
     }
-  }, [token, searchParams]);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +127,7 @@ export default function ResetPasswordPage() {
               </p>
               <p className="text-sm text-slate-400">Redirecting to login...</p>
             </div>
-          ) : !token ? (
+          ) : token === null ? (
             <div className="text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-red-600 text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>error</span>
