@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import SideNavBar from "./SideNavBar";
 import { getToken } from "@/lib/api";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/auth");
