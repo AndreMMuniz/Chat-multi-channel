@@ -1,10 +1,20 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from app.api.api import api_router
+from app.services.telegram_service import telegram_service
 
-app = FastAPI(title="Multi-Channel Chat API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    base_url = os.getenv("WEBHOOK_BASE_URL", "").rstrip("/")
+    if base_url and os.getenv("TELEGRAM_BOT_TOKEN"):
+        webhook_url = f"{base_url}/api/v1/telegram/webhook"
+        await telegram_service.set_webhook(webhook_url)
+    yield
+
+app = FastAPI(title="Multi-Channel Chat API", version="1.0.0", lifespan=lifespan)
 
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
 origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()] or ["*"]

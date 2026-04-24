@@ -82,15 +82,28 @@ class TelegramService:
         })
 
     async def send_message(self, chat_id: str, text: str) -> bool:
-        """Send a message to a Telegram chat."""
         async with httpx.AsyncClient() as client:
-            payload = {
-                "chat_id": chat_id,
-                "text": text
-            }
-            response = await client.post(f"{self.api_url}/sendMessage", json=payload)
+            response = await client.post(
+                f"{self.api_url}/sendMessage",
+                json={"chat_id": chat_id, "text": text}
+            )
             if response.status_code != 200:
-                print(f"Error sending to Telegram: {response.status_code} - {response.text}")
+                print(f"Telegram sendMessage error: {response.status_code} - {response.text}")
             return response.status_code == 200
+
+    async def set_webhook(self, url: str) -> bool:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.api_url}/setWebhook",
+                json={"url": url}
+            )
+            data = response.json()
+            print(f"Telegram setWebhook: {data}")
+            return data.get("ok", False)
+
+    async def get_webhook_info(self) -> dict:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{self.api_url}/getWebhookInfo")
+            return response.json()
 
 telegram_service = TelegramService()
