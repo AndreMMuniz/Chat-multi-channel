@@ -27,7 +27,16 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       console.log('Response status:', res.status);
-      const data = await res.json();
+      const text = await res.text();
+      console.log('Response text:', text);
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.log('JSON parse error:', e);
+        setError('Invalid response from server');
+        return;
+      }
       console.log('Response data:', data);
       if (!res.ok) {
         setError(data.detail || "Login failed. Check your credentials.");
@@ -42,12 +51,11 @@ export default function LoginPage() {
       setAuth(data.access_token, data.refresh_token, data.user);
       console.log('Redirecting to /');
       window.location.href = "/";
-    } catch (error) {
-      console.log('Fetch error:', error);
-      setError("Connection error. Check if the server is running.");
-    } finally {
-      setLoading(false);
-    }
+      } catch (error) {
+        console.log('Fetch error:', error);
+        alert('Fetch error: ' + error.message);
+        setError("Connection error. Check if the server is running.");
+      }
   };
 
   return (
