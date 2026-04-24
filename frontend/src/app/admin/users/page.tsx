@@ -32,6 +32,7 @@ interface CreateForm {
 interface EditForm {
   full_name: string;
   user_type_id: string;
+  is_active: boolean;
 }
 
 const ROLE_BADGE: Record<string, string> = {
@@ -86,7 +87,7 @@ export default function UsersPage() {
   const [createLoading, setCreateLoading] = useState(false);
 
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>({ full_name: "", user_type_id: "" });
+  const [editForm, setEditForm] = useState<EditForm>({ full_name: "", user_type_id: "", is_active: true });
   const [editError, setEditError] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
