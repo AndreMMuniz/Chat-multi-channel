@@ -47,10 +47,8 @@ export default function LoginPage() {
         setError('Login failed: no token received');
         return;
       }
-      console.log('Setting auth with:', data.access_token, data.refresh_token, data.user);
       setAuth(data.access_token, data.refresh_token, data.user);
-      console.log('Redirecting to /');
-      window.location.href = "/";
+      window.location.href = "/dashboard";
       } catch (error) {
         console.log('Fetch error:', error);
         setError("Connection error. Check if the server is running.");
