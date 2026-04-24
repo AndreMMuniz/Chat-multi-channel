@@ -53,20 +53,25 @@ async function _tryRefresh(): Promise<boolean> {
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = getToken();
+  console.log('apiFetch:', `${BASE}${path}`, 'token:', token);
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      // ...(token ? { Authorization: `Bearer ${token}` } : {}), // Temporarily disable to force cookie auth
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...((init.headers as Record<string, string>) || {}),
     },
   });
+  console.log('apiFetch response status:', res.status);
 
   if (res.status === 401) {
+    console.log('401 received, trying refresh');
     const refreshed = await _tryRefresh();
+    console.log('Refresh result:', refreshed);
     if (refreshed) {
       const newToken = getToken();
+      console.log('Retrying with new token');
       return fetch(`${BASE}${path}`, {
         ...init,
         credentials: 'include',
@@ -77,6 +82,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
         },
       });
     }
+    console.log('Refresh failed, redirecting to login');
     clearAuth();
     window.location.href = '/login';
   }

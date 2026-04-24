@@ -132,6 +132,7 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    console.log('Page loaded, token:', getToken());
     fetchConversations();
 
     // WebSocket Connection
