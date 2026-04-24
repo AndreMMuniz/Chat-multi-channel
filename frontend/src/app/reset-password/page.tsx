@@ -1,33 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-export default function ResetPasswordPage() {
+function ResetPasswordPageInner() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  const passwordChecks = {
-    length: password.length >= 8,
-    uppercase: /[A-Z]/.test(password),
-    lowercase: /[a-z]/.test(password),
-    number: /\d/.test(password),
-    special: /[!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|`~]/.test(password),
-  };
-
-  const allChecksPass = Object.values(passwordChecks).every(Boolean);
-
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
-
   useEffect(() => {
     console.log('Reset password page loaded at:', window.location.href);
     const queryToken = searchParams.get("token") || searchParams.get("access_token") || searchParams.get("code");
@@ -251,7 +236,9 @@ export default function ResetPasswordPage() {
                 ) : (
                   <>
                     Update password
-                    <span className="material-symbols-outlined text-[18px]">lock_reset</span>
+                    <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      lock_reset
+                    </span>
                   </>
                 )}
               </button>
@@ -274,5 +261,13 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen text-slate-400"><span className="material-symbols-outlined text-3xl animate-spin">progress_activity</span></div>}>
+      <ResetPasswordPageInner />
+    </Suspense>
   );
 }
