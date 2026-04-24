@@ -78,7 +78,7 @@ def create_user_type(
     db.refresh(user_type)
 
     log_action(db, current_user.id, "create_user_type", "user_type", str(user_type.id),
-               details={"name": data.name}, ip_address=get_client_ip(request))
+               details=data.model_dump(mode='json'), ip_address=get_client_ip(request))
     return user_type
 
 
@@ -103,7 +103,7 @@ def update_user_type(
     db.refresh(user_type)
 
     log_action(db, current_user.id, "update_user_type", "user_type", str(user_type.id),
-               details=update_dict, ip_address=get_client_ip(request))
+               details=data.model_dump(mode='json', exclude_unset=True), ip_address=get_client_ip(request))
     return user_type
 
 
@@ -268,7 +268,7 @@ def update_user(
     db.refresh(user)
 
     log_action(db, current_user.id, "update_user", "user", str(user_id),
-               details=update_dict, ip_address=get_client_ip(request))
+               details=data.model_dump(mode='json', exclude_unset=True), ip_address=get_client_ip(request))
     return user
 
 

@@ -13,7 +13,11 @@ def log_action(
     details: Optional[dict] = None,
     ip_address: Optional[str] = None,
 ) -> AuditLog:
-    """Record a sensitive action in the audit log."""
+    # Ensure details is JSON serializable (convert UUIDs, datetimes, etc. to strings)
+    if details:
+        import json
+        details = json.loads(json.dumps(details, default=str))
+
     entry = AuditLog(
         user_id=user_id,
         action=action,
