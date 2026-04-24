@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session, joinedload
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -135,6 +135,65 @@ def signup(data: UserSignup, request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     return {"detail": "Account created. An administrator will review your request and notify you by email."}
+
+
+class SetPasswordRequest(BaseModel):
+    new_password: str
+
+    @field_validator('new_password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        from app.schemas.user import validate_password_strength
+        return validate_password_strength(v)
+
+
+@router.post("/set-password")
+def set_password(data: SetPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    """Set a new password using a Supabase recovery token.
+    Auto-creates the local user record if the email was registered directly in Supabase.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Recovery token required")
+
+    token = auth_header[7:]
+    supabase = get_supabase()
+
+    try:
+        auth_response = supabase.auth.get_user(token)
+        if not auth_response or not auth_response.user:
+            raise HTTPException(status_code=401, detail="Invalid or expired recovery link")
+        auth_user = auth_response.user
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired recovery link")
+
+    try:
+        supabase.auth.admin.update_user_by_id(str(auth_user.id), {"password": data.new_password})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to update password: {str(e)}")
+
+    # Auto-create local user record if admin registered the email directly in Supabase
+    auth_id = str(auth_user.id)
+    user = db.query(User).filter(User.auth_id == auth_id).first()
+    if not user:
+        seed_default_user_types(db)
+        default_role = db.query(UserType).filter(UserType.name == "User", UserType.is_system == True).first()
+        if default_role and auth_user.email:
+            name = auth_user.email.split("@")[0].replace(".", " ").title()
+            new_user = User(
+                auth_id=auth_id,
+                email=auth_user.email,
+                full_name=name,
+                user_type_id=default_role.id,
+                is_active=True,
+                is_approved=True,
+            )
+            db.add(new_user)
+            db.commit()
+
+    return {"detail": "Password set successfully. You can now sign in."}
 
 
 @router.post("/logout")

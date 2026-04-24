@@ -6,7 +6,7 @@ import SideNavBar from "./SideNavBar";
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname === "/login" || pathname === "/signup") {
+  if (pathname === "/login" || pathname === "/signup" || pathname.startsWith("/auth")) {
     return <>{children}</>;
   }
 
