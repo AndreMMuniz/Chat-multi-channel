@@ -13,6 +13,9 @@ function ResetPasswordPageInner() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const searchParams = useSearchParams();
+
   useEffect(() => {
     console.log('Reset password page loaded at:', window.location.href);
     const queryToken = searchParams.get("token") || searchParams.get("access_token") || searchParams.get("code");
