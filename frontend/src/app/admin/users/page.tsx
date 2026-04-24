@@ -444,6 +444,19 @@ export default function UsersPage() {
                 {userTypes.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
               </select>
             </FieldGroup>
+            <div className="flex items-center justify-between p-3.5 rounded-lg bg-slate-50 border border-[#E9ECEF]">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Active account</p>
+                <p className="text-xs text-slate-500">Disabled users cannot sign in</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditForm((f) => ({ ...f, is_active: !f.is_active }))}
+                className={`w-11 h-6 rounded-full transition-colors relative ${editForm.is_active ? "bg-[#7C4DFF]" : "bg-slate-300"}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${editForm.is_active ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+            </div>
             {editError && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
                 <span className="material-symbols-outlined text-[15px] mt-0.5">error</span>
