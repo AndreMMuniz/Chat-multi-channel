@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { setAuth } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -32,7 +30,7 @@ export default function LoginPage() {
         return;
       }
       setAuth(data.access_token, data.refresh_token, data.user);
-      router.replace("/");
+      window.location.href = "/";
     } catch {
       setError("Connection error. Check if the server is running.");
     } finally {
