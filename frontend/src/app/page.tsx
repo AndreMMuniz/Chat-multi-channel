@@ -107,7 +107,7 @@ export default function ChatPage() {
   // Fetch Conversations
   const fetchConversations = async () => {
     try {
-      const res = await fetch(`${API_URL}/chat/conversations`);
+      const res = await apiFetch(`/chat/conversations`);
       if (res.ok) {
         const data = await res.json();
         setConversations(data);
@@ -120,7 +120,7 @@ export default function ChatPage() {
   // Fetch Messages for a conversation
   const fetchMessages = async (conversationId: string) => {
     try {
-      const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages`);
+      const res = await apiFetch(`/chat/conversations/${conversationId}/messages`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data);

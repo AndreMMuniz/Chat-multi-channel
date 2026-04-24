@@ -139,13 +139,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {error && (
-              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                <span className="material-symbols-outlined text-[16px] mt-0.5 shrink-0">error</span>
-                <span>{error}</span>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={loading}
@@ -163,6 +156,13 @@ export default function LoginPage() {
                 </>
               )}
             </button>
+
+            {error && (
+              <p className="flex items-center gap-1.5 text-xs text-red-500 mt-2">
+                <span className="material-symbols-outlined text-[14px]">error</span>
+                {error}
+              </p>
+            )}
           </form>
 
           <p className="text-center text-sm text-slate-500 mt-6">
