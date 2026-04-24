@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
-import { apiFetch, getStoredUser } from '@/lib/api';
+import { apiFetch, getStoredUser, getToken } from '@/lib/api';
 import AudioMessage from '@/components/AudioMessage';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;   // 5 MB
