@@ -5,6 +5,7 @@
 .trae/
 docs/
 skills-lock.json
+.kilo
 
 # ─── Environment variables (NEVER commit these) ───────────────────────────────
 .env

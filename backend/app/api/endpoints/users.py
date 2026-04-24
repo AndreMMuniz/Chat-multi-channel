@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db, get_supabase
 from app.core.auth import get_current_user, require_permission, get_client_ip
-from app.models.models import User, UserType, DefaultRole
+from app.models.models import User, UserType, DefaultRole, AuditLog, Conversation, Message
 from app.schemas.user import (
     UserCreate, UserUpdate, UserResponse, UserPasswordChange,
     UserTypeCreate, UserTypeUpdate, UserTypeResponse,
@@ -335,8 +335,49 @@ def enable_user(
     db.commit()
 
     log_action(db, current_user.id, "enable_user", "user", str(user_id),
-               details={"email": user.email}, ip_address=get_client_ip(request))
+                details={"email": user.email}, ip_address=get_client_ip(request))
     return {"detail": "User enabled"}
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_manage_users")),
+):
+    """Delete a user account permanently."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    # Handle foreign key constraints
+    # Reassign conversations
+    db.query(Conversation).filter(Conversation.assigned_user_id == user_id).update({"assigned_user_id": None})
+    # Reassign messages
+    db.query(Message).filter(Message.owner_id == user_id).update({"owner_id": None})
+    # Delete audit logs
+    db.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
+
+    # Delete from Supabase Auth
+    supabase = get_supabase()
+    try:
+        supabase.auth.admin.delete_user(user.auth_id)
+    except Exception:
+        pass  # Proceed even if Supabase deletion fails
+
+    # Log the deletion
+    log_action(db, current_user.id, "delete_user", "user", str(user_id),
+                details={"email": user.email}, ip_address=get_client_ip(request))
+
+    # Delete from local database
+    db.delete(user)
+    db.commit()
+
+    return {"detail": "User deleted"}
 
 
 # ─── Self-signup approval flow ────────────────────────────────────────────
