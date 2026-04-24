@@ -124,8 +124,11 @@ export default function DashboardPage() {
     setUser(getStoredUser<StoredUser>());
 
     apiFetch("/admin/stats")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load stats");
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          throw new Error(`Failed to load stats (${res.status}): ${body.slice(0, 200)}`);
+        }
         return res.json();
       })
       .then(setStats)

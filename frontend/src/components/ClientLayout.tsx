@@ -1,13 +1,43 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import SideNavBar from "./SideNavBar";
+import { getToken } from "@/lib/api";
+
+const PUBLIC_PATHS = ["/login", "/signup"];
+
+function isPublic(pathname: string): boolean {
+  return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/auth");
+}
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
 
-  if (pathname === "/login" || pathname === "/signup" || pathname.startsWith("/auth")) {
+  useEffect(() => {
+    if (isPublic(pathname)) {
+      setReady(true);
+      return;
+    }
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+    setReady(true);
+  }, [pathname, router]);
+
+  if (isPublic(pathname)) {
     return <>{children}</>;
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex items-center justify-center h-screen text-slate-400">
+        <span className="material-symbols-outlined text-3xl animate-spin">progress_activity</span>
+      </div>
+    );
   }
 
   return (

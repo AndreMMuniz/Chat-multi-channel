@@ -17,42 +17,28 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    console.log('Starting login for:', email);
     try {
-      console.log('Fetching:', `${API}/auth/login`);
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
-      console.log('Response status:', res.status);
-      const text = await res.text();
-      console.log('Response text:', text);
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.log('JSON parse error:', e);
-        setError('Invalid response from server');
-        return;
-      }
-      console.log('Response data:', data);
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(data.detail || "Login failed. Check your credentials.");
+        setError(data?.detail || "Login failed. Check your credentials.");
         return;
       }
-      if (!data.access_token) {
-        console.log('No access token in response');
-        setError('Login failed: no token received');
+      if (!data?.access_token) {
+        setError("Login failed: no token received");
         return;
       }
       setAuth(data.access_token, data.refresh_token, data.user);
       window.location.href = "/dashboard";
-      } catch (error) {
-        console.log('Fetch error:', error);
-        setError("Connection error. Check if the server is running.");
-      }
+    } catch {
+      setError("Connection error. Check if the server is running.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
