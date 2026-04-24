@@ -138,8 +138,8 @@ export default function UserTypesPage() {
       if (!res.ok) { setFormError(data.detail || "Operation failed."); return; }
       setShowModal(false);
       load();
-    } catch {
-      setFormError("Connection error.");
+    } catch (err: any) {
+      setFormError("Connection error: " + (err.message || "Unknown error"));
     } finally {
       setFormLoading(false);
     }

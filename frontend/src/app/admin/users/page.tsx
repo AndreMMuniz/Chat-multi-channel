@@ -116,8 +116,8 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
       if (!res.ok) { setCreateError(data.detail || "Failed to create user."); return; }
       setShowCreate(false);
       loadData();
-    } catch {
-      setCreateError("Connection error.");
+    } catch (err: any) {
+      setCreateError("Connection error: " + (err.message || "Unknown error"));
     } finally {
       setCreateLoading(false);
     }
@@ -140,8 +140,8 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
       if (!res.ok) { setEditError(data.detail || "Failed to update user."); return; }
       setEditingUser(null);
       loadData();
-    } catch {
-      setEditError("Connection error.");
+    } catch (err: any) {
+      setEditError("Connection error: " + (err.message || "Unknown error"));
     } finally {
       setEditLoading(false);
     }
