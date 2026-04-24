@@ -25,11 +25,14 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
+      console.log('Login response:', res.status, data);
       if (!res.ok) {
         setError(data.detail || "Login failed. Check your credentials.");
         return;
       }
+      console.log('Setting auth with:', data.access_token, data.refresh_token, data.user);
       setAuth(data.access_token, data.refresh_token, data.user);
+      console.log('Redirecting to /');
       window.location.href = "/";
     } catch {
       setError("Connection error. Check if the server is running.");
