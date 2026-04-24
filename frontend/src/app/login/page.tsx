@@ -33,6 +33,11 @@ export default function LoginPage() {
         setError(data.detail || "Login failed. Check your credentials.");
         return;
       }
+      if (!data.access_token) {
+        console.log('No access token in response');
+        setError('Login failed: no token received');
+        return;
+      }
       console.log('Setting auth with:', data.access_token, data.refresh_token, data.user);
       setAuth(data.access_token, data.refresh_token, data.user);
       console.log('Redirecting to /');
