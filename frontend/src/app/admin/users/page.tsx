@@ -92,6 +92,7 @@ export default function UsersPage() {
   const [editLoading, setEditLoading] = useState(false);
 
   const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
+const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -185,6 +186,19 @@ export default function UsersPage() {
       if (res.ok) loadData();
     } finally {
       setApprovalLoading(null);
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
+    setDeleteLoading(userId);
+    try {
+      const res = await apiFetch(`/admin/users/${userId}`, { method: "DELETE" });
+      if (res.ok) {
+        loadData();
+      }
+    } finally {
+      setDeleteLoading(null);
     }
   };
 
@@ -311,20 +325,36 @@ export default function UsersPage() {
                         <td className="px-4 py-3.5 text-xs text-slate-500">
                           {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                         </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1 justify-end">
-                            <button onClick={() => openEdit(u)} title="Edit" className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#7C4DFF] hover:bg-purple-50 transition-colors">
-                              <span className="material-symbols-outlined text-[18px]">edit</span>
-                            </button>
-                            <button
-                              onClick={() => toggleStatus(u)}
-                              title={u.is_active ? "Disable" : "Enable"}
-                              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${u.is_active ? "text-slate-400 hover:text-red-500 hover:bg-red-50" : "text-slate-400 hover:text-green-600 hover:bg-green-50"}`}
-                            >
-                              <span className="material-symbols-outlined text-[18px]">{u.is_active ? "block" : "check_circle"}</span>
-                            </button>
-                          </div>
-                        </td>
+                           <td className="px-4 py-3.5">
+                           <div className="flex items-center gap-1 justify-end">
+                             <button onClick={() => openEdit(u)} title="Edit" className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#7C4DFF] hover:bg-purple-50 transition-colors">
+                               <span className="material-symbols-outlined text-[18px]">edit</span>
+                             </button>
+                             <button
+                               onClick={() => toggleStatus(u)}
+                               title={u.is_active ? "Disable" : "Enable"}
+                               className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${u.is_active ? "text-slate-400 hover:text-red-500 hover:bg-red-50" : "text-slate-400 hover:text-green-600 hover:bg-green-50"}`}
+                             >
+                               <span className="material-symbols-outlined text-[18px]">{u.is_active ? "block" : "check_circle"}</span>
+                             </button>
+                             <button
+                               onClick={() => {
+                                 if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+                                   deleteUser(u.id);
+                                 }
+                               }}
+                               title="Delete"
+                               className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-400 hover:text-red-500 hover:bg-red-50"
+                               disabled={deleteLoading === u.id}
+                             >
+                               {deleteLoading === u.id ? (
+                                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                               ) : (
+                                 <span className="material-symbols-outlined text-[18px]">delete</span>
+                               )}
+                             </button>
+                           </div>
+                         </td>
                       </tr>
                     ))
                   )}
