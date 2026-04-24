@@ -14,6 +14,16 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const passwordChecks = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /\d/.test(password),
+    special: /[!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|`~]/.test(password),
+  };
+
+  const allChecksPass = Object.values(passwordChecks).every(Boolean);
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
@@ -47,8 +57,8 @@ export default function ResetPasswordPage() {
       setError("Passwords do not match");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+    if (!allChecksPass) {
+      setError("Password does not meet all requirements. Check the list above.");
       return;
     }
     setError("");
@@ -169,6 +179,50 @@ export default function ResetPasswordPage() {
                       {showPassword ? "visibility_off" : "visibility"}
                     </span>
                   </button>
+                </div>
+
+                {/* Password strength checklist */}
+                <div className="mt-3 space-y-1">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`material-symbols-outlined text-[16px] ${passwordChecks.length ? 'text-green-500' : 'text-slate-400'}`}>
+                      {passwordChecks.length ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={passwordChecks.length ? 'text-green-700' : 'text-slate-500'}>
+                      At least 8 characters
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`material-symbols-outlined text-[16px] ${passwordChecks.uppercase ? 'text-green-500' : 'text-slate-400'}`}>
+                      {passwordChecks.uppercase ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={passwordChecks.uppercase ? 'text-green-700' : 'text-slate-500'}>
+                      One uppercase letter (A-Z)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`material-symbols-outlined text-[16px] ${passwordChecks.lowercase ? 'text-green-500' : 'text-slate-400'}`}>
+                      {passwordChecks.lowercase ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={passwordChecks.lowercase ? 'text-green-700' : 'text-slate-500'}>
+                      One lowercase letter (a-z)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`material-symbols-outlined text-[16px] ${passwordChecks.number ? 'text-green-500' : 'text-slate-400'}`}>
+                      {passwordChecks.number ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={passwordChecks.number ? 'text-green-700' : 'text-slate-500'}>
+                      One number (0-9)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`material-symbols-outlined text-[16px] ${passwordChecks.special ? 'text-green-500' : 'text-slate-400'}`}>
+                      {passwordChecks.special ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={passwordChecks.special ? 'text-green-700' : 'text-slate-500'}>
+                      One special character (!@#$%^&*)
+                    </span>
+                  </div>
                 </div>
               </div>
 
