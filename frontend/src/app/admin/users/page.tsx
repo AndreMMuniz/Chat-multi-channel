@@ -32,7 +32,6 @@ interface CreateForm {
 interface EditForm {
   full_name: string;
   user_type_id: string;
-  is_active: boolean;
 }
 
 const ROLE_BADGE: Record<string, string> = {
@@ -87,7 +86,7 @@ export default function UsersPage() {
   const [createLoading, setCreateLoading] = useState(false);
 
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>({ full_name: "", user_type_id: "", is_active: true });
+  const [editForm, setEditForm] = useState<EditForm>({ full_name: "", user_type_id: "" });
   const [editError, setEditError] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
@@ -139,7 +138,7 @@ export default function UsersPage() {
 
   const openEdit = (u: User) => {
     setEditingUser(u);
-    setEditForm({ full_name: u.full_name, user_type_id: u.user_type_id, is_active: u.is_active });
+    setEditForm({ full_name: u.full_name, user_type_id: u.user_type_id });
     setEditError("");
   };
 
@@ -437,26 +436,13 @@ export default function UsersPage() {
         <Modal title="Edit User" onClose={() => setEditingUser(null)}>
           <form onSubmit={handleEdit} className="space-y-4">
             <FieldGroup label="Full Name">
-              <input type="text" value={editForm.full_name} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} className={inputCls} />
+              <input type="text" required value={editForm.full_name} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} className={inputCls} />
             </FieldGroup>
             <FieldGroup label="Role">
-              <select value={editForm.user_type_id} onChange={(e) => setEditForm((f) => ({ ...f, user_type_id: e.target.value }))} className={selectCls}>
+              <select required value={editForm.user_type_id} onChange={(e) => setEditForm((f) => ({ ...f, user_type_id: e.target.value }))} className={selectCls}>
                 {userTypes.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
               </select>
             </FieldGroup>
-            <div className="flex items-center justify-between p-3.5 rounded-lg bg-slate-50 border border-[#E9ECEF]">
-              <div>
-                <p className="text-sm font-medium text-slate-900">Active account</p>
-                <p className="text-xs text-slate-500">Disabled users cannot sign in</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditForm((f) => ({ ...f, is_active: !f.is_active }))}
-                className={`w-11 h-6 rounded-full transition-colors relative ${editForm.is_active ? "bg-[#7C4DFF]" : "bg-slate-300"}`}
-              >
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${editForm.is_active ? "left-[22px]" : "left-0.5"}`} />
-              </button>
-            </div>
             {editError && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
                 <span className="material-symbols-outlined text-[15px] mt-0.5">error</span>
