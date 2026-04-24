@@ -16,6 +16,7 @@ function ResetPasswordPageInner() {
   const [token, setToken] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const passwordChecks = {
     length: password.length >= 8,
