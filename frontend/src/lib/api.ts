@@ -58,7 +58,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // ...(token ? { Authorization: `Bearer ${token}` } : {}), // Temporarily disable to force cookie auth
       ...((init.headers as Record<string, string>) || {}),
     },
   });
