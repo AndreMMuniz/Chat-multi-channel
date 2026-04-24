@@ -17,15 +17,18 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    console.log('Starting login for:', email);
     try {
+      console.log('Fetching:', `${API}/auth/login`);
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ email, password }),
       });
+      console.log('Response status:', res.status);
       const data = await res.json();
-      console.log('Login response:', res.status, data);
+      console.log('Response data:', data);
       if (!res.ok) {
         setError(data.detail || "Login failed. Check your credentials.");
         return;
@@ -34,7 +37,8 @@ export default function LoginPage() {
       setAuth(data.access_token, data.refresh_token, data.user);
       console.log('Redirecting to /');
       window.location.href = "/";
-    } catch {
+    } catch (error) {
+      console.log('Fetch error:', error);
       setError("Connection error. Check if the server is running.");
     } finally {
       setLoading(false);
