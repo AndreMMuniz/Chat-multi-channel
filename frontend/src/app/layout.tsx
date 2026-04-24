@@ -5,6 +5,11 @@ import ClientLayout from "@/components/ClientLayout";
 export const metadata: Metadata = {
   title: "Omnichat",
   description: "Multi-channel customer support platform",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
