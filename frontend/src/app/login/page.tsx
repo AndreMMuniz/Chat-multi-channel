@@ -53,7 +53,8 @@ export default function LoginPage() {
       window.location.href = "/";
       } catch (error) {
         console.log('Fetch error:', error);
-        alert('Fetch error: ' + error.message);
+        const message = error instanceof Error ? error.message : String(error);
+        alert('Fetch error: ' + message);
         setError("Connection error. Check if the server is running.");
       }
   };
