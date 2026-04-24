@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SupportHub - Customer Service Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#1d1a24",
+                    "tertiary-container": "#b55800",
+                    "primary-fixed-dim": "#cdbdff",
+                    "on-tertiary-fixed-variant": "#733600",
+                    "on-error": "#ffffff",
+                    "surface": "#fdf7ff",
+                    "primary-container": "#7c4dff",
+                    "on-tertiary-container": "#fff7f4",
+                    "surface-container-high": "#ece5f4",
+                    "on-secondary-fixed-variant": "#3f484f",
+                    "tertiary": "#904500",
+                    "surface-bright": "#fdf7ff",
+                    "outline-variant": "#cac3d8",
+                    "background": "#fdf7ff",
+                    "secondary-fixed": "#dbe4ed",
+                    "surface-container": "#f2ebfa",
+                    "secondary": "#575f67",
+                    "on-secondary-fixed": "#141d23",
+                    "inverse-primary": "#cdbdff",
+                    "on-primary-fixed-variant": "#4f00d0",
+                    "inverse-surface": "#322f3a",
+                    "tertiary-fixed": "#ffdbc7",
+                    "on-primary-container": "#fcf6ff",
+                    "on-secondary-container": "#5b646b",
+                    "tertiary-fixed-dim": "#ffb688",
+                    "surface-variant": "#e6e0ee",
+                    "on-primary": "#ffffff",
+                    "outline": "#7a7487",
+                    "on-surface-variant": "#494455",
+                    "on-tertiary": "#ffffff",
+                    "inverse-on-surface": "#f5eefd",
+                    "primary-fixed": "#e8deff",
+                    "surface-tint": "#6833ea",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#1d1a24",
+                    "on-primary-fixed": "#20005f",
+                    "surface-container-highest": "#e6e0ee",
+                    "on-error-container": "#93000a",
+                    "secondary-fixed-dim": "#bfc8d0",
+                    "surface-container-low": "#f8f1ff",
+                    "error": "#ba1a1a",
+                    "primary": "#632ce5",
+                    "surface-dim": "#ded7e6",
+                    "error-container": "#ffdad6",
+                    "secondary-container": "#d8e1ea",
+                    "on-tertiary-fixed": "#311300",
+                    "on-secondary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "lg": "24px",
+                    "container-padding": "24px",
+                    "md": "16px",
+                    "xl": "32px",
+                    "base": "4px",
+                    "xs": "4px",
+                    "gutter": "16px",
+                    "sm": "8px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "h1": ["Inter"],
+                    "h2": ["Inter"],
+                    "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "h1": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "h2": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-hidden antialiased">
+<!-- SideNavBar (Shared Component) -->
+<nav class="fixed left-0 top-0 h-full w-[64px] border-r border-[#E9ECEF] dark:border-slate-800 bg-white dark:bg-slate-900 z-50 flex flex-col items-center py-4 space-y-4">
+<!-- Logo -->
+<div class="mb-4 flex items-center justify-center w-10 h-10 bg-primary-container text-on-primary-container rounded-lg">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">support_agent</span>
+</div>
+<!-- Tabs -->
+<div class="flex-1 flex flex-col items-center space-y-2 w-full">
+<button class="flex items-center justify-center w-12 h-12 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200" title="Dashboard">
+<span class="material-symbols-outlined">dashboard</span>
+</button>
+<!-- Active Tab: Inbox -->
+<button class="relative flex items-center justify-center w-12 h-12 bg-purple-50 dark:bg-purple-900/30 text-[#7C4DFF] rounded-lg before:absolute before:left-[-8px] before:w-1 before:h-6 before:bg-[#7C4DFF] before:rounded-r-full Active: scale-95 transition-transform" title="Inbox">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">chat_bubble</span>
+</button>
+<button class="flex items-center justify-center w-12 h-12 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200" title="Customers">
+<span class="material-symbols-outlined">group</span>
+</button>
+<button class="flex items-center justify-center w-12 h-12 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200" title="Analytics">
+<span class="material-symbols-outlined">bar_chart</span>
+</button>
+<button class="flex items-center justify-center w-12 h-12 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<!-- Footer Tabs -->
+<div class="flex flex-col items-center space-y-2 w-full mt-auto">
+<button class="flex items-center justify-center w-12 h-12 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200" title="Help">
+<span class="material-symbols-outlined">help</span>
+</button>
+<img alt="Current User" class="w-10 h-10 rounded-full border-2 border-surface-container-lowest object-cover mt-2" data-alt="close up portrait of a professional woman with warm smile in soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwdtoFtDbZ9EnsHYdY-0MNG5FkVgC1nw9KQHpb3PD8Fyupkkk2WTPjFp61FvEZHXXY76dZJCNvtJfLW9a1aeM3bFUIt2iBl9PBgWFAsHddKwP6bZgBhLpXz_f7A6rQXG2Bspa8VEmxOICd8VkwUrLNIRoVHNjFktWzuOyxeIYsj7YmyEAX4ehY5qWov_z8_E3tczQd0PdtA89QquwkBHTfNt-iuqw5ByOcmTUJlwaSHD-IIcSJesMlopJmsUVGRFkp0LQyu5wXUjc"/>
+</div>
+</nav>
+<!-- TopAppBar (Shared Component) -->
+<header class="fixed top-0 h-16 ml-[64px] border-b border-[#E9ECEF] dark:border-slate-800 bg-white/80 backdrop-blur-md dark:bg-slate-900/80 z-40 flex justify-between items-center px-6 w-[calc(100%-64px)]">
+<div class="flex items-center font-['Inter'] text-sm tracking-tight text-[#7C4DFF] font-semibold">
+<span class="font-h2 text-h2 text-on-surface">Inbox</span>
+</div>
+<div class="flex items-center space-x-4">
+<button class="text-slate-500 dark:text-slate-400 hover:text-[#7C4DFF] transition-all flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-slate-500 dark:text-slate-400 hover:text-[#7C4DFF] transition-all flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined">history</span>
+</button>
+</div>
+</header>
+<!-- Main Workspace (3-Column Layout) -->
+<main class="ml-[64px] pt-16 h-screen flex w-[calc(100%-64px)]">
+<!-- Left Column: Conversation List (Fixed 320px) -->
+<aside class="w-[320px] h-full flex flex-col bg-surface-container-lowest border-r border-outline-variant shrink-0">
+<!-- Search -->
+<div class="p-md border-surface-variant">
+<div class="relative flex items-center w-full h-10 rounded-DEFAULT bg-[#F1F3F5] text-on-surface-variant focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-container transition-all">
+<span class="material-symbols-outlined ml-sm text-outline">search</span>
+<input class="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm" placeholder="Search conversations..." type="text"/>
+</div>
+</div><!-- Channel & Tag Filters -->
+<div class="px-md pb-md border-b border-surface-variant space-y-md">
+<!-- Channel Filters -->
+<div class="flex items-center justify-between pt-md">
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-high text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]">block</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-sm hover:shadow-md transition-shadow">
+<img alt="Google" class="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCGC0l2Dhvn2D2PtxHehe2HetcEC9G-tW7pM0ay9dNDG6hDJ7dWaHpvuW6GVGzJ2GBwn3fnLH9r5eUhZfI9u0i-K1PoOopSGVYL3rpMGWpaacG2xUp-FxXmA_RkHc-ZZpfJ1Sy3WhuOFEHEp28RcqVXy4Wo0xihhq9VTWsJqfgUcHJD88cMdn1onCVD5drmwbK4-w14fNwI0Y57S0VG0VLAG0KKyvIkdYI1RV1J6KYEyuCzKFRiv8Sj6kA5-Orwlt5mU6INngDngg"/>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-[#25D366] hover:opacity-90 transition-opacity">
+<svg class="w-5 h-5 fill-white" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"></path></svg>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-[#0088CC] hover:opacity-90 transition-opacity">
+<svg class="w-5 h-5 fill-white" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18.717-3.956 16.323-4.108 17.078-.15.753-.541.904-.977.677-.435-.226-7.375-4.835-7.977-5.286-.602-.451-.677-.977 0-1.579.677-.601 5.941-5.414 6.318-5.714.376-.3.451-.677 0-.902-.451-.226-6.618-4.212-7.22-4.662-.601-.45-.451-1.053 0-1.278.451-.225 13.684-5.414 14.135-5.564.451-.15.827.15.827.827a42.98 42.98 0 01-.152 5.564z" transform="translate(2 2) scale(0.8)"></path></svg>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-[#A334FF] hover:opacity-90 transition-opacity">
+<svg class="w-5 h-5 fill-white" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.644 6.612 4.212 8.627V24l4.088-2.242c1.178.327 2.417.503 3.699.503 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.2 15.011l-3.056-3.261-5.967 3.261 6.563-6.972 3.128 3.261 5.896-3.261-6.564 6.972z"></path></svg>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">chat_bubble</span>
+</button>
+</div>
+<!-- Tag Filters -->
+<div class="flex flex-wrap gap-xs">
+<button class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-label-caps hover:bg-slate-200 transition-colors">All</button>
+<button class="px-3 py-1 rounded-full bg-orange-50 text-orange-600 text-label-caps border border-orange-100 hover:bg-orange-100 transition-colors">Problem</button>
+<button class="px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-label-caps border border-blue-100 hover:bg-blue-100 transition-colors">Request</button>
+<button class="px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-label-caps border border-purple-100 hover:bg-purple-100 transition-colors">Returns</button>
+<button class="px-3 py-1 rounded-full bg-green-50 text-green-600 text-label-caps border border-green-100 hover:bg-green-100 transition-colors">Others</button>
+</div>
+</div>
+<!-- List -->
+<div class="flex-1 overflow-y-auto p-sm space-y-sm">
+<!-- Active Conversation Card -->
+<div class="relative p-sm rounded-lg border border-outline-variant bg-surface-container cursor-pointer flex gap-sm items-start">
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary-container rounded-r-full"></div>
+<div class="relative shrink-0 ml-1">
+<img alt="Sarah Jenkins" class="w-10 h-10 rounded-full object-cover" data-alt="professional portrait of young woman with short brown hair" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5hFdl_UbU4cgBIxjdL0cc0pf964ZU3v0LpKIsfvkAGLp69wAD119IfKHGoGiVHvGiM5CGxVAy1oV07n6J6QdObYs10g4TsaM6xpTECq68jA0S9VJX4JfHNa4PYRFytmRsLQonCREEAi_0PMKKeipSrdMd8rHiZT0_vK6jf6Yp1_k-8KFfSX_l2GKNLqrINc2XKUCyixFNCRlAYn1dDL2NKBNYRYSuMBtMqIbNy8xkwORZYNdu4wN0sHBssiSZVVuDEK14y2q0Z_M"/>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-surface-container rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<span class="font-body-md text-body-md font-semibold text-on-surface truncate">Sarah Jenkins</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">10:42 AM</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">I'm having trouble accessing the new billing portal.</p>
+</div>
+</div>
+<!-- Inactive Cards -->
+<div class="relative p-sm rounded-lg border border-transparent hover:bg-surface-container-high cursor-pointer flex gap-sm items-start transition-colors">
+<div class="relative shrink-0 ml-1">
+<img alt="Marcus Chen" class="w-10 h-10 rounded-full object-cover" data-alt="headshot of smiling man with glasses" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYoS1jZQkSEmywRrqCcWmkd4aSrRdbUFqp0fojwSGzIoru8wes6qvYnQmBB-VPJ86lRR7qbL_iFBIBX3rpsS8Pv-FvwztHZZ42xTGsHAULi9GptQytrylSmNVQ8J-tvUGIRPGldeaOB2N8EPRqghoQsq9QRhrslXNHFO_qp0wJTUAMlxJEfGMIAbxSBXy6DzqUem3zr_oeI60VCQfZn8956odN7wUO_qSVzEBJP4TYC-wYERAjKN6j_iA8lDztgNxa_3mmDiYV--U"/>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-slate-300 border-2 border-surface-container-lowest rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<span class="font-body-md text-body-md font-medium text-on-surface truncate">Marcus Chen</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">09:15 AM</span>
+</div>
+<p class="font-body-sm text-body-sm text-outline truncate">Thanks for resolving the issue!</p>
+</div>
+</div>
+<div class="relative p-sm rounded-lg border border-transparent hover:bg-surface-container-high cursor-pointer flex gap-sm items-start transition-colors">
+<div class="relative shrink-0 ml-1">
+<div class="w-10 h-10 rounded-full bg-primary-fixed-dim text-on-primary-fixed-variant flex items-center justify-center font-h2 text-h2">
+                            EL
+                        </div>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-surface-container-lowest rounded-full"></div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-1">
+<span class="font-body-md text-body-md font-medium text-on-surface truncate">Elena Lopez</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Yesterday</span>
+</div>
+<p class="font-body-sm text-body-sm text-outline truncate">Can we schedule a demo for the team?</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Center Column: Active Chat Window (Fluid) -->
+<section class="flex-1 flex flex-col bg-surface-container-low relative min-w-0">
+<!-- Chat Header -->
+<div class="h-[72px] px-md py-sm border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between shrink-0">
+<div class="flex items-center gap-md">
+<div class="relative">
+<img alt="Sarah Jenkins" class="w-12 h-12 rounded-full object-cover" data-alt="professional portrait of young woman with short brown hair" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRp_pCyXz7iYenb7t2HCHfDn2HtaK6GPKHDD4ATwIwbbYCVtJLa8ULvQgEUS2f3UhuaP0B9btQVL2FV2VkVz7fD6mU0AH2LUt03StCiWCAIeSwgpKnfQJEZbx2zOa3cppJjs28DZE2GVDUHP-SgIAUPb_TTsDoGIPTUTxLGHUgIyMp7aH5CXCk-BpVQcQSmJiQueXZJlWNrEFl5tMHhQABZVA8KeBq4wDptJSWqCSDDi83yFRxkdXcrj6STiYFxCWT9UvTPUG6vus"/>
+<div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container-lowest rounded-full"></div>
+</div>
+<div>
+<h2 class="font-h2 text-h2 text-on-surface">Sarah Jenkins</h2>
+<div class="flex items-center gap-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px]">business</span>
+<span>Acme Corp</span>
+<span class="mx-1">•</span>
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span>Local time: 10:45 AM</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<button class="h-10 px-md rounded-full bg-surface-variant text-on-surface font-body-md text-body-md font-medium hover:bg-surface-dim transition-colors flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+<button class="h-10 px-lg rounded-full bg-[#7C4DFF] text-white font-body-md text-body-md font-medium hover:bg-[#6833ea] transition-colors flex items-center gap-xs shadow-sm">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+                        Resolve
+                    </button>
+</div>
+</div>
+<!-- Message History -->
+<div class="flex-1 overflow-y-auto p-lg flex flex-col gap-lg">
+<!-- Date Divider -->
+<div class="flex justify-center">
+<span class="px-sm py-xs bg-surface-variant rounded-full font-label-caps text-label-caps text-on-surface-variant">Today</span>
+</div>
+<!-- User Message -->
+<div class="flex gap-md max-w-[80%]">
+<img alt="Sarah Jenkins" class="w-8 h-8 rounded-full object-cover shrink-0 mt-1" data-alt="professional portrait of young woman with short brown hair" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_GOkIZ3md93P8wedUhe0v8hYsuPrg3rr1CBW_-fcb4sd3iNKyaKNLwjbMcBNGE0IMPX613NPGRaLhN8WwOPQoSLboqgbRC1lNoMOOnzF-ghUQWDADMFTKqg4CUZ28uspNoYlIb3p6E50aAA0lqmrF2AljaD65ckjzZbtmbDX0TQh0rf0ImoCCdBvDdc_CGLuw63gg3UWxxAvBz965ffAdjipc2M8PLaNB8aN7iUCzgB-ua2yp4GEW3C7O8iSV5J0IOe6ZuTJEAcg"/>
+<div class="flex flex-col gap-xs">
+<div class="flex items-baseline gap-sm">
+<span class="font-body-sm text-body-sm font-medium text-on-surface">Sarah Jenkins</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant font-normal">10:42 AM</span>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-md rounded-xl rounded-tl-sm text-on-surface font-body-md text-body-md shadow-sm">
+<p>Hi team, I'm trying to access the new billing portal but it keeps throwing a 403 error. I need to download last month's invoice urgently.</p>
+<img alt="Screenshot of error" class="mt-sm rounded-lg max-w-sm border border-outline-variant" data-alt="screenshot of a software interface showing a 403 forbidden error message in a modal dialog" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADfpElVd1rgnuXzdibjAmOB5ew8rzCwx34lbmqGFOtcCNxtNUcUSdVvNTfNfn2mGhDMQUZwzgb8xvnw-3NYVSSCD7Ctu-EqwSPt3S-TPAjZL3NG1sB9U3CMwEOMmRJhrY6sLlSsql-8P-l0ifFffnRJQ9OHRZOUMkzylaXZ98OJ2f-NPAf7JDYnHDIO-BqMVdwbvZSoORrOSPMVzWiUEwqBS2i7R4eOc4fD3mCh12a3B2Cu7rEiT7mCU1OSEaKhxly236GK5Ki0R0"/>
+</div>
+</div>
+</div>
+<!-- Agent Message -->
+<div class="flex gap-md max-w-[80%] self-end flex-row-reverse">
+<img alt="Current Agent" class="w-8 h-8 rounded-full object-cover shrink-0 mt-1 border border-surface-variant" data-alt="close up portrait of a professional woman with warm smile in soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCb1hOWKOywNF2wm92DPRG7ybc_aREl5Qe_Lr-FzGjXV_yKaaEAwlXxjnPQMM2biRDRdvRREvod7yntHmPy9s1dBVPqrwt7d8WeJSd--SxNKzLv82h4p2yWrKf2Mmqaa-clsnF4dikri-gW7tUX_19fCyFzrza4NUf68MJj1mDomKWKontzoNKIk_EJ8ngaT7CmWUuENyuIiRzZMlUWOUX_dbU_AAx0-PLvnECg7IlA9Yw9xt2gdHWPdjTwVxw3YafXwLa8ynYM9oI"/>
+<div class="flex flex-col gap-xs items-end">
+<div class="flex items-baseline gap-sm flex-row-reverse">
+<span class="font-body-sm text-body-sm font-medium text-on-surface">You</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant font-normal">10:44 AM</span>
+</div>
+<div class="bg-primary-fixed p-md rounded-xl rounded-tr-sm text-on-primary-fixed font-body-md text-body-md shadow-sm">
+<p>Hi Sarah! I'm sorry to hear you're running into that error. Let me check your account permissions right away.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Input Area -->
+<div class="p-md bg-surface-container-lowest border-t border-outline-variant">
+<div class="flex items-end gap-sm bg-[#F1F3F5] rounded-xl p-xs border border-transparent focus-within:bg-white focus-within:border-primary-container focus-within:shadow-sm transition-all min-h-[56px]">
+<button class="p-sm text-outline hover:text-on-surface transition-colors shrink-0">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<textarea class="w-full bg-transparent border-none text-body-md text-on-surface focus:ring-0 resize-none py-sm min-h-[40px] max-h-[120px] overflow-y-auto" placeholder="Type a message..." rows="1"></textarea>
+<button class="p-sm text-outline hover:text-on-surface transition-colors shrink-0">
+<span class="material-symbols-outlined">mood</span>
+</button>
+<button class="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center shrink-0 hover:bg-surface-tint transition-colors ml-xs">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Right Column: Context & Details (Fixed 300px) -->
+<aside class="w-[300px] h-full flex flex-col bg-surface-container-lowest border-l border-outline-variant shrink-0 overflow-y-auto">
+<!-- Customer Details Section -->
+<div class="p-lg border-b border-surface-variant flex flex-col gap-md">
+<h3 class="font-body-sm text-body-sm font-semibold text-on-surface uppercase tracking-wider">Customer Details</h3>
+<div class="flex flex-col gap-sm font-body-sm text-body-sm">
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Email</span>
+<span class="text-on-surface font-medium truncate ml-2">sarah.j@acmecorp.com</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Plan</span>
+<span class="text-on-surface font-medium">Enterprise</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-surface-variant">LTV</span>
+<span class="text-on-surface font-medium">$12,450</span>
+</div>
+</div>
+<!-- Tags -->
+<div class="flex flex-wrap gap-xs mt-xs">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-caps text-label-caps">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span> VIP
+                    </span>
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-caps text-label-caps">
+                        Billing Issue
+                    </span>
+</div>
+</div>
+<!-- AI Suggestions (Glassmorphism inspired card inside panel) -->
+<div class="p-md">
+<div class="rounded-xl bg-gradient-to-br from-surface-container-low to-surface-container-highest border border-outline-variant p-md relative overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+<div class="absolute top-0 right-0 p-sm text-primary-container opacity-20">
+<span class="material-symbols-outlined text-4xl">auto_awesome</span>
+</div>
+<h3 class="font-body-sm text-body-sm font-semibold text-on-surface flex items-center gap-xs mb-sm">
+<span class="material-symbols-outlined text-[18px] text-primary-container">auto_awesome</span>
+                        AI Suggested Action
+                    </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-md relative z-10">
+                        Sarah was recently migrated to the V2 billing infrastructure. Her permissions may need to be refreshed.
+                    </p>
+<button class="w-full py-2 px-md rounded-lg bg-white border border-outline-variant text-primary font-body-sm text-body-sm font-medium hover:bg-surface-container-low transition-colors shadow-sm relative z-10">
+                        Run Permission Sync
+                    </button>
+</div>
+</div>
+<!-- Quick Replies -->
+<div class="p-lg flex-1 flex flex-col gap-md">
+<h3 class="font-body-sm text-body-sm font-semibold text-on-surface uppercase tracking-wider">Quick Replies</h3>
+<div class="flex flex-col gap-sm">
+<button class="text-left p-sm rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container transition-colors font-body-sm text-body-sm text-on-surface truncate">
+                        "I've refreshed your permissions. Please try logging in again."
+                    </button>
+<button class="text-left p-sm rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container transition-colors font-body-sm text-body-sm text-on-surface truncate">
+                        "Here is a direct link to your latest invoice: [Link]"
+                    </button>
+<button class="text-left p-sm rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container transition-colors font-body-sm text-body-sm text-on-surface truncate">
+                        "Let me escalate this to our billing engineering team."
+                    </button>
+</div>
+</div>
+</aside>
+</main>
+</body></html>
