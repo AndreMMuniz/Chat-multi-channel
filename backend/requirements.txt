@@ -16,3 +16,4 @@ python-telegram-bot
 supabase
 alembic
 email-validator
+slowapi

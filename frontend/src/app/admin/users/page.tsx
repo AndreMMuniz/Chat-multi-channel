@@ -16,6 +16,7 @@ interface User {
   full_name: string;
   avatar?: string;
   is_active: boolean;
+  is_approved: boolean;
   created_at: string;
   user_type_id: string;
   user_type: UserType;
@@ -40,13 +41,13 @@ const ROLE_BADGE: Record<string, string> = {
   USER: "bg-slate-50 text-slate-600 border border-slate-200",
 };
 
+const inputCls = "w-full h-10 px-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:bg-white focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all placeholder:text-slate-400";
+const selectCls = inputCls + " cursor-pointer";
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" 
-        onClick={onClose} 
-      />
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#E9ECEF] shrink-0">
           <h3 className="font-semibold text-slate-900 text-lg">{title}</h3>
@@ -54,9 +55,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
-        <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
-          {children}
-        </div>
+        <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">{children}</div>
       </div>
     </div>
   );
@@ -71,11 +70,12 @@ function FieldGroup({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-const inputCls = "w-full h-10 px-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:bg-white focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all placeholder:text-slate-400";
-const selectCls = inputCls + " cursor-pointer";
+type Tab = "active" | "pending";
 
 export default function UsersPage() {
+  const [tab, setTab] = useState<Tab>("active");
   const [users, setUsers] = useState<User[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [userTypes, setUserTypes] = useState<UserType[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -91,15 +91,19 @@ export default function UsersPage() {
   const [editError, setEditError] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
+  const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [usersRes, typesRes] = await Promise.all([
+      const [usersRes, pendingRes, typesRes] = await Promise.all([
         apiFetch("/admin/users"),
+        apiFetch("/admin/users/pending"),
         apiFetch("/admin/user-types"),
       ]);
       if (usersRes.ok) setUsers(await usersRes.json());
       else setError("Failed to load users. Check your permissions.");
+      if (pendingRes.ok) setPendingUsers(await pendingRes.json());
       if (typesRes.ok) setUserTypes(await typesRes.json());
     } catch {
       setError("Connection error.");
@@ -121,10 +125,7 @@ export default function UsersPage() {
     setCreateError("");
     setCreateLoading(true);
     try {
-      const res = await apiFetch("/admin/users", {
-        method: "POST",
-        body: JSON.stringify(createForm),
-      });
+      const res = await apiFetch("/admin/users", { method: "POST", body: JSON.stringify(createForm) });
       const data = await res.json();
       if (!res.ok) { setCreateError(data.detail || "Failed to create user."); return; }
       setShowCreate(false);
@@ -148,10 +149,7 @@ export default function UsersPage() {
     setEditError("");
     setEditLoading(true);
     try {
-      const res = await apiFetch(`/admin/users/${editingUser.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(editForm),
-      });
+      const res = await apiFetch(`/admin/users/${editingUser.id}`, { method: "PATCH", body: JSON.stringify(editForm) });
       const data = await res.json();
       if (!res.ok) { setEditError(data.detail || "Failed to update user."); return; }
       setEditingUser(null);
@@ -169,6 +167,27 @@ export default function UsersPage() {
     if (res.ok) loadData();
   };
 
+  const handleApprove = async (userId: string) => {
+    setApprovalLoading(userId);
+    try {
+      const res = await apiFetch(`/admin/users/${userId}/approve`, { method: "POST" });
+      if (res.ok) loadData();
+    } finally {
+      setApprovalLoading(null);
+    }
+  };
+
+  const handleReject = async (userId: string) => {
+    if (!confirm("Reject and permanently delete this user request?")) return;
+    setApprovalLoading(userId);
+    try {
+      const res = await apiFetch(`/admin/users/${userId}/reject`, { method: "POST" });
+      if (res.ok) loadData();
+    } finally {
+      setApprovalLoading(null);
+    }
+  };
+
   const filtered = users.filter(
     (u) =>
       u.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -179,14 +198,37 @@ export default function UsersPage() {
     <>
       {/* Header */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-[#E9ECEF] bg-white shrink-0">
-        <h1 className="text-[18px] font-semibold text-slate-900">Users</h1>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 h-9 px-4 bg-[#7C4DFF] hover:bg-[#632ce5] text-white text-sm font-semibold rounded-lg transition-colors"
-        >
-          <span className="material-symbols-outlined text-[18px]">person_add</span>
-          New User
-        </button>
+        <div className="flex items-center gap-6">
+          <h1 className="text-[18px] font-semibold text-slate-900">Users</h1>
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            <button
+              onClick={() => setTab("active")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${tab === "active" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setTab("pending")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${tab === "pending" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Pending approval
+              {pendingUsers.length > 0 && (
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#7C4DFF] text-white text-[10px] font-bold">
+                  {pendingUsers.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+        {tab === "active" && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 h-9 px-4 bg-[#7C4DFF] hover:bg-[#632ce5] text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">person_add</span>
+            New User
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -198,101 +240,160 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="relative mb-4 max-w-sm">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 rounded-lg bg-white border border-[#E9ECEF] text-sm text-slate-900 outline-none focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all"
-          />
-        </div>
+        {/* ── Active users tab ── */}
+        {tab === "active" && (
+          <>
+            <div className="relative mb-4 max-w-sm">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-10 pl-9 pr-3 rounded-lg bg-white border border-[#E9ECEF] text-sm text-slate-900 outline-none focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all"
+              />
+            </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-[#E9ECEF] overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#E9ECEF] bg-slate-50">
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3.5">User</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Role</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Status</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Created</th>
-                <th className="px-4 py-3.5 w-24" />
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
-                    <span className="material-symbols-outlined text-3xl animate-spin block mb-2">progress_activity</span>
-                    Loading users...
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
-                    {search ? "No users match your search." : "No users yet. Create the first one."}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((u) => (
-                  <tr key={u.id} className="border-b border-[#F1F3F5] last:border-0 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        {u.avatar ? (
-                          <img src={u.avatar} alt={u.full_name} className="w-9 h-9 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-purple-100 text-[#632ce5] flex items-center justify-center text-xs font-bold shrink-0">
-                            {u.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{u.full_name}</p>
-                          <p className="text-xs text-slate-500">{u.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_BADGE[u.user_type?.base_role] || ROLE_BADGE.USER}`}>
-                        {u.user_type?.name || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${u.is_active ? "bg-green-50 text-green-700 border border-green-200" : "bg-slate-50 text-slate-500 border border-slate-200"}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? "bg-green-500" : "bg-slate-400"}`} />
-                        {u.is_active ? "Active" : "Disabled"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-xs text-slate-500">
-                      {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button
-                          onClick={() => openEdit(u)}
-                          title="Edit"
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#7C4DFF] hover:bg-purple-50 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
-                        <button
-                          onClick={() => toggleStatus(u)}
-                          title={u.is_active ? "Disable" : "Enable"}
-                          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${u.is_active ? "text-slate-400 hover:text-red-500 hover:bg-red-50" : "text-slate-400 hover:text-green-600 hover:bg-green-50"}`}
-                        >
-                          <span className="material-symbols-outlined text-[18px]">{u.is_active ? "block" : "check_circle"}</span>
-                        </button>
-                      </div>
-                    </td>
+            <div className="bg-white rounded-xl border border-[#E9ECEF] overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[#E9ECEF] bg-slate-50">
+                    <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3.5">User</th>
+                    <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Role</th>
+                    <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Status</th>
+                    <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Created</th>
+                    <th className="px-4 py-3.5 w-24" />
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-slate-400 mt-3">{filtered.length} {filtered.length === 1 ? "user" : "users"}</p>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
+                        <span className="material-symbols-outlined text-3xl animate-spin block mb-2">progress_activity</span>
+                        Loading users...
+                      </td>
+                    </tr>
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
+                        {search ? "No users match your search." : "No users yet. Create the first one."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((u) => (
+                      <tr key={u.id} className="border-b border-[#F1F3F5] last:border-0 hover:bg-slate-50/50 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            {u.avatar ? (
+                              <img src={u.avatar} alt={u.full_name} className="w-9 h-9 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-purple-100 text-[#632ce5] flex items-center justify-center text-xs font-bold shrink-0">
+                                {u.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">{u.full_name}</p>
+                              <p className="text-xs text-slate-500">{u.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_BADGE[u.user_type?.base_role] || ROLE_BADGE.USER}`}>
+                            {u.user_type?.name || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${u.is_active ? "bg-green-50 text-green-700 border border-green-200" : "bg-slate-50 text-slate-500 border border-slate-200"}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? "bg-green-500" : "bg-slate-400"}`} />
+                            {u.is_active ? "Active" : "Disabled"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-slate-500">
+                          {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1 justify-end">
+                            <button onClick={() => openEdit(u)} title="Edit" className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#7C4DFF] hover:bg-purple-50 transition-colors">
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                            </button>
+                            <button
+                              onClick={() => toggleStatus(u)}
+                              title={u.is_active ? "Disable" : "Enable"}
+                              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${u.is_active ? "text-slate-400 hover:text-red-500 hover:bg-red-50" : "text-slate-400 hover:text-green-600 hover:bg-green-50"}`}
+                            >
+                              <span className="material-symbols-outlined text-[18px]">{u.is_active ? "block" : "check_circle"}</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-slate-400 mt-3">{filtered.length} {filtered.length === 1 ? "user" : "users"}</p>
+          </>
+        )}
+
+        {/* ── Pending approval tab ── */}
+        {tab === "pending" && (
+          <>
+            {loading ? (
+              <div className="flex items-center justify-center py-16 text-sm text-slate-400">
+                <span className="material-symbols-outlined text-3xl animate-spin block mr-3">progress_activity</span>
+                Loading...
+              </div>
+            ) : pendingUsers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center mb-4">
+                  <span className="material-symbols-outlined text-green-500 text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                </div>
+                <p className="text-sm font-medium text-slate-700 mb-1">No pending requests</p>
+                <p className="text-xs text-slate-400">All signup requests have been reviewed.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingUsers.map((u) => (
+                  <div key={u.id} className="bg-white rounded-xl border border-[#E9ECEF] p-5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-bold shrink-0">
+                        {u.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{u.full_name}</p>
+                        <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Requested {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleReject(u.id)}
+                        disabled={approvalLoading === u.id}
+                        className="h-9 px-4 rounded-lg border border-[#E9ECEF] text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 transition-colors"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleApprove(u.id)}
+                        disabled={approvalLoading === u.id}
+                        className="h-9 px-4 rounded-lg bg-[#7C4DFF] hover:bg-[#632ce5] text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                      >
+                        {approvalLoading === u.id ? (
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]">check</span>
+                        )}
+                        Approve
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Create Modal */}
@@ -306,7 +407,7 @@ export default function UsersPage() {
               <input type="email" required value={createForm.email} onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))} placeholder="jane@company.com" className={inputCls} />
             </FieldGroup>
             <FieldGroup label="Password">
-              <input type="password" required minLength={8} value={createForm.password} onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))} placeholder="Min. 8 characters" className={inputCls} />
+              <input type="password" required minLength={8} value={createForm.password} onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))} placeholder="Min. 8 chars with uppercase, number & symbol" className={inputCls} />
             </FieldGroup>
             <FieldGroup label="Role">
               <select value={createForm.user_type_id} onChange={(e) => setCreateForm((f) => ({ ...f, user_type_id: e.target.value }))} required className={selectCls}>

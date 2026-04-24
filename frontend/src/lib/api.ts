@@ -1,10 +1,5 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token');
-}
-
 export function getStoredUser<T = unknown>(): T | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -15,34 +10,50 @@ export function getStoredUser<T = unknown>(): T | null {
   }
 }
 
-export function setAuth(accessToken: string, refreshToken: string, user: object) {
-  localStorage.setItem('auth_token', accessToken);
-  localStorage.setItem('auth_refresh_token', refreshToken);
+export function setAuth(user: object) {
   localStorage.setItem('auth_user', JSON.stringify(user));
-  const expires = new Date(Date.now() + 3600 * 1000).toUTCString();
-  document.cookie = `auth_token=${accessToken}; path=/; samesite=lax; expires=${expires}`;
 }
 
 export function clearAuth() {
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('auth_refresh_token');
   localStorage.removeItem('auth_user');
-  document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+}
+
+let _refreshing: Promise<boolean> | null = null;
+
+async function _tryRefresh(): Promise<boolean> {
+  if (_refreshing) return _refreshing;
+  _refreshing = fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
+    .then((r) => r.ok)
+    .catch(() => false)
+    .finally(() => { _refreshing = null; });
+  return _refreshing;
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...((init.headers as Record<string, string>) || {}),
     },
   });
+
   if (res.status === 401) {
+    const refreshed = await _tryRefresh();
+    if (refreshed) {
+      return fetch(`${BASE}${path}`, {
+        ...init,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...((init.headers as Record<string, string>) || {}),
+        },
+      });
+    }
     clearAuth();
     window.location.href = '/login';
   }
+
   return res;
 }

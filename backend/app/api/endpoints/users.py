@@ -10,6 +10,7 @@ from app.schemas.user import (
     UserTypeCreate, UserTypeUpdate, UserTypeResponse,
 )
 from app.services.audit_service import log_action
+from app.core.email import send_approval_email
 
 router = APIRouter()
 
@@ -140,8 +141,14 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("can_manage_users")),
 ):
-    """List all internal users."""
-    users = db.query(User).options(joinedload(User.user_type)).order_by(User.full_name).all()
+    """List approved users (excludes pending signups)."""
+    users = (
+        db.query(User)
+        .options(joinedload(User.user_type))
+        .filter(User.is_approved == True)
+        .order_by(User.full_name)
+        .all()
+    )
     return users
 
 
@@ -151,6 +158,23 @@ def get_current_user_profile(
 ):
     """Get the authenticated user's own profile."""
     return current_user
+
+
+# NOTE: /users/pending must be defined before /users/{user_id} to avoid route conflict
+@router.get("/users/pending", response_model=List[UserResponse])
+def list_pending_users_inline(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_manage_users")),
+):
+    """List users who signed up and are awaiting admin approval."""
+    users = (
+        db.query(User)
+        .options(joinedload(User.user_type))
+        .filter(User.is_approved == False)
+        .order_by(User.created_at.asc())
+        .all()
+    )
+    return users
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
@@ -313,3 +337,59 @@ def enable_user(
     log_action(db, current_user.id, "enable_user", "user", str(user_id),
                details={"email": user.email}, ip_address=get_client_ip(request))
     return {"detail": "User enabled"}
+
+
+# ─── Self-signup approval flow ────────────────────────────────────────────
+
+@router.post("/users/{user_id}/approve", response_model=UserResponse)
+def approve_user(
+    user_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_manage_users")),
+):
+    """Approve a pending signup — activates account and sends notification email."""
+    user = db.query(User).options(joinedload(User.user_type)).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_approved:
+        raise HTTPException(status_code=400, detail="User is already approved")
+
+    user.is_approved = True
+    user.is_active = True
+    db.commit()
+    db.refresh(user)
+
+    send_approval_email(user.email, user.full_name, db)
+
+    log_action(db, current_user.id, "approve_user", "user", str(user_id),
+               details={"email": user.email}, ip_address=get_client_ip(request))
+    return user
+
+
+@router.post("/users/{user_id}/reject")
+def reject_user(
+    user_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_manage_users")),
+):
+    """Reject and remove a pending signup request."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_approved:
+        raise HTTPException(status_code=400, detail="Cannot reject an already approved user")
+
+    supabase = get_supabase()
+    try:
+        supabase.auth.admin.delete_user(user.auth_id)
+    except Exception:
+        pass
+
+    log_action(db, current_user.id, "reject_user", "user", str(user_id),
+               details={"email": user.email}, ip_address=get_client_ip(request))
+
+    db.delete(user)
+    db.commit()
+    return {"detail": "User rejected and removed"}

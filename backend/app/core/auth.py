@@ -6,22 +6,29 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db, get_supabase
 from app.models.models import User, UserType
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    """Verify the Supabase JWT and return the corresponding internal User."""
-    token = credentials.credentials
-    supabase = get_supabase()
+    """Verify Supabase JWT from HttpOnly cookie or Authorization header."""
+    token = credentials.credentials if credentials else None
+    if not token:
+        token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
+    supabase = get_supabase()
     try:
         auth_response = supabase.auth.get_user(token)
         if not auth_response or not auth_response.user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
         auth_id = auth_response.user.id
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
@@ -35,8 +42,11 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User profile not found. Contact an administrator.")
 
+    if not user.is_approved:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account pending admin approval.")
+
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled.")
 
     return user
 

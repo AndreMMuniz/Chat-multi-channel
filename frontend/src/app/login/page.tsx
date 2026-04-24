@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setAuth } from "@/lib/api";
 
@@ -22,6 +23,7 @@ export default function LoginPage() {
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
@@ -29,7 +31,7 @@ export default function LoginPage() {
         setError(data.detail || "Login failed. Check your credentials.");
         return;
       }
-      setAuth(data.access_token, data.refresh_token, data.user);
+      setAuth(data.user);
       router.replace("/");
     } catch {
       setError("Connection error. Check if the server is running.");
@@ -162,6 +164,13 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          <p className="text-center text-sm text-slate-500 mt-6">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="font-semibold text-[#7C4DFF] hover:text-[#632ce5] transition-colors">
+              Request access
+            </Link>
+          </p>
         </div>
       </div>
     </div>

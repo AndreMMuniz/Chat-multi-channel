@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getStoredUser, clearAuth } from "@/lib/api";
+import { getStoredUser, clearAuth, apiFetch } from "@/lib/api";
 
 interface StoredUser {
   full_name: string;
@@ -34,7 +34,8 @@ export default function SideNavBar() {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
     clearAuth();
     router.replace("/login");
   };

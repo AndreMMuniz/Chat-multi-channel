@@ -1,8 +1,28 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+import re
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
 from app.models.models import DefaultRole
+
+
+# --- Password validation ---
+
+def validate_password_strength(v: str) -> str:
+    errors = []
+    if len(v) < 8:
+        errors.append("at least 8 characters")
+    if not re.search(r'[A-Z]', v):
+        errors.append("at least one uppercase letter")
+    if not re.search(r'[a-z]', v):
+        errors.append("at least one lowercase letter")
+    if not re.search(r'\d', v):
+        errors.append("at least one number")
+    if not re.search(r'[!@#$%^&*()\-_=+\[\]{};:\'",.<>/?\\|`~]', v):
+        errors.append("at least one special character")
+    if errors:
+        raise ValueError("Password must contain: " + ", ".join(errors))
+    return v
 
 
 # --- UserType Schemas ---
@@ -58,9 +78,26 @@ class UserBase(BaseModel):
     full_name: str
     avatar: Optional[str] = None
 
+class UserSignup(BaseModel):
+    """Self-service signup — requires strong password, goes through admin approval."""
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=255)
+    password: str
+
+    @field_validator('password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return validate_password_strength(v)
+
 class UserCreate(UserBase):
+    """Admin-created user — also requires strong password."""
     password: str = Field(..., min_length=8)
     user_type_id: UUID
+
+    @field_validator('password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return validate_password_strength(v)
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -71,11 +108,17 @@ class UserUpdate(BaseModel):
 class UserPasswordChange(BaseModel):
     new_password: str = Field(..., min_length=8)
 
+    @field_validator('new_password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return validate_password_strength(v)
+
 class UserResponse(UserBase):
     id: UUID
     auth_id: str
     user_type_id: UUID
     is_active: bool
+    is_approved: bool
     created_at: datetime
     updated_at: datetime
     user_type: Optional[UserTypeResponse] = None

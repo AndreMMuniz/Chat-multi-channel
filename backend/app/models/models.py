@@ -86,6 +86,7 @@ class User(Base):
 
     user_type_id = Column(UUID(as_uuid=True), ForeignKey("user_types.id"), nullable=False)
     is_active = Column(Boolean, default=True)
+    is_approved = Column(Boolean, default=True)  # False for self-signup users until admin approves
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
