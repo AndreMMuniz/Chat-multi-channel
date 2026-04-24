@@ -29,6 +29,7 @@ export default function ResetPasswordPage() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('Reset password page loaded at:', window.location.href);
     const queryToken = searchParams.get("token") || searchParams.get("access_token") || searchParams.get("code");
 
     // Parse hash as query string
@@ -38,12 +39,9 @@ export default function ResetPasswordPage() {
     const finalToken = queryToken || hashToken;
     setToken(finalToken);
 
-    console.log('Reset password page loaded');
     console.log('Search params:', Object.fromEntries(searchParams.entries()));
     console.log('Hash:', window.location.hash);
     console.log('Hash params:', Object.fromEntries(hashParams.entries()));
-    console.log('Query token:', queryToken);
-    console.log('Hash token:', hashToken);
     console.log('Final token:', finalToken);
 
     if (!finalToken) {
