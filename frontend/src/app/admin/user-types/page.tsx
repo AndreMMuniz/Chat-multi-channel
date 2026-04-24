@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { AnimatePresence } from "framer-motion";
 import { apiFetch } from "@/lib/api";
+import Modal from "@/components/shared/Modal";
 
 interface UserType {
   id: string;
@@ -73,26 +75,6 @@ const BASE_ROLE_BADGE: Record<string, string> = {
   MANAGER: "bg-blue-50 text-blue-700 border border-blue-200",
   USER: "bg-slate-50 text-slate-600 border border-slate-200",
 };
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" 
-        onClick={onClose} 
-      />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[#E9ECEF] shrink-0">
-          <h3 className="font-semibold text-slate-900 text-lg">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
-        </div>
-        <div className="overflow-y-auto flex-1 px-6 py-4 custom-scrollbar">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 type FormState = { name: string; base_role: "ADMIN" | "MANAGER" | "USER" } & Record<PermKey, boolean>;
 
@@ -272,11 +254,13 @@ export default function UserTypesPage() {
       </div>
 
       {/* Create / Edit Modal */}
-      {showModal && (
-        <Modal
-          title={editingType ? `Edit: ${editingType.name}` : "New User Type"}
-          onClose={() => setShowModal(false)}
-        >
+      <AnimatePresence>
+        {showModal && (
+          <Modal
+            title={editingType ? `Edit: ${editingType.name}` : "New User Type"}
+            onClose={() => setShowModal(false)}
+            maxWidth="max-w-lg"
+          >
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Role Name</label>
@@ -354,24 +338,26 @@ export default function UserTypesPage() {
           </form>
         </Modal>
       )}
+      </AnimatePresence>
 
       {/* Delete Confirm */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-red-500 text-[24px]">delete</span>
+      <AnimatePresence>
+        {deleteConfirm && (
+          <Modal title="Confirm Delete" onClose={() => setDeleteConfirm(null)} maxWidth="max-w-sm">
+            <div className="py-2">
+              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                <span className="material-symbols-outlined text-red-500 text-[24px]">delete</span>
+              </div>
+              <h3 className="text-center font-semibold text-slate-900 mb-2">Delete "{deleteConfirm.name}"?</h3>
+              <p className="text-center text-sm text-slate-500 mb-6">This action cannot be undone. Users with this role will need to be reassigned.</p>
+              <div className="flex gap-2.5">
+                <button onClick={() => setDeleteConfirm(null)} className="flex-1 h-10 rounded-lg border border-[#E9ECEF] text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+                <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 h-10 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors">Delete</button>
+              </div>
             </div>
-            <h3 className="text-center font-semibold text-slate-900 mb-2">Delete "{deleteConfirm.name}"?</h3>
-            <p className="text-center text-sm text-slate-500 mb-6">This action cannot be undone. Users with this role will need to be reassigned.</p>
-            <div className="flex gap-2.5">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 h-10 rounded-lg border border-[#E9ECEF] text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-              <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 h-10 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+          </Modal>
+        )}
+      </AnimatePresence>
     </>
   );
 }

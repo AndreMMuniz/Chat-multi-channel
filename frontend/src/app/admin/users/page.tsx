@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { AnimatePresence } from "framer-motion";
 import { apiFetch } from "@/lib/api";
+import Modal from "@/components/shared/Modal";
 
 interface UserType {
   id: string;
@@ -43,23 +45,6 @@ const ROLE_BADGE: Record<string, string> = {
 
 const inputCls = "w-full h-10 px-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:bg-white focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all placeholder:text-slate-400";
 const selectCls = inputCls + " cursor-pointer";
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[#E9ECEF] shrink-0">
-          <h3 className="font-semibold text-slate-900 text-lg">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
-        </div>
-        <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -427,8 +412,9 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
       </div>
 
       {/* Create Modal */}
-      {showCreate && (
-        <Modal title="New User" onClose={() => setShowCreate(false)}>
+      <AnimatePresence>
+        {showCreate && (
+          <Modal title="New User" onClose={() => setShowCreate(false)}>
           <form onSubmit={handleCreate} className="space-y-4">
             <FieldGroup label="Full Name">
               <input type="text" required value={createForm.full_name} onChange={(e) => setCreateForm((f) => ({ ...f, full_name: e.target.value }))} placeholder="Jane Doe" className={inputCls} />
@@ -459,12 +445,14 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
               </button>
             </div>
           </form>
-        </Modal>
-      )}
+          </Modal>
+        )}
+      </AnimatePresence>
 
       {/* Edit Modal */}
-      {editingUser && (
-        <Modal title="Edit User" onClose={() => setEditingUser(null)}>
+      <AnimatePresence>
+        {editingUser && (
+          <Modal title="Edit User" onClose={() => setEditingUser(null)}>
           <form onSubmit={handleEdit} className="space-y-4">
             <FieldGroup label="Full Name">
               <input type="text" required value={editForm.full_name} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} className={inputCls} />
@@ -503,6 +491,7 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
           </form>
         </Modal>
       )}
+      </AnimatePresence>
     </>
   );
 }
