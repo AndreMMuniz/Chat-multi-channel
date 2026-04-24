@@ -413,6 +413,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           conversation_id: activeConversation.id,
           owner_id: user?.id,
+          inbound: false,
           ...payload
         })
       });

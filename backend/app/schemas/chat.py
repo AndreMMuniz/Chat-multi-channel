@@ -28,6 +28,7 @@ class MessageBase(BaseModel):
 class MessageCreate(MessageBase):
     conversation_id: UUID
     owner_id: Optional[UUID] = None
+    inbound: bool = False
 
 class MessageResponse(MessageBase):
     id: UUID
