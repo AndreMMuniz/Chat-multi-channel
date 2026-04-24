@@ -147,6 +147,25 @@ class SetPasswordRequest(BaseModel):
         return validate_password_strength(v)
 
 
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+def forgot_password(data: dict, request: Request):
+    """Send password reset email via Supabase."""
+    email = data.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email required")
+
+    supabase = get_supabase()
+    try:
+        supabase.auth.reset_password_for_email(email, {
+            "redirect_to": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password"
+        })
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to send reset email: {str(e)}")
+
+    return {"detail": "Password reset email sent. Check your inbox."}
+
+
 @router.post("/set-password")
 def set_password(data: SetPasswordRequest, request: Request, db: Session = Depends(get_db)):
     """Set a new password using a Supabase recovery token.
