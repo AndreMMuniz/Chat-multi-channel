@@ -13,6 +13,7 @@ function ResetPasswordPageInner() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
 
