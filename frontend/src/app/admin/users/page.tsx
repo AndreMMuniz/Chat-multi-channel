@@ -139,7 +139,7 @@ export default function UsersPage() {
 
   const openEdit = (u: User) => {
     setEditingUser(u);
-    setEditForm({ full_name: u.full_name, user_type_id: u.user_type_id });
+    setEditForm({ full_name: u.full_name, user_type_id: u.user_type_id, is_active: u.is_active });
     setEditError("");
   };
 
