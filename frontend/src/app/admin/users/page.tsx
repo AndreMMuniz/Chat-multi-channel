@@ -98,6 +98,12 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     }
   }, []);
 
+  useEffect(() => {
+    if (userTypes.length > 0 && !createForm.user_type_id) {
+      setCreateForm((f) => ({ ...f, user_type_id: userTypes[0].id }));
+    }
+  }, [userTypes, createForm.user_type_id]);
+
   useEffect(() => { loadData(); }, [loadData]);
 
   const openCreate = () => {
@@ -113,7 +119,11 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     try {
       const res = await apiFetch("/admin/users", { method: "POST", body: JSON.stringify(createForm) });
       const data = await res.json();
-      if (!res.ok) { setCreateError(data.detail || "Failed to create user."); return; }
+      if (!res.ok) {
+        const errorMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+        setCreateError(errorMsg || "Failed to create user.");
+        return;
+      }
       setShowCreate(false);
       loadData();
     } catch (err: any) {
@@ -137,7 +147,11 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     try {
       const res = await apiFetch(`/admin/users/${editingUser.id}`, { method: "PATCH", body: JSON.stringify(editForm) });
       const data = await res.json();
-      if (!res.ok) { setEditError(data.detail || "Failed to update user."); return; }
+      if (!res.ok) {
+        const errorMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+        setEditError(errorMsg || "Failed to update user.");
+        return;
+      }
       setEditingUser(null);
       loadData();
     } catch (err: any) {

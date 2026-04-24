@@ -135,7 +135,11 @@ export default function UserTypesPage() {
       const method = editingType ? "PATCH" : "POST";
       const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
       const data = await res.json();
-      if (!res.ok) { setFormError(data.detail || "Operation failed."); return; }
+      if (!res.ok) {
+        const errorMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+        setFormError(errorMsg || "Operation failed.");
+        return;
+      }
       setShowModal(false);
       load();
     } catch (err: any) {
