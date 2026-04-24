@@ -1,20 +1,20 @@
 # Chat Multi-Channel
 
-Plataforma de atendimento multi-canal que centraliza conversas de WhatsApp, Telegram, E-mail e SMS em uma única interface, com suporte a IA e controle de acesso granular por perfis.
+A multi-channel customer support platform that centralizes WhatsApp, Telegram, Email, and SMS conversations in a single interface, with AI support and granular role-based access control.
 
 ## Stack
 
-| Camada | Tecnologia |
+| Layer | Technology |
 |---|---|
 | Frontend | Next.js 14 (App Router), Tailwind CSS, Shadcn UI |
 | Backend | Python 3.11, FastAPI, Uvicorn |
-| AI / Agentes | LangGraph, LangChain, OpenAI |
-| Banco de dados | PostgreSQL via SQLAlchemy + Alembic |
+| AI / Agents | LangGraph, LangChain, OpenAI |
+| Database | PostgreSQL via SQLAlchemy + Alembic |
 | Auth | Supabase Auth (JWT) |
-| Canais | Telegram, WhatsApp (Meta Cloud API), E-mail (IMAP/SMTP), SMS (Twilio) |
-| Tempo real | WebSocket nativo (FastAPI) |
+| Channels | Telegram, WhatsApp (Meta Cloud API), Email (IMAP/SMTP), SMS (Twilio) |
+| Real-time | Native WebSocket (FastAPI) |
 
-## Estrutura do projeto
+## Project Structure
 
 ```
 /backend          FastAPI service
@@ -22,8 +22,8 @@ Plataforma de atendimento multi-canal que centraliza conversas de WhatsApp, Tele
     /api
       /endpoints  auth, chat, users, audit, dashboard, upload, telegram, settings
     /core         database, auth, config, websocket, checkpointer
-    /models       modelos SQLAlchemy (User, Conversation, Message, etc.)
-    /schemas      schemas Pydantic
+    /models       SQLAlchemy models (User, Conversation, Message, etc.)
+    /schemas      Pydantic schemas
     /services     telegram_service, storage_service, audit_service
   main.py
   requirements.txt
@@ -32,41 +32,41 @@ Plataforma de atendimento multi-canal que centraliza conversas de WhatsApp, Tele
   /src
     /app          login, dashboard, admin (users, user-types, settings)
     /components   SideNavBar, ClientLayout, AudioMessage
-    /lib          api.ts (cliente HTTP)
+    /lib          api.ts (HTTP client)
 ```
 
-## Funcionalidades implementadas
+## Implemented Features
 
 ### Backend
-- Autenticação JWT integrada ao Supabase Auth
-- RBAC com `UserType` customizável — permissões granulares por papel (ver todas as conversas, deletar mensagens, gerenciar usuários, alterar configurações, ver audit logs, etc.)
-- Modelos completos: `User`, `UserType`, `Contact`, `Conversation`, `Message`, `AISuggestion`, `QuickReply`, `GeneralSettings`, `AuditLog`
-- API REST em `/api/v1` com os grupos: `auth`, `chat`, `upload`, `telegram`, `admin` (users, audit, dashboard, settings)
-- Sugestões de resposta por IA via LangGraph
-- Webhook do Telegram
-- Upload de arquivos/mídia
-- WebSocket para entrega de mensagens em tempo real
-- Migrations via Alembic
+- JWT authentication integrated with Supabase Auth
+- RBAC with customizable `UserType` — granular permissions per role (view all conversations, delete messages, manage users, change settings, view audit logs, etc.)
+- Full model set: `User`, `UserType`, `Contact`, `Conversation`, `Message`, `AISuggestion`, `QuickReply`, `GeneralSettings`, `AuditLog`
+- REST API at `/api/v1` with groups: `auth`, `chat`, `upload`, `telegram`, `admin` (users, audit, dashboard, settings)
+- AI reply suggestions via LangGraph
+- Telegram webhook
+- File/media upload
+- WebSocket for real-time message delivery
+- Database migrations via Alembic
 
 ### Frontend
-- Tela de login
-- Dashboard de conversas
-- Painel admin: gestão de usuários, tipos de usuário (RBAC), configurações gerais da plataforma
-- Integração com a API via `lib/api.ts`
+- Login screen
+- Conversation dashboard
+- Admin panel: user management, user types (RBAC), general platform settings
+- API integration via `lib/api.ts`
 
-### Settings (configurações da plataforma)
-- Branding: nome do app, logo, cores (primária, secundária, accent)
-- IA: provider e modelo (ex.: OpenRouter + gpt-4o-mini)
+### Platform Settings
+- Branding: app name, logo, colors (primary, secondary, accent)
+- AI: provider and model (e.g. OpenRouter + gpt-4o-mini)
 - WhatsApp: Phone ID, Account ID, Access Token, Webhook Token
-- E-mail: IMAP e SMTP (host, porta, endereço, senha)
-- SMS: Twilio Account SID, Auth Token, número
+- Email: IMAP and SMTP (host, port, address, password)
+- SMS: Twilio Account SID, Auth Token, phone number
 
-## Primeiros passos
+## Getting Started
 
-### Pré-requisitos
+### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL (ou projeto Supabase)
+- PostgreSQL (or a Supabase project)
 
 ### Backend
 
@@ -81,11 +81,11 @@ source venv/bin/activate
 .\venv\Scripts\Activate.ps1
 
 pip install -r requirements.txt
-cp .env.example .env   # preencha as variáveis
+cp .env.example .env   # fill in your keys
 python main.py
 ```
 
-A API sobe em `http://localhost:8000` e a documentação interativa em `http://localhost:8000/docs`.
+The API runs at `http://localhost:8000` and the interactive docs at `http://localhost:8000/docs`.
 
 ### Frontend
 
@@ -95,9 +95,9 @@ npm install
 npm run dev
 ```
 
-O app sobe em `http://localhost:3000`.
+The app runs at `http://localhost:3000`.
 
-## Variáveis de ambiente (backend)
+## Environment Variables (backend)
 
 ```env
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
@@ -107,11 +107,11 @@ SECRET_KEY=
 TELEGRAM_BOT_TOKEN=
 ```
 
-## Canais suportados
+## Channel Status
 
-| Canal | Status |
+| Channel | Status |
 |---|---|
-| Telegram | Integrado (webhook) |
-| WhatsApp | Configuração via Settings (Meta Cloud API) |
-| E-mail | Configuração via Settings (IMAP/SMTP) |
-| SMS | Configuração via Settings (Twilio) |
+| Telegram | Integrated (webhook) |
+| WhatsApp | Configurable via Settings (Meta Cloud API) |
+| Email | Configurable via Settings (IMAP/SMTP) |
+| SMS | Configurable via Settings (Twilio) |
