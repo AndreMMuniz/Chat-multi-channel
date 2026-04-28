@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { authApi } from "@/lib/api/index";
 
 interface PasswordRule {
   label: string;
@@ -91,22 +90,10 @@ export default function RecoveryPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API}/auth/set-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ new_password: password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail || "Failed to set password. The link may have expired.");
-        return;
-      }
+      await authApi.setPassword(token, password);
       setState("success");
-    } catch {
-      setError("Connection error. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connection error. Please try again.");
     } finally {
       setSubmitting(false);
     }

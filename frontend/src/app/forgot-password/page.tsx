@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { authApi } from "@/lib/api/index";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -16,19 +15,10 @@ export default function ForgotPasswordPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(`${API}/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail || "Failed to send reset email");
-        return;
-      }
+      await authApi.forgotPassword(email);
       setSuccess(true);
-    } catch {
-      setError("Connection error. Check if the server is running.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connection error.");
     } finally {
       setLoading(false);
     }

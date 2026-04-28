@@ -1,25 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch, getStoredUser } from "@/lib/api";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-interface DayPoint { date: string; count: number }
-interface Stats {
-  total_conversations: number;
-  open_conversations: number;
-  closed_conversations: number;
-  pending_conversations: number;
-  unread_conversations: number;
-  messages_today: number;
-  resolution_rate: number;
-  channels: Record<string, number>;
-  daily_conversations: DayPoint[];
-  daily_messages: DayPoint[];
-}
-
-interface StoredUser { full_name: string; avatar?: string; user_type?: { can_manage_users: boolean } }
+import { getStoredUser } from "@/lib/api";
+import { dashboardApi } from "@/lib/api/index";
+import type { DashboardStats, DayPoint } from "@/types/chat";
+import type { StoredUser } from "@/types/auth";
 
 // ── Channel config ─────────────────────────────────────────────────────────
 
@@ -115,7 +100,7 @@ function DonutChart({ open, closed, pending, total }: { open: number; closed: nu
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [user, setUser] = useState<StoredUser | null>(null);
@@ -123,16 +108,9 @@ export default function DashboardPage() {
   useEffect(() => {
     setUser(getStoredUser<StoredUser>());
 
-    apiFetch("/admin/stats")
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.text().catch(() => "");
-          throw new Error(`Failed to load stats (${res.status}): ${body.slice(0, 200)}`);
-        }
-        return res.json();
-      })
+    dashboardApi.getDashboardStats()
       .then(setStats)
-      .catch((e) => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 

@@ -1,443 +1,165 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
-import { apiFetch, getStoredUser, getToken } from '@/lib/api';
+import { useConversations } from '@/hooks/useConversations';
+import { useMessages } from '@/hooks/useMessages';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useAISuggestions } from '@/hooks/useAISuggestions';
+import { useQuickReplySearch } from '@/hooks/useQuickReplies';
+import type { SequencedEvent } from '@/types/api';
+import type { Conversation, Message } from '@/types/chat';
 import AudioMessage from '@/components/AudioMessage';
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;   // 5 MB
-const MAX_AUDIO_SIZE = 10 * 1024 * 1024;  // 10 MB
-const MAX_FILE_SIZE  = 20 * 1024 * 1024;  // 20 MB
-
-async function compressImage(file: File, maxDim = 1920, quality = 0.82): Promise<File> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      let { width, height } = img;
-      if (width > maxDim || height > maxDim) {
-        if (width >= height) { height = Math.round((height * maxDim) / width); width = maxDim; }
-        else { width = Math.round((width * maxDim) / height); height = maxDim; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) { resolve(file); return; }
-          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
-        },
-        'image/jpeg',
-        quality
-      );
-    };
-    img.onerror = () => resolve(file);
-    img.src = objectUrl;
-  });
-}
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Types
-
-interface Message {
-  id: string;
-  conversation_id: string;
-  content: string;
-  inbound: boolean;
-  message_type: 'text' | 'image' | 'file' | 'audio';
-  created_at: string;
-  image?: string;
-  file?: string;
-}
-
-interface Contact {
-  id: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  avatar?: string;
-  channel_identifier?: string;
-}
-
-interface Conversation {
-  id: string;
-  contact_id: string;
-  channel: string;
-  status: string;
-  tag?: string;
-  is_unread: boolean;
-  last_message?: string;
-  last_message_date?: string;
-  created_at: string;
-  updated_at: string;
-  contact: Contact;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/api/v1/chat/ws';
-
 export default function ChatPage() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  // Multimedia State
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  
-  const ws = useRef<WebSocket | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch Conversations
-  const fetchConversations = async () => {
-    try {
-      const res = await apiFetch(`/chat/conversations`);
-      if (res.ok) {
-        const data = await res.json();
-        setConversations(data);
-      }
-    } catch (err) {
-      console.error("Error fetching conversations:", err);
-    }
-  };
-
-  // Fetch Messages for a conversation
-  const fetchMessages = async (conversationId: string) => {
-    try {
-      const res = await apiFetch(`/chat/conversations/${conversationId}/messages`);
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data);
-        scrollToBottom();
-      }
-    } catch (err) {
-      console.error("Error fetching messages:", err);
-    }
-  };
-
-  useEffect(() => {
-    console.log('Page loaded, token:', getToken());
-    fetchConversations();
-
-    // WebSocket Connection
-    let isMounted = true;
-    const connectWs = () => {
-      if (ws.current) ws.current.close();
-      ws.current = new WebSocket(WS_URL);
-      ws.current.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          if (parsed.type === "new_message") {
-            const newMsg = parsed.data as Message;
-            
-            // Update conversations list (optimistic sort to top)
-            setConversations(prev => {
-              const updated = [...prev];
-              const idx = updated.findIndex(c => c.id === newMsg.conversation_id);
-              if (idx > -1) {
-                updated[idx].last_message = newMsg.content;
-                updated[idx].last_message_date = newMsg.created_at;
-                updated[idx].is_unread = newMsg.inbound;
-                // Move to top
-                const [conv] = updated.splice(idx, 1);
-                updated.unshift(conv);
-              } else {
-                // If we don't have the conversation, fetch it all again
-                fetchConversations();
-              }
-              return updated;
-            });
-
-            // If the message belongs to the active conversation, append it
-            setActiveConversation(active => {
-              if (active && active.id === newMsg.conversation_id) {
-                setMessages(prev => {
-                  if (prev.some(m => m.id === newMsg.id)) return prev;
-                  return [...prev, newMsg];
-                });
-                scrollToBottom();
-              }
-              return active;
-            });
-          } else if (parsed.type === "conversation_updated") {
-            // Update status/tag in list
-            fetchConversations();
-          }
-        } catch (err) {
-          console.error("Error parsing WS message", err);
-        }
-      };
-    };
-
-    connectWs();
-
-    return () => {
-      isMounted = false;
-      if (ws.current) {
-        ws.current.close();
-        ws.current = null;
-      }
-    };
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }, []);
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+  // ── Domain hooks ──────────────────────────────────────────────────────────
+  const {
+    conversations,
+    activeConversation,
+    activeConversationRef,
+    fetchConversations,
+    selectConversation,
+    onNewMessage,
+    onConversationUpdated,
+  } = useConversations();
 
-  const handleSelectConversation = async (conv: Conversation) => {
-    setActiveConversation(conv);
-    cancelAttachment();
-    await fetchMessages(conv.id);
-    
-    // Mark as read
-    if (conv.is_unread) {
-      try {
-        await apiFetch(`/chat/conversations/${conv.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ is_unread: false })
-        });
-        // Update local state
-        setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, is_unread: false } : c));
-      } catch (err) {
-        console.error("Failed to mark as read", err);
+  const {
+    messages,
+    sending,
+    fetchMessages,
+    sendText,
+    sendFile,
+    sendAudio,
+    appendMessage,
+  } = useMessages(scrollToBottom);
+
+  const {
+    suggestions,
+    generating: aiGenerating,
+    fetchCached: fetchAICached,
+    generate: generateAI,
+    clear: clearAI,
+  } = useAISuggestions();
+
+  const { matches: qrMatches, open: qrOpen, search: qrSearch, close: qrClose } = useQuickReplySearch();
+
+  // ── WebSocket event dispatcher ─────────────────────────────────────────────
+  const handleWsEvent = useCallback((event: SequencedEvent) => {
+    if (event.type === 'new_message') {
+      const msg = event.data as unknown as Message;
+      onNewMessage(msg, fetchConversations);
+      if (activeConversationRef.current?.id === msg.conversation_id) {
+        appendMessage(msg);
       }
+    } else if (event.type === 'conversation_updated') {
+      onConversationUpdated();
     }
-  };
+  }, [onNewMessage, onConversationUpdated, fetchConversations, appendMessage, activeConversationRef]);
 
-  // --- Multimedia Handlers ---
+  const { subscribe, unsubscribe } = useWebSocket(handleWsEvent);
 
-  const handleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
+  useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // ── Conversation selection ────────────────────────────────────────────────
+  const handleSelectConversation = useCallback(async (conv: Conversation) => {
+    if (activeConversationRef.current) unsubscribe(activeConversationRef.current.id);
+    cancelAttachment();
+    clearAI();
+    await selectConversation(conv);
+    subscribe(conv.id);
+    await fetchMessages(conv.id);
+    fetchAICached(conv.id);
+  }, [selectConversation, fetchMessages, subscribe, unsubscribe, activeConversationRef, fetchAICached, clearAI]);
 
-    const isImage = file.type.startsWith('image/');
-    const limit = isImage ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
-    if (file.size > limit) {
-      alert(`File too large. Maximum size is ${isImage ? '5' : '20'} MB.`);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    setSelectedFile(file);
-    if (isImage) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-    } else {
-      setPreviewUrl(null);
-    }
-    setShowEmojiPicker(false);
-  };
-
+  // ── Attachment helpers ────────────────────────────────────────────────────
   const cancelAttachment = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const onEmojiClick = (emojiData: { emoji: string }) => {
-    setInput(prev => prev + emojiData.emoji);
-    // setShowEmojiPicker(false); // Keep open for multiple emojis?
+  const handleFileSelect = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile(file);
+    setPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+    setShowEmojiPicker(false);
   };
 
+  const onEmojiClick = (emojiData: { emoji: string }) =>
+    setInput(prev => prev + emojiData.emoji);
+
+  // ── Recording ─────────────────────────────────────────────────────────────
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      const rec = new MediaRecorder(stream);
+      mediaRecorderRef.current = rec;
       audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      rec.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      rec.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/mpeg' });
+        if (activeConversation) await sendAudio(activeConversation.id, blob);
+        stream.getTracks().forEach(t => t.stop());
       };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mpeg' });
-        await uploadAndSendAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
+      rec.start();
       setIsRecording(true);
       setRecordingDuration(0);
-      timerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-      alert("Microphone access denied or not available.");
+      timerRef.current = setInterval(() => setRecordingDuration(p => p + 1), 1000);
+    } catch {
+      alert('Microphone access denied or not available.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+    if (timerRef.current) clearInterval(timerRef.current);
   };
 
-  const uploadAndSendAudio = async (blob: Blob) => {
-    if (!activeConversation) return;
-
-    if (blob.size > MAX_AUDIO_SIZE) {
-      alert('Audio recording too large. Maximum size is 10 MB.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', blob, 'recording.mp3');
-
-      const uploadRes = await fetch(`${API_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-        // No Content-Type header - browser will set it with boundary
-      });
-
-      if (!uploadRes.ok) throw new Error("Failed to upload audio");
-      const { url } = await uploadRes.json();
-
-      await sendMessageInternal({
-        content: "Audio message",
-        message_type: 'audio',
-        file: url
-      });
-    } catch (err) {
-      console.error("Error sending audio:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── Send ──────────────────────────────────────────────────────────────────
   const handleSendMessage = async () => {
-    if ((!input.trim() && !selectedFile) || !activeConversation) return;
-    
-    let content = input;
-    let type: 'text' | 'image' | 'file' = 'text';
-    let fileUrl = '';
-    let imageUrl = '';
-
-    setLoading(true);
-    try {
-      if (selectedFile) {
-        const fileToUpload = selectedFile.type.startsWith('image/')
-          ? await compressImage(selectedFile)
-          : selectedFile;
-
-        const formData = new FormData();
-        formData.append('file', fileToUpload);
-
-        const uploadRes = await fetch(`${API_URL.replace('/api/v1', '')}/api/v1/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadRes.ok) throw new Error("Failed to upload file");
-        const { url } = await uploadRes.json();
-
-        if (selectedFile.type.startsWith('image/')) {
-          type = 'image';
-          imageUrl = url;
-          if (!content) content = "Image";
-        } else {
-          type = 'file';
-          fileUrl = url;
-          if (!content) content = `File: ${selectedFile.name}`;
-        }
-      }
-
-      await sendMessageInternal({
-        content,
-        message_type: type,
-        image: imageUrl,
-        file: fileUrl
-      });
-
-      setInput('');
+    if (!activeConversation || (!input.trim() && !selectedFile)) return;
+    if (selectedFile) {
+      await sendFile(activeConversation.id, selectedFile);
       cancelAttachment();
-    } catch (err) {
-      console.error("Error sending message:", err);
-    } finally {
-      setLoading(false);
+    } else {
+      await sendText(activeConversation.id, input.trim());
+      setInput('');
     }
   };
 
-  const sendMessageInternal = async (payload: any) => {
-    if (!activeConversation) return;
-
-    const user = getStoredUser<{id: string}>();
-    
-    // Optimistic UI Update
-    const tempId = `temp-${Date.now()}`;
-    const optimisticMessage: Message = {
-      id: tempId,
-      conversation_id: activeConversation.id,
-      content: payload.content,
-      inbound: false,
-      message_type: payload.message_type,
-      created_at: new Date().toISOString(),
-      image: payload.image,
-      file: payload.file
-    };
-
-    setMessages(prev => [...prev, optimisticMessage]);
-    scrollToBottom();
-    
-    try {
-      const res = await apiFetch(`/chat/conversations/${activeConversation.id}/messages`, {
-        method: 'POST',
-        body: JSON.stringify({
-          conversation_id: activeConversation.id,
-          owner_id: user?.id,
-          inbound: false,
-          ...payload
-        })
-      });
-      
-      if (!res.ok) throw new Error('Failed to send message');
-      const realMessage = await res.json();
-      
-      setMessages(prev => {
-        if (prev.some(m => m.id === realMessage.id)) {
-          return prev.filter(m => m.id !== tempId);
-        }
-        return prev.map(m => m.id === tempId ? realMessage : m);
-      });
-    } catch (err) {
-      console.error("Error in sendMessageInternal:", err);
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-    }
-  };
-
+  const loading = sending;
   const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -577,7 +299,7 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="p-md bg-surface-container-lowest border-t border-outline-variant relative">
+              <div className="p-md bg-surface-container-lowest border-t border-outline-variant relative" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) qrClose(); }}>
                 {/* Emoji Picker */}
                 {showEmojiPicker && (
                   <div className="absolute bottom-full mb-2 left-md z-50 shadow-2xl rounded-2xl overflow-hidden border border-outline-variant">
@@ -628,18 +350,42 @@ export default function ChatPage() {
                           <span className="material-symbols-outlined text-[22px]">attach_file</span>
                         </button>
                       </div>
-                      <textarea 
-                        className="flex-1 bg-transparent border-none text-body-md text-on-surface focus:ring-0 outline-none resize-none py-sm pl-sm min-h-[40px] max-h-[120px] overflow-y-auto" 
-                        placeholder="Type a message..." 
+                      {/* Quick Reply autocomplete dropdown */}
+                      {qrOpen && (
+                        <div className="absolute bottom-full left-0 right-0 mb-2 mx-3 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50">
+                          {qrMatches.map(qr => (
+                            <button
+                              key={qr.id}
+                              className="w-full px-4 py-2.5 flex items-start gap-3 hover:bg-slate-50 text-left border-b border-slate-100 last:border-0 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setInput(qr.content);
+                                qrClose();
+                              }}
+                            >
+                              <span className="text-xs font-mono text-[#7C4DFF] bg-purple-50 px-2 py-0.5 rounded-md shrink-0 mt-0.5">{qr.shortcut}</span>
+                              <span className="text-sm text-slate-700 truncate">{qr.content}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <textarea
+                        className="flex-1 bg-transparent border-none text-body-md text-on-surface focus:ring-0 outline-none resize-none py-sm pl-sm min-h-[40px] max-h-[120px] overflow-y-auto"
+                        placeholder="Type a message or / for quick replies…"
                         rows={1}
                         value={input}
                         onFocus={() => setShowEmojiPicker(false)}
                         onChange={(e) => {
-                          setInput(e.target.value);
+                          const val = e.target.value;
+                          setInput(val);
+                          qrSearch(val);
                           e.target.style.height = 'auto';
                           e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                         }}
-                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSendMessage())}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') { qrClose(); return; }
+                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); qrClose(); handleSendMessage(); }
+                        }}
                       />
                     </>
                   )}
@@ -687,27 +433,78 @@ export default function ChatPage() {
         {/* Right Column: Context & Details */}
         <aside className="w-[300px] h-full flex flex-col bg-surface-container-lowest border-l border-outline-variant shrink-0 overflow-y-auto">
           {activeConversation ? (
-            <div className="p-lg flex flex-col gap-md">
-              <h3 className="font-body-sm text-body-sm font-semibold text-on-surface uppercase tracking-wider">Contact Details</h3>
-              <div className="flex flex-col gap-sm font-body-sm text-body-sm">
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Name</span>
-                  <span className="text-on-surface font-medium ml-2">{activeConversation.contact.name || '-'}</span>
+            <div className="flex flex-col gap-0">
+              {/* Contact Details */}
+              <div className="p-5 border-b border-outline-variant">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Details</h3>
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Name</span>
+                    <span className="text-slate-900 font-medium ml-2">{activeConversation.contact.name || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Identifier</span>
+                    <span className="text-slate-900 font-medium truncate ml-2" title={activeConversation.contact.channel_identifier}>{activeConversation.contact.channel_identifier}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Status</span>
+                    <span className="text-slate-900 font-medium capitalize">{activeConversation.status.toLowerCase()}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Identifier</span>
-                  <span className="text-on-surface font-medium truncate ml-2" title={activeConversation.contact.channel_identifier}>{activeConversation.contact.channel_identifier}</span>
+              </div>
+
+              {/* AI Suggestions */}
+              <div className="p-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px] text-[#7C4DFF]" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                    AI Suggestions
+                  </h3>
+                  <button
+                    onClick={() => generateAI(activeConversation.id)}
+                    disabled={aiGenerating}
+                    className="flex items-center gap-1 text-xs text-[#7C4DFF] hover:text-[#632ce5] disabled:opacity-50 transition-colors"
+                  >
+                    <span className={cn("material-symbols-outlined text-[14px]", aiGenerating && "animate-spin")}>
+                      {aiGenerating ? "progress_activity" : "refresh"}
+                    </span>
+                    {aiGenerating ? "Generating…" : "Refresh"}
+                  </button>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Status</span>
-                  <span className="text-on-surface font-medium capitalize">{activeConversation.status.toLowerCase()}</span>
-                </div>
+
+                {suggestions.length === 0 && !aiGenerating && (
+                  <button
+                    onClick={() => generateAI(activeConversation.id)}
+                    className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-sm text-slate-400 hover:border-[#7C4DFF] hover:text-[#7C4DFF] transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                    Generate suggestions
+                  </button>
+                )}
+
+                {aiGenerating && (
+                  <div className="flex flex-col gap-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                )}
+
+                {!aiGenerating && suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInput(s)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl bg-purple-50 border border-purple-100 text-sm text-slate-700 hover:bg-purple-100 hover:border-[#7C4DFF] transition-all leading-snug"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
-             <div className="p-lg flex flex-col gap-md opacity-50">
-                <h3 className="font-body-sm text-body-sm font-semibold text-on-surface uppercase tracking-wider">Contact Details</h3>
-                <p className="text-sm">No contact selected.</p>
+             <div className="p-5 opacity-50">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Contact Details</h3>
+                <p className="text-sm text-slate-400">No contact selected.</p>
              </div>
           )}
         </aside>

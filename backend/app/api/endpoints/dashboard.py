@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Dict, Any
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -6,15 +7,16 @@ from sqlalchemy import func
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.models.models import Conversation, Message, ConversationStatus, ChannelType
+from app.schemas.common import create_response
 
 router = APIRouter()
 
 
 @router.get("/stats")
-def get_dashboard_stats(
+async def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
-):
+) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -83,7 +85,7 @@ def get_dashboard_stats(
             "count": count,
         })
 
-    return {
+    return create_response({
         "total_conversations": total,
         "open_conversations": open_count,
         "closed_conversations": closed_count,
@@ -94,4 +96,4 @@ def get_dashboard_stats(
         "channels": channels,
         "daily_conversations": daily_conversations,
         "daily_messages": daily_messages,
-    }
+    })

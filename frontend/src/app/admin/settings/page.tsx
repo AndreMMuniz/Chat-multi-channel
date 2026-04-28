@@ -1,36 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { apiFetch } from "@/lib/api";
+import { settingsApi } from "@/lib/api/index";
+import type { Settings } from "@/types/settings";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Settings {
-  app_name: string;
-  app_email: string;
-  app_logo: string;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
-  ai_model: string;
-  ai_provider: string;
-  // WhatsApp
-  whatsapp_phone_id: string;
-  whatsapp_account_id: string;
-  whatsapp_access_token: string;
-  whatsapp_webhook_token: string;
-  // Email
-  email_imap_host: string;
-  email_imap_port: string;
-  email_smtp_host: string;
-  email_smtp_port: string;
-  email_address: string;
-  email_password: string;
-  // SMS
-  twilio_account_sid: string;
-  twilio_auth_token: string;
-  twilio_phone_number: string;
-}
 
 type TabId = "general" | "visual" | "ai" | "api";
 
@@ -122,14 +96,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    apiFetch("/admin/settings")
-      .then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(`${r.status}: ${body.detail || r.statusText}`);
-        }
-        return r.json();
-      })
+    settingsApi.getSettings()
       .then(data => setSettings({
         app_name: "", app_email: "", app_logo: "",
         primary_color: "#0F172A", secondary_color: "#3B82F6", accent_color: "#10B981",
@@ -153,18 +120,16 @@ export default function SettingsPage() {
     if (!settings) return;
     setSaving(true); setError(""); setSuccess(false);
     try {
-      const res = await apiFetch("/admin/settings", {
-        method: "PATCH",
-        body: JSON.stringify({
-          ...settings,
-          email_imap_port: settings.email_imap_port ? Number(settings.email_imap_port) : null,
-          email_smtp_port: settings.email_smtp_port ? Number(settings.email_smtp_port) : null,
-        }),
+      await settingsApi.updateSettings({
+        ...settings,
+        email_imap_port: settings.email_imap_port ? String(Number(settings.email_imap_port)) : "",
+        email_smtp_port: settings.email_smtp_port ? String(Number(settings.email_smtp_port)) : "",
       });
-      if (res.ok) { setSuccess(true); setTimeout(() => setSuccess(false), 3000); }
-      else { const d = await res.json(); setError(d.detail || "Failed to save."); }
-    } catch { setError("Connection error."); }
-    finally { setSaving(false); }
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save.");
+    } finally { setSaving(false); }
   };
 
   if (loading) {

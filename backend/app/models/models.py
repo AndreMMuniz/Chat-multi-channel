@@ -168,6 +168,10 @@ class Message(Base):
     image = Column(String, nullable=True) # URL to image
     file = Column(String, nullable=True) # URL to file
 
+    # Sequencing & deduplication for ordered WebSocket delivery
+    conversation_sequence = Column(Integer, nullable=False, default=0)
+    idempotency_key = Column(String(255), nullable=True, unique=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     conversation = relationship("Conversation", back_populates="messages")

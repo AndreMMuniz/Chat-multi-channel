@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { setAuth } from "@/lib/api";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { authApi } from "@/lib/api/index";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,24 +16,10 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError(data?.detail || "Login failed. Check your credentials.");
-        return;
-      }
-      if (!data?.access_token) {
-        setError("Login failed: no token received");
-        return;
-      }
-      setAuth(data.access_token, data.refresh_token, data.user);
+      await authApi.login(email, password);
       window.location.href = "/dashboard";
-    } catch {
-      setError("Connection error. Check if the server is running.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connection error.");
     } finally {
       setLoading(false);
     }

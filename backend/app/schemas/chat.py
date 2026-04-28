@@ -29,11 +29,13 @@ class MessageCreate(MessageBase):
     conversation_id: UUID
     owner_id: Optional[UUID] = None
     inbound: bool = False
+    idempotency_key: Optional[str] = None
 
 class MessageResponse(MessageBase):
     id: UUID
     conversation_id: UUID
     owner_id: Optional[UUID] = None
+    conversation_sequence: int = 0
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -66,3 +68,8 @@ class ConversationResponse(ConversationBase):
 
 class ConversationWithMessagesResponse(ConversationResponse):
     messages: List[MessageResponse] = []
+
+class AISuggestionResponse(BaseModel):
+    suggestions: List[str]
+    conversation_id: UUID
+    model_config = ConfigDict(from_attributes=True)

@@ -1,9 +1,7 @@
 import httpx
 from sqlalchemy.orm import Session
-from app.models.models import Contact, Conversation, Message, ChannelType, MessageType
-from app.core.websocket import manager
+from app.models.models import Contact, Conversation, ChannelType
 from app.core.config import settings
-import uuid
 
 class TelegramService:
     def __init__(self):
@@ -58,28 +56,14 @@ class TelegramService:
         conversation.is_unread = True
         db.commit()
 
-        # 3. Create message
-        new_message = Message(
-            conversation_id=conversation.id,
+        # 3. Create message + broadcast via MessageService
+        from app.services.message_service import MessageService
+        msg_svc = MessageService(db)
+        await msg_svc.receive_from_channel(
+            conversation=conversation,
             content=text,
-            inbound=True,
-            message_type=MessageType.TEXT
+            message_type="TEXT",
         )
-        db.add(new_message)
-        db.commit()
-        db.refresh(new_message)
-
-        # 4. Broadcast to WebSocket
-        await manager.broadcast_json({
-            "type": "new_message",
-            "data": {
-                "id": str(new_message.id),
-                "conversation_id": str(conversation.id),
-                "content": text,
-                "inbound": True,
-                "created_at": new_message.created_at.isoformat() if new_message.created_at else None
-            }
-        })
 
     async def send_message(self, chat_id: str, text: str) -> bool:
         async with httpx.AsyncClient() as client:

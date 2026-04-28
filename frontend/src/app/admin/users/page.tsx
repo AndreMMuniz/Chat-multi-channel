@@ -2,36 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
-import { apiFetch } from "@/lib/api";
+import { usersApi, userTypesApi } from "@/lib/api/index";
 import Modal from "@/components/shared/Modal";
+import type { User, UserType, CreateUserRequest, UpdateUserRequest } from "@/types/auth";
 
-interface UserType {
-  id: string;
-  name: string;
-  base_role: "ADMIN" | "MANAGER" | "USER";
-  is_system: boolean;
-}
+interface CreateForm extends CreateUserRequest {}
 
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
-  avatar?: string;
-  is_active: boolean;
-  is_approved: boolean;
-  created_at: string;
-  user_type_id: string;
-  user_type: UserType;
-}
-
-interface CreateForm {
-  full_name: string;
-  email: string;
-  password: string;
-  user_type_id: string;
-}
-
-interface EditForm {
+interface EditForm extends UpdateUserRequest {
   full_name: string;
   user_type_id: string;
   is_active: boolean;
@@ -82,17 +59,16 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [usersRes, pendingRes, typesRes] = await Promise.all([
-        apiFetch("/admin/users"),
-        apiFetch("/admin/users/pending"),
-        apiFetch("/admin/user-types"),
+      const [{ data: usersData }, { data: pendingData }, { data: typesData }] = await Promise.all([
+        usersApi.listUsers(),
+        usersApi.listPendingUsers(),
+        userTypesApi.listUserTypes(),
       ]);
-      if (usersRes.ok) setUsers(await usersRes.json());
-      else setError("Failed to load users. Check your permissions.");
-      if (pendingRes.ok) setPendingUsers(await pendingRes.json());
-      if (typesRes.ok) setUserTypes(await typesRes.json());
+      setUsers(usersData);
+      setPendingUsers(pendingData);
+      setUserTypes(typesData);
     } catch {
-      setError("Connection error.");
+      setError("Connection error or insufficient permissions.");
     } finally {
       setLoading(false);
     }
@@ -117,17 +93,11 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     setCreateError("");
     setCreateLoading(true);
     try {
-      const res = await apiFetch("/admin/users", { method: "POST", body: JSON.stringify(createForm) });
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
-        setCreateError(errorMsg || "Failed to create user.");
-        return;
-      }
+      await usersApi.createUser(createForm);
       setShowCreate(false);
       loadData();
-    } catch (err: any) {
-      setCreateError("Connection error: " + (err.message || "Unknown error"));
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create user.");
     } finally {
       setCreateLoading(false);
     }
@@ -145,34 +115,30 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     setEditError("");
     setEditLoading(true);
     try {
-      const res = await apiFetch(`/admin/users/${editingUser.id}`, { method: "PATCH", body: JSON.stringify(editForm) });
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
-        setEditError(errorMsg || "Failed to update user.");
-        return;
-      }
+      await usersApi.updateUser(editingUser.id, editForm);
       setEditingUser(null);
       loadData();
-    } catch (err: any) {
-      setEditError("Connection error: " + (err.message || "Unknown error"));
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to update user.");
     } finally {
       setEditLoading(false);
     }
   };
 
   const toggleStatus = async (u: User) => {
-    const endpoint = u.is_active ? `/admin/users/${u.id}/disable` : `/admin/users/${u.id}/enable`;
-    const res = await apiFetch(endpoint, { method: "POST" });
-    if (res.ok) loadData();
+    try {
+      if (u.is_active) await usersApi.disableUser(u.id);
+      else await usersApi.enableUser(u.id);
+      loadData();
+    } catch { /* silently ignore */ }
   };
 
   const handleApprove = async (userId: string) => {
     setApprovalLoading(userId);
     try {
-      const res = await apiFetch(`/admin/users/${userId}/approve`, { method: "POST" });
-      if (res.ok) loadData();
-    } finally {
+      await usersApi.approveUser(userId);
+      loadData();
+    } catch { /* silently ignore */ } finally {
       setApprovalLoading(null);
     }
   };
@@ -181,9 +147,9 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     if (!confirm("Reject and permanently delete this user request?")) return;
     setApprovalLoading(userId);
     try {
-      const res = await apiFetch(`/admin/users/${userId}/reject`, { method: "POST" });
-      if (res.ok) loadData();
-    } finally {
+      await usersApi.rejectUser(userId);
+      loadData();
+    } catch { /* silently ignore */ } finally {
       setApprovalLoading(null);
     }
   };
@@ -192,11 +158,9 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     if (!window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
     setDeleteLoading(userId);
     try {
-      const res = await apiFetch(`/admin/users/${userId}`, { method: "DELETE" });
-      if (res.ok) {
-        loadData();
-      }
-    } finally {
+      await usersApi.deleteUser(userId);
+      loadData();
+    } catch { /* silently ignore */ } finally {
       setDeleteLoading(null);
     }
   };

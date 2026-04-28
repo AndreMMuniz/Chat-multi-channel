@@ -1,4 +1,5 @@
 import os
+from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session, joinedload
@@ -7,7 +8,9 @@ from slowapi.util import get_remote_address
 from app.core.database import get_db, get_supabase
 from app.models.models import User, UserType
 from app.schemas.user import UserResponse, UserSignup
+from app.schemas.common import create_response, create_error_response
 from app.api.endpoints.users import seed_default_user_types
+from app.repositories import RepositoryFactory, get_repositories
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -54,9 +57,9 @@ class LoginResponse(BaseModel):
     user: UserResponse
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login")
 @limiter.limit("10/minute")
-def login(data: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+async def login(data: LoginRequest, request: Request, response: Response, repos: RepositoryFactory = Depends(get_repositories)) -> Dict[str, Any]:
     """Authenticate via Supabase, set HttpOnly cookies and return tokens."""
     supabase = get_supabase()
 
@@ -66,51 +69,84 @@ def login(data: LoginRequest, request: Request, response: Response, db: Session 
             "password": data.password,
         })
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        error_response, status = create_error_response(
+            code="INVALID_CREDENTIALS",
+            message="Invalid email or password",
+            status_code=401
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     if not auth_response.session:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        error_response, status = create_error_response(
+            code="INVALID_CREDENTIALS",
+            message="Invalid email or password",
+            status_code=401
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     auth_id = str(auth_response.user.id)
 
-    user = (
-        db.query(User)
-        .options(joinedload(User.user_type))
-        .filter(User.auth_id == auth_id)
-        .first()
-    )
+    # Use repository to find user
+    user = await repos.users.find_by_auth_id(auth_id)
 
     if not user:
-        raise HTTPException(status_code=403, detail="User profile not found. Contact an administrator.")
+        error_response, status = create_error_response(
+            code="USER_NOT_FOUND",
+            message="User profile not found. Contact an administrator.",
+            status_code=403
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     if not user.is_approved:
-        raise HTTPException(status_code=403, detail="Account pending admin approval. You will be notified by email when approved.")
+        error_response, status = create_error_response(
+            code="USER_NOT_APPROVED",
+            message="Account pending admin approval. You will be notified by email when approved.",
+            status_code=403
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account is disabled. Contact an administrator.")
+        error_response, status = create_error_response(
+            code="USER_DISABLED",
+            message="Account is disabled. Contact an administrator.",
+            status_code=403
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     _set_auth_cookies(response, auth_response.session.access_token, auth_response.session.refresh_token)
 
-    return LoginResponse(
-        access_token=auth_response.session.access_token,
-        refresh_token=auth_response.session.refresh_token,
-        user=UserResponse.model_validate(user),
-    )
+    return create_response({
+        "access_token": auth_response.session.access_token,
+        "refresh_token": auth_response.session.refresh_token,
+        "user": UserResponse.model_validate(user)
+    })
 
 
 @router.post("/signup")
 @limiter.limit("5/minute")
-def signup(data: UserSignup, request: Request, db: Session = Depends(get_db)):
+async def signup(data: UserSignup, request: Request, repos: RepositoryFactory = Depends(get_repositories), db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Self-service registration — creates account pending admin approval."""
     seed_default_user_types(db)
 
-    existing = db.query(User).filter(User.email == data.email).first()
+    # Use repository to check if email exists
+    existing = await repos.users.find_by_email(data.email)
     if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        error_response, status = create_error_response(
+            code="DUPLICATE_EMAIL",
+            message="Email already registered",
+            details={"field": "email", "value": data.email},
+            status_code=409
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     default_role = db.query(UserType).filter(UserType.name == "User", UserType.is_system == True).first()
     if not default_role:
-        raise HTTPException(status_code=500, detail="Default role not found. Contact an administrator.")
+        error_response, status = create_error_response(
+            code="INTERNAL_ERROR",
+            message="Default role not found. Contact an administrator.",
+            status_code=500
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     supabase = get_supabase()
     try:
@@ -121,20 +157,27 @@ def signup(data: UserSignup, request: Request, db: Session = Depends(get_db)):
         })
         auth_id = auth_response.user.id
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to create account: {str(e)}")
+        error_response, status = create_error_response(
+            code="INTERNAL_ERROR",
+            message="Failed to create account",
+            details={"error": str(e)},
+            status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
-    user = User(
-        auth_id=str(auth_id),
-        email=data.email,
-        full_name=data.full_name,
-        user_type_id=default_role.id,
-        is_active=False,
-        is_approved=False,
-    )
-    db.add(user)
-    db.commit()
+    # Use repository to create user
+    user = await repos.users.create({
+        "auth_id": str(auth_id),
+        "email": data.email,
+        "full_name": data.full_name,
+        "user_type_id": default_role.id,
+        "is_active": False,
+        "is_approved": False,
+    })
 
-    return {"detail": "Account created. An administrator will review your request and notify you by email."}
+    return create_response({
+        "detail": "Account created. An administrator will review your request and notify you by email."
+    })
 
 
 class SetPasswordRequest(BaseModel):
@@ -149,11 +192,17 @@ class SetPasswordRequest(BaseModel):
 
 @router.post("/forgot-password")
 @limiter.limit("3/minute")
-def forgot_password(data: dict, request: Request):
+async def forgot_password(data: dict, request: Request) -> Dict[str, Any]:
     """Send password reset email via Supabase."""
     email = data.get("email")
     if not email:
-        raise HTTPException(status_code=400, detail="Email required")
+        error_response, status = create_error_response(
+            code="VALIDATION_ERROR",
+            message="Email required",
+            details={"field": "email"},
+            status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     supabase = get_supabase()
     try:
@@ -161,19 +210,32 @@ def forgot_password(data: dict, request: Request):
             "redirect_to": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password"
         })
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to send reset email: {str(e)}")
+        error_response, status = create_error_response(
+            code="INTERNAL_ERROR",
+            message="Failed to send reset email",
+            details={"error": str(e)},
+            status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
-    return {"detail": "Password reset email sent. Check your inbox."}
+    return create_response({
+        "detail": "Password reset email sent. Check your inbox."
+    })
 
 
 @router.post("/set-password")
-def set_password(data: SetPasswordRequest, request: Request, db: Session = Depends(get_db)):
+async def set_password(data: SetPasswordRequest, request: Request, repos: RepositoryFactory = Depends(get_repositories), db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Set a new password using a Supabase recovery token.
     Auto-creates the local user record if the email was registered directly in Supabase.
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Recovery token required")
+        error_response, status = create_error_response(
+            code="INVALID_TOKEN",
+            message="Recovery token required",
+            status_code=401
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     token = auth_header[7:]
     supabase = get_supabase()
@@ -181,62 +243,90 @@ def set_password(data: SetPasswordRequest, request: Request, db: Session = Depen
     try:
         auth_response = supabase.auth.get_user(token)
         if not auth_response or not auth_response.user:
-            raise HTTPException(status_code=401, detail="Invalid or expired recovery link")
+            error_response, status = create_error_response(
+                code="TOKEN_EXPIRED",
+                message="Invalid or expired recovery link",
+                status_code=401
+            )
+            raise HTTPException(status_code=status, detail=error_response)
         auth_user = auth_response.user
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired recovery link")
+        error_response, status = create_error_response(
+            code="TOKEN_EXPIRED",
+            message="Invalid or expired recovery link",
+            status_code=401
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     try:
         supabase.auth.admin.update_user_by_id(str(auth_user.id), {"password": data.new_password})
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to update password: {str(e)}")
+        error_response, status = create_error_response(
+            code="INTERNAL_ERROR",
+            message="Failed to update password",
+            details={"error": str(e)},
+            status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     # Auto-create local user record if admin registered the email directly in Supabase
     auth_id = str(auth_user.id)
-    user = db.query(User).filter(User.auth_id == auth_id).first()
+    user = await repos.users.find_by_auth_id(auth_id)
     if not user:
         seed_default_user_types(db)
         default_role = db.query(UserType).filter(UserType.name == "User", UserType.is_system == True).first()
         if default_role and auth_user.email:
             name = auth_user.email.split("@")[0].replace(".", " ").title()
-            new_user = User(
-                auth_id=auth_id,
-                email=auth_user.email,
-                full_name=name,
-                user_type_id=default_role.id,
-                is_active=True,
-                is_approved=True,
-            )
-            db.add(new_user)
-            db.commit()
+            new_user = await repos.users.create({
+                "auth_id": auth_id,
+                "email": auth_user.email,
+                "full_name": name,
+                "user_type_id": default_role.id,
+                "is_active": True,
+                "is_approved": True,
+            })
 
-    return {"detail": "Password set successfully. You can now sign in."}
+    return create_response({
+        "detail": "Password set successfully. You can now sign in."
+    })
 
 
 @router.post("/logout")
-def logout(response: Response):
+async def logout(response: Response) -> Dict[str, Any]:
     """Invalidate session by clearing auth cookies."""
     _clear_auth_cookies(response)
-    return {"detail": "Logged out"}
+    return create_response({
+        "detail": "Logged out"
+    })
 
 
 @router.post("/refresh")
-def refresh_token(request: Request, response: Response):
+async def refresh_token(request: Request, response: Response) -> Dict[str, Any]:
     """Refresh access token using the HttpOnly refresh cookie."""
     token = request.cookies.get("refresh_token")
     if not token:
-        raise HTTPException(status_code=401, detail="No refresh token")
+        error_response, status = create_error_response(
+            code="INVALID_TOKEN",
+            message="No refresh token",
+            status_code=401
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
     supabase = get_supabase()
     try:
         auth_response = supabase.auth.refresh_session(token)
         _set_auth_cookies(response, auth_response.session.access_token, auth_response.session.refresh_token)
-        return {
+        return create_response({
             "access_token": auth_response.session.access_token,
             "refresh_token": auth_response.session.refresh_token,
-        }
+        })
     except Exception:
         _clear_auth_cookies(response)
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        error_response, status = create_error_response(
+            code="TOKEN_EXPIRED",
+            message="Invalid refresh token",
+            status_code=401
+        )
+        raise HTTPException(status_code=status, detail=error_response)

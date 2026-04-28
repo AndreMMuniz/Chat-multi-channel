@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { authApi } from "@/lib/api/index";
 
 interface PasswordRule {
   label: string;
@@ -85,19 +84,10 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, full_name: fullName }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail || "Registration failed. Try again.");
-        return;
-      }
+      await authApi.signup({ email, password, full_name: fullName });
       setSubmitted(true);
-    } catch {
-      setError("Connection error. Check if the server is running.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed. Try again.");
     } finally {
       setLoading(false);
     }
