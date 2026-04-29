@@ -1,4 +1,4 @@
-"""System prompts for the assistant_omini agent."""
+"""System prompts for the assistant_AI-suggestion-creator agent."""
 
 CLASSIFY_PROMPT = """You are a customer support triage system. Classify the conversation into exactly one category.
 
