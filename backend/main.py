@@ -65,6 +65,39 @@ async def health_check():
     }
 
 
+@app.get("/diagnostics")
+async def diagnostics():
+    """Detailed diagnostics for debugging."""
+    from app.core.database import get_supabase, get_db
+    from app.core.config import settings
+
+    diagnostics = {
+        "environment": settings.ENVIRONMENT,
+        "supabase_url": bool(settings.SUPABASE_URL),
+        "supabase_keys": bool(settings.supabase_key),
+        "database_url": bool(settings.DATABASE_URL),
+        "checks": {}
+    }
+
+    # Test Supabase connection
+    try:
+        supabase = get_supabase()
+        auth_settings = supabase.auth.get_settings()
+        diagnostics["checks"]["supabase"] = "ok"
+    except Exception as e:
+        diagnostics["checks"]["supabase"] = f"error: {str(e)}"
+
+    # Test database connection
+    try:
+        db = next(get_db())
+        result = db.execute("SELECT 1 as test").fetchone()
+        diagnostics["checks"]["database"] = "ok" if result else "error: no result"
+    except Exception as e:
+        diagnostics["checks"]["database"] = f"error: {str(e)}"
+
+    return diagnostics
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
