@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 
 import { conversationsApi, uploadApi } from "@/lib/api/index";
+import type { DeliveryStatus } from "@/types/chat";
 import { getStoredUser } from "@/lib/api";
 import type { Message, MessageType, SendMessageRequest } from "@/types/chat";
 
@@ -125,19 +126,26 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
     }
   }, [scrollToBottom]);
 
-  const retryMessage = useCallback((conversationId: string, tempId: string) => {
-    const pending = pendingRef.current[tempId];
-    if (!pending) return;
-    // Remove failed message, re-send
-    setMessages(prev => prev.filter(m => m.id !== tempId));
-    setSendStatus(prev => {
-      const next = { ...prev };
-      delete next[tempId];
-      return next;
-    });
-    delete pendingRef.current[tempId];
-    sendCore(conversationId, pending.payload);
-  }, []);
+  const retryMessage = useCallback(async (conversationId: string, messageId: string) => {
+    // If it's a temp (optimistic) message, re-send via client-side pending payload
+    const pending = pendingRef.current[messageId];
+    if (pending) {
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+      setSendStatus(prev => { const n = { ...prev }; delete n[messageId]; return n; });
+      delete pendingRef.current[messageId];
+      sendCore(conversationId, pending.payload);
+      return;
+    }
+    // Persisted failed message — call backend retry endpoint
+    setSendStatus(prev => ({ ...prev, [messageId]: "sending" }));
+    try {
+      const updated = await conversationsApi.retryMessage(conversationId, messageId);
+      setMessages(prev => prev.map(m => m.id === messageId ? updated : m));
+      setSendStatus(prev => { const n = { ...prev }; delete n[messageId]; return n; });
+    } catch {
+      setSendStatus(prev => ({ ...prev, [messageId]: "failed" }));
+    }
+  }, [sendCore]);
 
   // ── Public send actions ────────────────────────────────────────────────────
 

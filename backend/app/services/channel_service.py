@@ -1,14 +1,15 @@
 """
 ChannelService — unified router for all outbound channel dispatches.
 
-Reads credentials from GeneralSettings (admin-configurable) and routes
-to the appropriate channel service. MessageService delegates here.
+Raises ChannelDeliveryError on failure so the caller can persist the reason.
 """
 
-from typing import Optional
 from sqlalchemy.orm import Session
-
 from app.models.models import Conversation, Contact, ChannelType
+
+
+class ChannelDeliveryError(Exception):
+    """Raised when an outbound message cannot be delivered to the channel."""
 
 
 class ChannelService:
@@ -17,67 +18,68 @@ class ChannelService:
     def __init__(self, db: Session):
         self.db = db
 
-    async def send(self, conversation: Conversation, content: str) -> bool:
+    async def send(self, conversation: Conversation, content: str) -> None:
         """
         Dispatch outbound message to the external channel.
-        Returns True if successful.
+        Raises ChannelDeliveryError on failure.
         """
         contact = self.db.query(Contact).filter(
             Contact.id == conversation.contact_id
         ).first()
         if not contact:
-            print(f"ChannelService: no contact for conversation {conversation.id}")
-            return False
+            raise ChannelDeliveryError(f"contact_not_found:{conversation.contact_id}")
 
         channel = conversation.channel
 
         if channel == ChannelType.TELEGRAM:
-            return await self._send_telegram(contact, content)
+            await self._send_telegram(contact, content)
         elif channel == ChannelType.WHATSAPP:
-            return await self._send_whatsapp(contact, content)
+            await self._send_whatsapp(contact, content)
         elif channel == ChannelType.EMAIL:
-            return await self._send_email(contact, content)
+            await self._send_email(contact, content)
         elif channel == ChannelType.SMS:
-            return await self._send_sms(contact, content)
-        else:
-            # WEB channel — no external dispatch needed
-            return True
+            await self._send_sms(contact, content)
+        # WEB — no external dispatch
 
     # ── Channel-specific dispatchers ──────────────────────────────────────────
 
-    async def _send_telegram(self, contact: Contact, content: str) -> bool:
+    async def _send_telegram(self, contact: Contact, content: str) -> None:
         if not contact.channel_identifier:
-            return False
+            raise ChannelDeliveryError("telegram:missing_identifier")
         from app.services.telegram_service import telegram_service
-        return await telegram_service.send_message(contact.channel_identifier, content)
+        ok = await telegram_service.send_message(contact.channel_identifier, content)
+        if not ok:
+            raise ChannelDeliveryError("telegram:send_failed")
 
-    async def _send_whatsapp(self, contact: Contact, content: str) -> bool:
+    async def _send_whatsapp(self, contact: Contact, content: str) -> None:
         if not contact.channel_identifier:
-            return False
+            raise ChannelDeliveryError("whatsapp:missing_identifier")
         from app.services.whatsapp_service import WhatsAppService
         svc = WhatsAppService.from_settings(self.db)
         if not svc:
-            print("ChannelService: WhatsApp not configured in settings")
-            return False
-        return await svc.send_message(contact.channel_identifier, content)
+            raise ChannelDeliveryError("whatsapp:not_configured")
+        ok = await svc.send_message(contact.channel_identifier, content)
+        if not ok:
+            raise ChannelDeliveryError("whatsapp:send_failed")
 
-    async def _send_email(self, contact: Contact, content: str) -> bool:
+    async def _send_email(self, contact: Contact, content: str) -> None:
         if not contact.email:
-            return False
+            raise ChannelDeliveryError("email:missing_address")
         from app.services.email_service import EmailService
         svc = EmailService.from_settings(self.db)
         if not svc:
-            print("ChannelService: Email not configured in settings")
-            return False
-        subject = "Reply from support"
-        return await svc.send_email(contact.email, subject, content)
+            raise ChannelDeliveryError("email:not_configured")
+        ok = await svc.send_email(contact.email, "Reply from support", content)
+        if not ok:
+            raise ChannelDeliveryError("email:send_failed")
 
-    async def _send_sms(self, contact: Contact, content: str) -> bool:
+    async def _send_sms(self, contact: Contact, content: str) -> None:
         if not contact.phone:
-            return False
+            raise ChannelDeliveryError("sms:missing_phone")
         from app.services.sms_service import SMSService
         svc = SMSService.from_settings(self.db)
         if not svc:
-            print("ChannelService: SMS/Twilio not configured in settings")
-            return False
-        return await svc.send_message(contact.phone, content)
+            raise ChannelDeliveryError("sms:not_configured")
+        ok = await svc.send_message(contact.phone, content)
+        if not ok:
+            raise ChannelDeliveryError("sms:send_failed")

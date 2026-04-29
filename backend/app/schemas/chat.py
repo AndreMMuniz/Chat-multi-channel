@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
-from app.models.models import ChannelType, ConversationStatus, ConversationTag, MessageType
+from app.models.models import ChannelType, ConversationStatus, ConversationTag, MessageType, DeliveryStatus
 
 # --- Contacts ---
 class ContactBase(BaseModel):
@@ -36,6 +36,9 @@ class MessageResponse(MessageBase):
     conversation_id: UUID
     owner_id: Optional[UUID] = None
     conversation_sequence: int = 0
+    delivery_status: Optional[DeliveryStatus] = None
+    delivery_error: Optional[str] = None
+    retry_count: int = 0
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

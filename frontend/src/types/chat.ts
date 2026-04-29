@@ -2,8 +2,9 @@
 
 export type ChannelType = "TELEGRAM" | "WHATSAPP" | "EMAIL" | "SMS" | "WEB";
 export type ConversationStatus = "OPEN" | "CLOSED" | "PENDING";
-export type ConversationTag = "SUPPORT" | "SALES" | "GENERAL";
+export type ConversationTag = "SUPPORT" | "BILLING" | "FEEDBACK" | "SALES" | "GENERAL" | "SPAM";
 export type MessageType = "text" | "image" | "file" | "audio";
+export type DeliveryStatus = "pending" | "sent" | "delivered" | "failed";
 
 export interface Contact {
   id: string;
@@ -42,6 +43,10 @@ export interface Message {
   file?: string;
   owner_id?: string;
   created_at: string;
+  /** Delivery tracking (Story 4.1) — only set for outbound messages */
+  delivery_status?: DeliveryStatus;
+  delivery_error?: string;
+  retry_count?: number;
 }
 
 /** POST /chat/conversations/{id}/messages request */

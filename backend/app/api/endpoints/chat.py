@@ -153,6 +153,51 @@ async def send_message(
     return create_response(MessageResponse.model_validate(new_message))
 
 
+# ── Message Retry (Story 4.3) ─────────────────────────────────────────────────
+
+@router.post("/conversations/{conversation_id}/messages/{message_id}/retry")
+async def retry_message(
+    conversation_id: UUID,
+    message_id: UUID,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Retry a failed outbound message (max 3 attempts)."""
+    from app.models.models import Message, DeliveryStatus
+
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND", message="Conversation not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    message = db.query(Message).filter(
+        Message.id == message_id,
+        Message.conversation_id == conversation_id,
+    ).first()
+    if not message:
+        error_response, status = create_error_response(
+            code="MESSAGE_NOT_FOUND", message="Message not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    if message.delivery_status != DeliveryStatus.FAILED:
+        error_response, status = create_error_response(
+            code="NOT_FAILED", message="Message is not in failed state", status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    from app.services.message_service import MessageService
+    try:
+        updated = await MessageService(db).retry_message(message, conversation)
+        return create_response(MessageResponse.model_validate(updated))
+    except ValueError as e:
+        error_response, status = create_error_response(
+            code="RETRY_LIMIT", message=str(e), status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+
 # ── AI Suggestions ────────────────────────────────────────────────────────────
 
 @router.get("/conversations/{conversation_id}/suggestions")

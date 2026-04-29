@@ -27,6 +27,12 @@ class ConversationTag(enum.Enum):
     GENERAL = "general"
     SPAM = "spam"
 
+class DeliveryStatus(enum.Enum):
+    PENDING   = "pending"    # not yet dispatched to channel
+    SENT      = "sent"       # accepted by channel API
+    DELIVERED = "delivered"  # confirmed delivery (where supported)
+    FAILED    = "failed"     # channel rejected or unreachable
+
 class MessageType(enum.Enum):
     TEXT = "text"
     IMAGE = "image"
@@ -174,6 +180,12 @@ class Message(Base):
     # Sequencing & deduplication for ordered WebSocket delivery
     conversation_sequence = Column(Integer, nullable=False, default=0)
     idempotency_key = Column(String(255), nullable=True, unique=True)
+
+    # Delivery tracking (Story 4.1)
+    delivery_status = Column(Enum(DeliveryStatus), nullable=True)          # null = inbound (no delivery)
+    delivery_error  = Column(Text, nullable=True)                           # last error reason
+    retry_count     = Column(Integer, nullable=False, default=0)
+    last_retry_at   = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

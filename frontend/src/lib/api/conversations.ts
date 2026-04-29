@@ -45,3 +45,13 @@ export async function updateConversation(
     data
   );
 }
+
+export async function retryMessage(
+  conversationId: string,
+  messageId: string
+): Promise<Message> {
+  return apiMutate<undefined, Message>(
+    `/chat/conversations/${conversationId}/messages/${messageId}/retry`,
+    "POST"
+  );
+}

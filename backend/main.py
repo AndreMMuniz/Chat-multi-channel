@@ -14,6 +14,8 @@ from app.services.telegram_service import telegram_service
 limiter = Limiter(key_func=get_remote_address)
 
 _EMAIL_POLL_INTERVAL = int(os.getenv("EMAIL_POLL_INTERVAL_SECONDS", "60"))
+_SLA_CHECK_INTERVAL = int(os.getenv("SLA_CHECK_INTERVAL_SECONDS", "120"))
+_SLA_THRESHOLD_MINUTES = int(os.getenv("SLA_THRESHOLD_MINUTES", "60"))
 
 
 async def _email_poll_loop() -> None:
@@ -35,6 +37,40 @@ async def _email_poll_loop() -> None:
         await asyncio.sleep(_EMAIL_POLL_INTERVAL)
 
 
+async def _sla_check_loop() -> None:
+    """Periodically scan open conversations exceeding the SLA threshold and alert managers."""
+    from datetime import datetime, timedelta, timezone
+    from app.core.database import SessionLocal
+    from app.models.models import Conversation, ConversationStatus
+    from app.core.websocket import manager
+
+    while True:
+        await asyncio.sleep(_SLA_CHECK_INTERVAL)
+        try:
+            db = SessionLocal()
+            try:
+                cutoff = datetime.now(timezone.utc) - timedelta(minutes=_SLA_THRESHOLD_MINUTES)
+                at_risk = db.query(Conversation).filter(
+                    Conversation.status == ConversationStatus.OPEN,
+                    Conversation.is_unread == True,
+                    Conversation.last_message_date <= cutoff,
+                ).all()
+                if at_risk:
+                    await manager.broadcast_global(
+                        event_type="sla_risk_alert",
+                        data={
+                            "count": len(at_risk),
+                            "threshold_minutes": _SLA_THRESHOLD_MINUTES,
+                            "conversation_ids": [str(c.id) for c in at_risk],
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        },
+                    )
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[SLACheck] Error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: register Telegram webhook + start Email IMAP polling + agent workers."""
@@ -44,6 +80,7 @@ async def lifespan(app: FastAPI):
         await telegram_service.set_webhook(webhook_url)
 
     email_task = asyncio.create_task(_email_poll_loop())
+    sla_task = asyncio.create_task(_sla_check_loop())
 
     # Start AI agent workers
     from src.worker.consumer import start_workers, stop_workers
@@ -51,11 +88,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    email_task.cancel()
-    try:
-        await email_task
-    except asyncio.CancelledError:
-        pass
+    for task in (email_task, sla_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     await stop_workers(agent_worker_tasks)
 

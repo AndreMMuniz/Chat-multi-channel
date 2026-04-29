@@ -37,6 +37,8 @@ export default function ChatPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [slaAlert, setSlaAlert] = useState<{ count: number; threshold: number } | null>(null);
+  const [deliveryAlert, setDeliveryAlert] = useState<{ channel: string; count: number } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -114,6 +116,12 @@ export default function ChatPage() {
       onPresenceUpdate(conversation_id, viewers);
     } else if (event.type === 'conversation_updated') {
       onConversationUpdated();
+    } else if (event.type === 'sla_risk_alert') {
+      const d = event.data as { count: number; threshold_minutes: number };
+      setSlaAlert({ count: d.count, threshold: d.threshold_minutes });
+    } else if (event.type === 'delivery_failure_alert') {
+      const d = event.data as { channel: string; failure_count: number };
+      setDeliveryAlert({ channel: d.channel, count: d.failure_count });
     }
   }, [onNewMessage, onConversationNotification, onPresenceUpdate, onConversationUpdated, fetchConversations, appendMessage, activeConversationRef]);
 
@@ -214,6 +222,32 @@ export default function ChatPage() {
         )}>
           <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
           {connectionState === 'connecting' ? 'Connecting to server…' : 'Connection lost — reconnecting…'}
+        </div>
+      )}
+
+      {/* SLA Risk Alert banner — Story 4.5 */}
+      {slaAlert && (
+        <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-amber-50 text-amber-800 border-b border-amber-200">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[14px]">schedule</span>
+            <span><strong>{slaAlert.count}</strong> conversa{slaAlert.count !== 1 ? 's' : ''} sem resposta há mais de {slaAlert.threshold} min</span>
+          </div>
+          <button onClick={() => setSlaAlert(null)} className="ml-2 text-amber-600 hover:text-amber-900">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      )}
+
+      {/* Delivery Failure Alert banner — Story 4.4 */}
+      {deliveryAlert && (
+        <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-red-50 text-red-800 border-b border-red-200">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[14px]">error</span>
+            <span><strong>{deliveryAlert.count}</strong> falhas de entrega no canal <strong className="uppercase">{deliveryAlert.channel}</strong> nos últimos minutos</span>
+          </div>
+          <button onClick={() => setDeliveryAlert(null)} className="ml-2 text-red-600 hover:text-red-900">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
         </div>
       )}
 
@@ -410,17 +444,25 @@ export default function ChatPage() {
                             <span className="material-symbols-outlined text-[16px] ml-auto opacity-50">download</span>
                           </a>
                         )}
-                        {/* Send failure indicator + retry — P0-2 */}
-                        {sendStatus[msg.id] === 'failed' && (
+                        {/* Send failure indicator + retry — Stories 4.2 + 4.3 */}
+                        {(sendStatus[msg.id] === 'failed' || msg.delivery_status === 'failed') && (
                           <div className="mt-1.5 flex items-center gap-2 text-red-500 text-xs">
                             <span className="material-symbols-outlined text-[14px]">error</span>
-                            <span>Falha no envio</span>
-                            <button
-                              onClick={() => retryMessage(msg.conversation_id, msg.id)}
-                              className="underline hover:text-red-700 transition-colors"
-                            >
-                              Tentar novamente
-                            </button>
+                            <span title={msg.delivery_error || 'Erro desconhecido'}>
+                              Falha no envio
+                              {msg.delivery_error && <span className="ml-1 opacity-60 font-mono">({msg.delivery_error.split(':').pop()})</span>}
+                            </span>
+                            {(msg.retry_count ?? 0) < 3 && (
+                              <button
+                                onClick={() => retryMessage(msg.conversation_id, msg.id)}
+                                className="underline hover:text-red-700 transition-colors"
+                              >
+                                Tentar novamente {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
+                              </button>
+                            )}
+                            {(msg.retry_count ?? 0) >= 3 && (
+                              <span className="opacity-60">Limite de tentativas atingido</span>
+                            )}
                           </div>
                         )}
                         {sendStatus[msg.id] === 'sending' && (
