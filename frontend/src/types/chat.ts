@@ -78,7 +78,13 @@ export interface DashboardStats {
   unread_conversations: number;
   messages_today: number;
   resolution_rate: number;
+  avg_resolution_hours: number | null;
   channels: Record<string, number>;
   daily_conversations: DayPoint[];
   daily_messages: DayPoint[];
+  period_days: number;
+  current_period_conversations: number;
+  prev_period_conversations: number;
+  current_period_messages: number;
+  prev_period_messages: number;
 }

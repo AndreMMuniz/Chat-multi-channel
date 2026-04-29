@@ -20,6 +20,7 @@ function cn(...inputs: ClassValue[]) {
 export default function ChatPage() {
   // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -43,9 +44,20 @@ export default function ChatPage() {
     activeConversationRef,
     fetchConversations,
     selectConversation,
+    updateConversation,
     onNewMessage,
     onConversationUpdated,
   } = useConversations();
+
+  const filteredConversations = searchQuery.trim()
+    ? conversations.filter(c => {
+        const q = searchQuery.toLowerCase();
+        return (
+          c.contact.name?.toLowerCase().includes(q) ||
+          c.contact.channel_identifier?.toLowerCase().includes(q)
+        );
+      })
+    : conversations;
 
   const {
     messages,
@@ -176,21 +188,31 @@ export default function ChatPage() {
           <div className="p-md border-surface-variant">
             <div className="relative flex items-center w-full h-10 rounded-DEFAULT bg-[#F1F3F5] text-on-surface-variant focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-container transition-all">
               <span className="material-symbols-outlined ml-sm text-outline">search</span>
-              <input className="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm outline-none" placeholder="Search conversations..." type="text" />
+              <input
+                className="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm outline-none"
+                placeholder="Search conversations..."
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
           
           {/* List */}
           <div className="flex-1 overflow-y-auto p-sm space-y-sm">
-            {conversations.length === 0 && <div className="p-4 text-center text-sm text-gray-500">No conversations yet</div>}
-            {conversations.map((conv) => (
-              <div 
-                key={conv.id} 
+            {filteredConversations.length === 0 && (
+              <div className="p-4 text-center text-sm text-gray-500">
+                {searchQuery ? 'No results found' : 'No conversations yet'}
+              </div>
+            )}
+            {filteredConversations.map((conv) => (
+              <div
+                key={conv.id}
                 onClick={() => handleSelectConversation(conv)}
                 className={cn(
                   "relative p-sm rounded-lg border cursor-pointer flex gap-sm items-start transition-colors",
-                  activeConversation?.id === conv.id 
-                    ? "border-outline-variant bg-surface-container" 
+                  activeConversation?.id === conv.id
+                    ? "border-outline-variant bg-surface-container"
                     : "border-transparent hover:bg-surface-container-high"
                 )}
               >
@@ -205,8 +227,14 @@ export default function ChatPage() {
                       {(conv.contact.name || 'U')[0]}
                     </div>
                   )}
+                  {/* Channel icon badge */}
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-sm border border-outline-variant">
+                    <span className="material-symbols-outlined text-[10px] text-slate-500" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      {conv.channel === 'TELEGRAM' ? 'send' : conv.channel === 'WHATSAPP' ? 'chat_bubble' : conv.channel === 'EMAIL' ? 'mail' : conv.channel === 'SMS' ? 'sms' : 'language'}
+                    </span>
+                  </div>
                   {conv.is_unread && (
-                    <div className={cn("absolute bottom-0 right-0 w-3 h-3 border-2 border-surface-container-lowest rounded-full bg-green-500")}></div>
+                    <div className="absolute -top-0.5 -left-0.5 w-3 h-3 border-2 border-surface-container-lowest rounded-full bg-green-500"></div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -252,10 +280,36 @@ export default function ChatPage() {
                   <div>
                     <h2 className="font-h2 text-h2 text-on-surface">{activeConversation.contact.name || activeConversation.contact.channel_identifier}</h2>
                     <div className="flex items-center gap-xs text-on-surface-variant font-body-sm text-body-sm">
-                      <span className="material-symbols-outlined text-[16px]">{activeConversation.channel === 'TELEGRAM' ? 'send' : 'chat'}</span>
+                      <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {activeConversation.channel === 'TELEGRAM' ? 'send' : activeConversation.channel === 'WHATSAPP' ? 'chat_bubble' : activeConversation.channel === 'EMAIL' ? 'mail' : activeConversation.channel === 'SMS' ? 'sms' : 'language'}
+                      </span>
                       <span className="capitalize">{activeConversation.channel.toLowerCase()}</span>
                     </div>
                   </div>
+                </div>
+                {/* Header actions: status selector + mark unread */}
+                <div className="flex items-center gap-sm">
+                  <select
+                    value={activeConversation.status}
+                    onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
+                    className={cn(
+                      "text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-container",
+                      activeConversation.status === 'OPEN' && "bg-green-50 text-green-700 border-green-200",
+                      activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700 border-yellow-200",
+                      activeConversation.status === 'CLOSED' && "bg-slate-100 text-slate-500 border-slate-200"
+                    )}
+                  >
+                    <option value="OPEN">Open</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                  <button
+                    title="Mark as unread"
+                    onClick={() => updateConversation(activeConversation.id, { is_unread: true })}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">mark_email_unread</span>
+                  </button>
                 </div>
               </div>
               
@@ -446,9 +500,13 @@ export default function ChatPage() {
                     <span className="text-slate-500">Identifier</span>
                     <span className="text-slate-900 font-medium truncate ml-2" title={activeConversation.contact.channel_identifier}>{activeConversation.contact.channel_identifier}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Status</span>
-                    <span className="text-slate-900 font-medium capitalize">{activeConversation.status.toLowerCase()}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Channel</span>
+                    <span className="text-slate-900 font-medium capitalize">{activeConversation.channel.toLowerCase()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Tag</span>
+                    <span className="text-slate-900 font-medium capitalize">{activeConversation.tag?.toLowerCase() || '-'}</span>
                   </div>
                 </div>
               </div>

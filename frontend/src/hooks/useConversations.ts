@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { conversationsApi } from "@/lib/api/index";
-import type { Conversation, Message } from "@/types/chat";
+import type { Conversation, Message, UpdateConversationRequest } from "@/types/chat";
 
 export interface UseConversationsReturn {
   conversations: Conversation[];
@@ -11,6 +11,7 @@ export interface UseConversationsReturn {
   loading: boolean;
   fetchConversations: () => Promise<void>;
   selectConversation: (conv: Conversation) => Promise<void>;
+  updateConversation: (id: string, data: UpdateConversationRequest) => Promise<void>;
   /** Called by WS handler when a new message arrives */
   onNewMessage: (msg: Message, refetchIfMissing: () => void) => void;
   /** Called by WS handler when a conversation is updated */
@@ -78,6 +79,20 @@ export function useConversations(): UseConversationsReturn {
     []
   );
 
+  const updateConversation = useCallback(async (id: string, data: UpdateConversationRequest) => {
+    try {
+      await conversationsApi.updateConversation(id, data);
+      setConversations(prev =>
+        prev.map(c => (c.id === id ? { ...c, ...data } : c))
+      );
+      if (activeConversationRef.current?.id === id) {
+        setActive({ ...activeConversationRef.current, ...data });
+      }
+    } catch (err) {
+      console.error("updateConversation:", err);
+    }
+  }, []);
+
   const onConversationUpdated = useCallback(() => {
     fetchConversations();
   }, [fetchConversations]);
@@ -89,6 +104,7 @@ export function useConversations(): UseConversationsReturn {
     loading,
     fetchConversations,
     selectConversation,
+    updateConversation,
     onNewMessage,
     onConversationUpdated,
   };
