@@ -54,28 +54,15 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    from app.core.database import get_supabase
-    from app.core.config import settings
-
-    health_status = {
-        "status": "healthy",
+    """
+    Lightweight liveness probe for Railway healthcheck.
+    Always returns 200 if the app is running — external dependency
+    failures (Supabase, DB) are handled at the request level, not here.
+    """
+    return {
+        "status": "ok",
         "environment": settings.ENVIRONMENT,
-        "database_url_configured": bool(settings.DATABASE_URL),
-        "supabase_url_configured": bool(settings.SUPABASE_URL),
-        "supabase_keys_configured": bool(settings.supabase_key),
     }
-
-    # Test Supabase connection
-    try:
-        supabase = get_supabase()
-        # Simple test - try to get auth settings
-        auth_settings = supabase.auth.get_settings()
-        health_status["supabase_connection"] = "ok"
-    except Exception as e:
-        health_status["supabase_connection"] = f"error: {str(e)}"
-        health_status["status"] = "unhealthy"
-
-    return health_status
 
 
 if __name__ == "__main__":
