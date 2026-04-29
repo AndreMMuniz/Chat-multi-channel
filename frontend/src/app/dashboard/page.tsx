@@ -67,30 +67,75 @@ function KpiCard({
   );
 }
 
-function BarChart({ data, color = "#7C4DFF" }: { data: DayPoint[]; color?: string }) {
-  const max = Math.max(...data.map((d) => d.count), 1);
+function BarChart({
+  data,
+  prevData,
+  color = "#7C4DFF",
+}: {
+  data: DayPoint[];
+  prevData?: DayPoint[];
+  color?: string;
+}) {
+  const allCounts = [
+    ...data.map((d) => d.count),
+    ...(prevData ?? []).map((d) => d.count),
+  ];
+  const max = Math.max(...allCounts, 1);
+
   return (
-    <div className="flex items-end gap-1.5 h-32 w-full">
-      {data.map((d, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full group">
-          <div className="flex-1 w-full flex items-end relative">
-            {d.count > 0 && (
-              <div className="absolute -top-6 left-1/2 -translate-x-1/2 hidden group-hover:flex bg-slate-800 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-10">
-                {d.count}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-end gap-1.5 h-32 w-full">
+        {data.map((d, i) => {
+          const prev = prevData?.[i];
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full group">
+              <div className="flex-1 w-full flex items-end gap-px relative">
+                {/* Tooltip */}
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
+                  <div className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
+                    {d.count} {prev !== undefined && <span className="opacity-60 ml-1">vs {prev.count}</span>}
+                  </div>
+                </div>
+                {/* Previous period bar (behind, lighter) */}
+                {prev !== undefined && (
+                  <div
+                    className="flex-1 rounded-t-sm transition-all"
+                    style={{
+                      height: `${Math.max((prev.count / max) * 100, prev.count > 0 ? 4 : 1)}%`,
+                      backgroundColor: color,
+                      opacity: 0.2,
+                    }}
+                  />
+                )}
+                {/* Current period bar */}
+                <div
+                  className="flex-1 rounded-t-md transition-all"
+                  style={{
+                    height: `${Math.max((d.count / max) * 100, d.count > 0 ? 6 : 2)}%`,
+                    backgroundColor: d.count > 0 ? color : "#E2E8F0",
+                    opacity: d.count > 0 ? 1 : 0.4,
+                  }}
+                />
               </div>
-            )}
-            <div
-              className="w-full rounded-t-md transition-all"
-              style={{
-                height: `${Math.max((d.count / max) * 100, d.count > 0 ? 6 : 2)}%`,
-                backgroundColor: d.count > 0 ? color : "#E2E8F0",
-                opacity: d.count > 0 ? 1 : 0.4,
-              }}
-            />
+              <span className="text-[10px] text-slate-400 font-medium">{d.date}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      {prevData && (
+        <div className="flex items-center gap-4 text-[11px] text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+            <span>Período atual</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-medium">{d.date}</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color, opacity: 0.25 }} />
+            <span>Período anterior</span>
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -386,12 +431,9 @@ export default function DashboardPage() {
                   <h2 className="text-sm font-semibold text-slate-900">New Conversations</h2>
                   <span className="text-xs text-slate-400">Last {days} days</span>
                 </div>
-                <BarChart data={stats.daily_conversations} color="#7C4DFF" />
-                <div className="mt-3 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#7C4DFF]" />
-                  <span className="text-xs text-slate-500">
-                    {stats.current_period_conversations} conversations this period
-                  </span>
+                <BarChart data={stats.daily_conversations} prevData={stats.prev_daily_conversations} color="#7C4DFF" />
+                <div className="mt-1 text-xs text-slate-500">
+                  {stats.current_period_conversations} conversas neste período
                 </div>
               </div>
 
@@ -401,12 +443,9 @@ export default function DashboardPage() {
                   <h2 className="text-sm font-semibold text-slate-900">Messages Exchanged</h2>
                   <span className="text-xs text-slate-400">Last {days} days</span>
                 </div>
-                <BarChart data={stats.daily_messages} color="#3B82F6" />
-                <div className="mt-3 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#3B82F6]" />
-                  <span className="text-xs text-slate-500">
-                    {stats.current_period_messages} messages this period
-                  </span>
+                <BarChart data={stats.daily_messages} prevData={stats.prev_daily_messages} color="#3B82F6" />
+                <div className="mt-1 text-xs text-slate-500">
+                  {stats.current_period_messages} mensagens neste período
                 </div>
               </div>
             </div>

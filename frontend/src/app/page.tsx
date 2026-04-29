@@ -17,6 +17,17 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { label: string; color: string } | null {
+  if (!isUnread || !lastMessageDate) return null;
+  const diffMs = Date.now() - new Date(lastMessageDate).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 15) return null;
+  if (diffMin < 60) return { label: `há ${diffMin}m`, color: 'text-yellow-600' };
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return { label: `há ${diffH}h`, color: diffH >= 2 ? 'text-red-500' : 'text-orange-500' };
+  return { label: `há ${Math.floor(diffH / 24)}d`, color: 'text-red-600' };
+}
+
 export default function ChatPage() {
   // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
@@ -77,7 +88,10 @@ export default function ChatPage() {
 
   const {
     suggestions,
+    source: aiSource,
+    generatedAt: aiGeneratedAt,
     generating: aiGenerating,
+    loading: aiLoading,
     fetchCached: fetchAICached,
     generate: generateAI,
     clear: clearAI,
@@ -279,12 +293,23 @@ export default function ChatPage() {
                       </span>
                     </div>
                   </div>
-                  <p className={cn(
-                    "font-body-sm text-body-sm truncate",
-                    conv.is_unread ? "font-medium text-on-surface" : "text-outline"
-                  )}>
-                    {conv.last_message || 'No messages'}
-                  </p>
+                  <div className="flex items-center justify-between gap-1">
+                    <p className={cn(
+                      "font-body-sm text-body-sm truncate flex-1",
+                      conv.is_unread ? "font-medium text-on-surface" : "text-outline"
+                    )}>
+                      {conv.last_message || 'No messages'}
+                    </p>
+                    {/* Waiting time indicator — P1-1 */}
+                    {(() => {
+                      const wt = waitingTime(conv.last_message_date, conv.is_unread);
+                      return wt ? (
+                        <span className={cn("text-[10px] font-semibold shrink-0", wt.color)}>
+                          {wt.label}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
                 </div>
               </div>
             ))}
@@ -333,7 +358,7 @@ export default function ChatPage() {
                     onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
                     className={cn(
                       "text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-container",
-                      activeConversation.status === 'OPEN' && "bg-green-50 text-green-700 border-green-200",
+                      activeConversation.status === 'OPEN' && "bg-orange-50 text-orange-700 border-orange-200",
                       activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700 border-yellow-200",
                       activeConversation.status === 'CLOSED' && "bg-slate-100 text-slate-500 border-slate-200"
                     )}
@@ -566,10 +591,64 @@ export default function ChatPage() {
                     <span className="text-slate-500">Tag</span>
                     <span className="text-slate-900 font-medium capitalize">{activeConversation.tag?.toLowerCase() || '-'}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Status</span>
+                    <span className={cn(
+                      "text-xs font-semibold px-2 py-0.5 rounded-full",
+                      activeConversation.status === 'OPEN' && "bg-orange-50 text-orange-700",
+                      activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700",
+                      activeConversation.status === 'CLOSED' && "bg-slate-100 text-slate-500",
+                    )}>
+                      {activeConversation.status}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* AI Suggestions */}
+              {/* Cross-channel history — P1-2 */}
+              {(() => {
+                const otherConvs = conversations.filter(
+                  c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
+                );
+                if (otherConvs.length === 0) return null;
+                const CHANNEL_ICON: Record<string, string> = {
+                  TELEGRAM: 'send', WHATSAPP: 'chat_bubble', EMAIL: 'mail', SMS: 'sms', WEB: 'language',
+                };
+                return (
+                  <div className="p-5 border-b border-outline-variant">
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                      Outras conversas ({otherConvs.length})
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {otherConvs.map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => handleSelectConversation(c)}
+                          className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 text-left transition-colors w-full"
+                        >
+                          <span className="material-symbols-outlined text-[16px] text-slate-400" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {CHANNEL_ICON[c.channel] || 'chat'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-slate-700 truncate capitalize">{c.channel.toLowerCase()}</p>
+                            <p className="text-[11px] text-slate-400 truncate">{c.last_message || 'No messages'}</p>
+                          </div>
+                          <span className={cn(
+                            "text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0",
+                            c.status === 'OPEN' && "bg-orange-50 text-orange-600",
+                            c.status === 'PENDING' && "bg-yellow-50 text-yellow-600",
+                            c.status === 'CLOSED' && "bg-slate-100 text-slate-400",
+                          )}>
+                            {c.status}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* AI Suggestions — P2-1 */}
               <div className="p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -584,21 +663,41 @@ export default function ChatPage() {
                     <span className={cn("material-symbols-outlined text-[14px]", aiGenerating && "animate-spin")}>
                       {aiGenerating ? "progress_activity" : "refresh"}
                     </span>
-                    {aiGenerating ? "Generating…" : "Refresh"}
+                    {aiGenerating ? "Gerando…" : "Gerar"}
                   </button>
                 </div>
 
-                {suggestions.length === 0 && !aiGenerating && (
+                {/* Source + timestamp badge */}
+                {aiSource && aiGeneratedAt && (
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                      "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                      aiSource === "generated"
+                        ? "bg-purple-50 text-[#7C4DFF]"
+                        : "bg-slate-100 text-slate-500"
+                    )}>
+                      <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {aiSource === "generated" ? "auto_awesome" : "cached"}
+                      </span>
+                      {aiSource === "generated" ? "Gerado agora" : "Cache da última sessão"}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {aiGeneratedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                )}
+
+                {suggestions.length === 0 && !aiGenerating && !aiLoading && (
                   <button
                     onClick={() => generateAI(activeConversation.id)}
                     className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-sm text-slate-400 hover:border-[#7C4DFF] hover:text-[#7C4DFF] transition-colors flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                    Generate suggestions
+                    Gerar sugestões com IA
                   </button>
                 )}
 
-                {aiGenerating && (
+                {(aiGenerating || aiLoading) && (
                   <div className="flex flex-col gap-2">
                     {[1, 2, 3].map(i => (
                       <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
@@ -606,7 +705,7 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {!aiGenerating && suggestions.map((s, i) => (
+                {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
                   <button
                     key={i}
                     onClick={() => setInput(s)}

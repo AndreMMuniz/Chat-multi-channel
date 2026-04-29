@@ -114,7 +114,10 @@ class EmailService:
 
     async def poll_and_process(self, db: Session) -> None:
         """Called by background scheduler. Processes unseen emails as inbound messages."""
-        for from_addr, subject, body in self.fetch_unseen():
+        import asyncio
+        # fetch_unseen uses blocking imaplib — run in thread pool to avoid blocking event loop
+        messages = await asyncio.to_thread(self.fetch_unseen)
+        for from_addr, subject, body in messages:
             await self._handle_inbound(db, from_addr, body)
 
     async def _handle_inbound(self, db: Session, from_addr: str, text: str) -> None:

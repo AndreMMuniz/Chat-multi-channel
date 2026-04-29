@@ -87,39 +87,26 @@ async def get_dashboard_stats(
         Message.created_at < period_start,
     ).scalar() or 0
 
-    # ── Daily trend for selected period ───────────────────────────────────
-    daily_conversations = []
-    for i in range(days - 1, -1, -1):
-        day_start = (now - timedelta(days=i)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        day_end = day_start + timedelta(days=1)
-        count = db.query(func.count(Conversation.id)).filter(
-            Conversation.created_at >= day_start,
-            Conversation.created_at < day_end,
-        ).scalar() or 0
-        label = day_start.strftime("%d/%m") if days > 7 else day_start.strftime("%a")
-        daily_conversations.append({
-            "date": label,
-            "full_date": day_start.strftime("%b %d"),
-            "count": count,
-        })
+    # ── Daily trend builder ────────────────────────────────────────────────
+    def build_daily(model, date_field, offset_days: int):
+        rows = []
+        for i in range(days - 1, -1, -1):
+            day_start = (now - timedelta(days=i + offset_days)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            day_end = day_start + timedelta(days=1)
+            count = db.query(func.count(model.id)).filter(
+                date_field >= day_start,
+                date_field < day_end,
+            ).scalar() or 0
+            label = day_start.strftime("%d/%m") if days > 7 else day_start.strftime("%a")
+            rows.append({"date": label, "full_date": day_start.strftime("%b %d"), "count": count})
+        return rows
 
-    daily_messages = []
-    for i in range(days - 1, -1, -1):
-        day_start = (now - timedelta(days=i)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        day_end = day_start + timedelta(days=1)
-        count = db.query(func.count(Message.id)).filter(
-            Message.created_at >= day_start,
-            Message.created_at < day_end,
-        ).scalar() or 0
-        label = day_start.strftime("%d/%m") if days > 7 else day_start.strftime("%a")
-        daily_messages.append({
-            "date": label,
-            "count": count,
-        })
+    daily_conversations      = build_daily(Conversation, Conversation.created_at, 0)
+    prev_daily_conversations = build_daily(Conversation, Conversation.created_at, days)
+    daily_messages           = build_daily(Message,       Message.created_at,       0)
+    prev_daily_messages      = build_daily(Message,       Message.created_at,       days)
 
     return create_response({
         "total_conversations": total,
@@ -132,7 +119,9 @@ async def get_dashboard_stats(
         "avg_resolution_hours": avg_resolution_hours,
         "channels": channels,
         "daily_conversations": daily_conversations,
+        "prev_daily_conversations": prev_daily_conversations,
         "daily_messages": daily_messages,
+        "prev_daily_messages": prev_daily_messages,
         "period_days": days,
         "current_period_conversations": current_period_convs,
         "prev_period_conversations": prev_period_convs,

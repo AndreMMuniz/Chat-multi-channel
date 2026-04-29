@@ -306,6 +306,24 @@ export default function SettingsPage() {
 
                   {/* WhatsApp */}
                   <ApiGroup icon="chat" label="WhatsApp — Meta Cloud API" color="bg-green-50 text-green-800 border-b border-green-100" configured={whatsappConfigured}>
+                    {/* Webhook URL — readonly, for Meta Dashboard setup */}
+                    <Field label="Webhook URL" hint="Copy this URL into your Meta App → Webhooks">
+                      <div className="flex items-center gap-2">
+                        <input
+                          readOnly
+                          value={`${process.env.NEXT_PUBLIC_API_URL ?? 'https://your-backend.railway.app'}/api/v1/whatsapp/webhook`}
+                          className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600 font-mono select-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/whatsapp/webhook`)}
+                          className="shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+                          title="Copy to clipboard"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                        </button>
+                      </div>
+                    </Field>
                     <Field label="Phone Number ID">
                       <TextInput value={s.whatsapp_phone_id} onChange={set("whatsapp_phone_id")} placeholder="123456789012345" />
                     </Field>

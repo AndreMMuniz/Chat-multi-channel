@@ -3,8 +3,12 @@
 import { useState, useCallback } from "react";
 import { aiApi } from "@/lib/api/index";
 
+export type SuggestionsSource = "cache" | "generated" | null;
+
 export interface UseAISuggestionsReturn {
   suggestions: string[];
+  source: SuggestionsSource;
+  generatedAt: Date | null;
   loading: boolean;
   generating: boolean;
   fetchCached: (conversationId: string) => Promise<void>;
@@ -14,6 +18,8 @@ export interface UseAISuggestionsReturn {
 
 export function useAISuggestions(): UseAISuggestionsReturn {
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [source, setSource] = useState<SuggestionsSource>(null);
+  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -21,9 +27,13 @@ export function useAISuggestions(): UseAISuggestionsReturn {
     setLoading(true);
     try {
       const result = await aiApi.getSuggestions(conversationId);
-      setSuggestions(result.suggestions ?? []);
+      const s = result.suggestions ?? [];
+      setSuggestions(s);
+      setSource(s.length > 0 ? "cache" : null);
+      setGeneratedAt(s.length > 0 ? new Date() : null);
     } catch {
       setSuggestions([]);
+      setSource(null);
     } finally {
       setLoading(false);
     }
@@ -33,15 +43,23 @@ export function useAISuggestions(): UseAISuggestionsReturn {
     setGenerating(true);
     try {
       const result = await aiApi.generateSuggestions(conversationId);
-      setSuggestions(result.suggestions ?? []);
+      const s = result.suggestions ?? [];
+      setSuggestions(s);
+      setSource(s.length > 0 ? "generated" : null);
+      setGeneratedAt(s.length > 0 ? new Date() : null);
     } catch {
       setSuggestions([]);
+      setSource(null);
     } finally {
       setGenerating(false);
     }
   }, []);
 
-  const clear = useCallback(() => setSuggestions([]), []);
+  const clear = useCallback(() => {
+    setSuggestions([]);
+    setSource(null);
+    setGeneratedAt(null);
+  }, []);
 
-  return { suggestions, loading, generating, fetchCached, generate, clear };
+  return { suggestions, source, generatedAt, loading, generating, fetchCached, generate, clear };
 }
