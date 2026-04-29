@@ -57,6 +57,15 @@ class ConversationUpdate(BaseModel):
     status: Optional[ConversationStatus] = None
     tag: Optional[ConversationTag] = None
     is_unread: Optional[bool] = None
+    assigned_user_id: Optional[UUID] = None
+
+class AssignedUserSlim(BaseModel):
+    id: UUID
+    full_name: str
+    email: str
+    avatar: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ConversationResponse(ConversationBase):
     id: UUID
@@ -64,6 +73,9 @@ class ConversationResponse(ConversationBase):
     thread_id: Optional[str] = None
     last_message: Optional[str] = None
     last_message_date: Optional[datetime] = None
+    first_response_at: Optional[datetime] = None
+    assigned_user_id: Optional[UUID] = None
+    assigned_user: Optional[AssignedUserSlim] = None
     created_at: datetime
     updated_at: datetime
     contact: Optional[ContactResponse] = None

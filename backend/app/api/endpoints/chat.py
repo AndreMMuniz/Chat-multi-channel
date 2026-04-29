@@ -1,5 +1,5 @@
 import uuid as _uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
@@ -64,15 +64,40 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # --- REST Endpoints ---
 @router.get("/conversations")
-async def get_conversations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """List all conversations (used by the frontend dashboard)."""
-    conversations = db.query(Conversation).order_by(Conversation.last_message_date.desc().nulls_last()).offset(skip).limit(limit).all()
-    total = db.query(Conversation).count()
+async def get_conversations(
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = None,
+    assigned_user_id: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List conversations with optional filters. Eager-loads contact and assigned_user."""
+    from sqlalchemy.orm import joinedload
+    from app.models.models import Contact, User
+
+    q = (
+        db.query(Conversation)
+        .options(
+            joinedload(Conversation.contact),
+            joinedload(Conversation.assigned_user),
+        )
+    )
+    if status:
+        from app.models.models import ConversationStatus as CS
+        try:
+            q = q.filter(Conversation.status == CS[status.upper()])
+        except KeyError:
+            pass
+    if assigned_user_id:
+        q = q.filter(Conversation.assigned_user_id == assigned_user_id)
+
+    total = q.count()
+    conversations = q.order_by(Conversation.last_message_date.desc().nulls_last()).offset(skip).limit(limit).all()
     return create_paginated_response(
         data=[ConversationResponse.model_validate(c) for c in conversations],
         total=total,
         page=(skip // limit) + 1,
-        page_size=limit
+        page_size=limit,
     )
 
 @router.get("/conversations/{conversation_id}/messages")
@@ -151,6 +176,50 @@ async def send_message(
     )
 
     return create_response(MessageResponse.model_validate(new_message))
+
+
+# ── Conversation Assignment (Story 3.5) ──────────────────────────────────────
+
+@router.patch("/conversations/{conversation_id}/assign")
+async def assign_conversation(
+    conversation_id: UUID,
+    body: Dict[str, Any],
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Assign or unassign a conversation to an agent. Pass {assigned_user_id: uuid|null}."""
+    from app.models.models import User
+    from app.services.audit_service import log_action
+
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND", message="Conversation not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    new_uid = body.get("assigned_user_id")
+
+    if new_uid:
+        user = db.query(User).filter(User.id == new_uid).first()
+        if not user:
+            error_response, status = create_error_response(
+                code="USER_NOT_FOUND", message="User not found", status_code=404
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+        conversation.assigned_user_id = user.id
+    else:
+        conversation.assigned_user_id = None
+
+    db.commit()
+    db.refresh(conversation)
+
+    await manager.broadcast_to_conversation(
+        conversation_id=str(conversation_id),
+        event_type="conversation_updated",
+        data={"conversation_id": str(conversation_id), "assigned_user_id": str(new_uid) if new_uid else None},
+    )
+
+    return create_response(ConversationResponse.model_validate(conversation))
 
 
 # ── Message Retry (Story 4.3) ─────────────────────────────────────────────────

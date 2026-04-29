@@ -108,6 +108,63 @@ async def get_dashboard_stats(
     daily_messages           = build_daily(Message,       Message.created_at,       0)
     prev_daily_messages      = build_daily(Message,       Message.created_at,       days)
 
+    # ── SLA & Queue Health (Epic 3) ────────────────────────────────────────────
+    sla_threshold_min = int(os.getenv("SLA_THRESHOLD_MINUTES", "60"))
+    sla_cutoff = now - timedelta(minutes=sla_threshold_min)
+
+    # Conversations at SLA risk: OPEN + unread + last_message_date before cutoff
+    sla_at_risk = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.OPEN,
+        Conversation.is_unread == True,
+        Conversation.last_message_date <= sla_cutoff,
+    ).scalar() or 0
+
+    # First-response SLA compliance: % of CLOSED conversations in period that had first_response_at
+    closed_with_response = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.CLOSED,
+        Conversation.created_at >= period_start,
+        Conversation.first_response_at.isnot(None),
+    ).scalar() or 0
+    total_closed_period = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.CLOSED,
+        Conversation.created_at >= period_start,
+    ).scalar() or 0
+    sla_compliance_pct = round(
+        (closed_with_response / total_closed_period * 100) if total_closed_period > 0 else 0, 1
+    )
+
+    # Avg first-response time (minutes) for conversations in the period
+    resp_rows = db.query(Conversation).filter(
+        Conversation.first_response_at.isnot(None),
+        Conversation.created_at >= period_start,
+    ).all()
+    if resp_rows:
+        avg_first_response_min = round(
+            sum(
+                (c.first_response_at - c.created_at).total_seconds() / 60
+                for c in resp_rows
+                if c.first_response_at and c.created_at and c.first_response_at > c.created_at
+            ) / len(resp_rows), 1
+        )
+    else:
+        avg_first_response_min = None
+
+    # Queue health: open conversations by channel
+    queue_by_channel = {
+        (row[0].name if hasattr(row[0], "name") else str(row[0])).upper(): row[1]
+        for row in db.query(Conversation.channel, func.count(Conversation.id))
+        .filter(Conversation.status == ConversationStatus.OPEN)
+        .group_by(Conversation.channel)
+        .all()
+    }
+
+    # Unassigned open conversations
+    unassigned_open = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.OPEN,
+        Conversation.assigned_user_id.is_(None),
+    ).scalar() or 0
+
+    import os
     return create_response({
         "total_conversations": total,
         "open_conversations": open_count,
@@ -127,4 +184,11 @@ async def get_dashboard_stats(
         "prev_period_conversations": prev_period_convs,
         "current_period_messages": current_period_msgs,
         "prev_period_messages": prev_period_msgs,
+        # SLA & Queue (Epic 3)
+        "sla_at_risk": sla_at_risk,
+        "sla_threshold_minutes": sla_threshold_min,
+        "sla_compliance_pct": sla_compliance_pct,
+        "avg_first_response_minutes": avg_first_response_min,
+        "queue_by_channel": queue_by_channel,
+        "unassigned_open": unassigned_open,
     })

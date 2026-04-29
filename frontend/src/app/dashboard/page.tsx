@@ -310,6 +310,37 @@ export default function DashboardPage() {
               />
             </div>
 
+            {/* ── SLA & Queue Health (Epic 3) ───────────────────────── */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+              <KpiCard
+                icon="warning"          label="SLA at Risk"
+                value={stats.sla_at_risk}
+                sub={`>${stats.sla_threshold_minutes}min sem resposta`}
+                iconBg={stats.sla_at_risk > 0 ? "bg-red-50" : "bg-slate-50"}
+                color={stats.sla_at_risk > 0 ? "#EF4444" : "#94A3B8"}
+              />
+              <KpiCard
+                icon="verified"         label="SLA Compliance"
+                value={`${stats.sla_compliance_pct}%`}
+                sub="conversas fechadas com resposta"
+                iconBg={stats.sla_compliance_pct >= 80 ? "bg-green-50" : "bg-yellow-50"}
+                color={stats.sla_compliance_pct >= 80 ? "#10B981" : "#F59E0B"}
+              />
+              <KpiCard
+                icon="speed"            label="Avg First Response"
+                value={stats.avg_first_response_minutes !== null ? `${stats.avg_first_response_minutes}m` : "—"}
+                sub="tempo até 1ª resposta do agente"
+                iconBg="bg-indigo-50"   color="#6366F1"
+              />
+              <KpiCard
+                icon="person_off"       label="Unassigned Open"
+                value={stats.unassigned_open}
+                sub="sem agente atribuído"
+                iconBg={stats.unassigned_open > 5 ? "bg-orange-50" : "bg-slate-50"}
+                color={stats.unassigned_open > 5 ? "#F97316" : "#94A3B8"}
+              />
+            </div>
+
             {/* ── Period comparison strip ────────────────────────────── */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <div className="bg-white rounded-2xl border border-[#E9ECEF] p-5 flex items-center gap-6">
@@ -339,6 +370,27 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* ── Queue by Channel (Story 3.4) ──────────────────────── */}
+            {Object.keys(stats.queue_by_channel ?? {}).length > 0 && (
+              <div className="bg-white rounded-2xl border border-[#E9ECEF] p-5">
+                <h2 className="text-sm font-semibold text-slate-900 mb-4">Open Queue by Channel</h2>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(stats.queue_by_channel).sort(([,a],[,b]) => b - a).map(([ch, count]) => {
+                    const meta = CHANNEL_META[ch] ?? { label: ch, icon: "chat", color: "#64748B", bg: "bg-slate-50" };
+                    return (
+                      <div key={ch} className={`flex items-center gap-2.5 px-4 py-3 rounded-xl ${meta.bg} border border-transparent`}>
+                        <span className="material-symbols-outlined text-[18px]" style={{ color: meta.color, fontVariationSettings: "'FILL' 1" }}>{meta.icon}</span>
+                        <div>
+                          <p className="text-xs text-slate-500">{meta.label}</p>
+                          <p className="text-lg font-bold text-slate-900 leading-none">{count}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── Middle row ────────────────────────────────────────── */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">

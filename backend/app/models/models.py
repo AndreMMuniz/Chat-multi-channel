@@ -153,6 +153,9 @@ class Conversation(Base):
     last_message = Column(Text, nullable=True)
     last_message_date = Column(DateTime(timezone=True), nullable=True)
 
+    # SLA tracking (Story 3.6)
+    first_response_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

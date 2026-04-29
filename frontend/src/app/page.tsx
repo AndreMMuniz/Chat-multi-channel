@@ -9,23 +9,66 @@ import { useMessages } from '@/hooks/useMessages';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
+import { conversationsApi, usersApi } from '@/lib/api/index';
 import type { SequencedEvent } from '@/types/api';
 import type { Conversation, Message } from '@/types/chat';
 import AudioMessage from '@/components/AudioMessage';
+import { useState as useLocalState, useEffect as useLocalEffect } from 'react';
+
+// ── Assignment Panel (Story 3.5) ──────────────────────────────────────────────
+
+function AssignmentPanel({ conversation, onAssign }: {
+  conversation: Conversation;
+  onAssign: (userId: string | null) => Promise<void>;
+}) {
+  const [agents, setAgents] = useLocalState<{ id: string; full_name: string }[]>([]);
+  const [saving, setSaving] = useLocalState(false);
+
+  useLocalEffect(() => {
+    usersApi.listUsers(100).then(r => setAgents(r.data ?? [])).catch(() => {});
+  }, []);
+
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSaving(true);
+    await onAssign(e.target.value || null).catch(() => {});
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={conversation.assigned_user_id ?? ''}
+        onChange={handleChange}
+        disabled={saving}
+        className="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:border-[#7C4DFF] outline-none cursor-pointer text-slate-700 disabled:opacity-50"
+      >
+        <option value="">— Unassigned —</option>
+        {agents.map(a => (
+          <option key={a.id} value={a.id}>{a.full_name}</option>
+        ))}
+      </select>
+      {saving && <span className="material-symbols-outlined text-[16px] text-slate-400 animate-spin">progress_activity</span>}
+    </div>
+  );
+}
+
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { label: string; color: string } | null {
+const SLA_THRESHOLD_MINUTES = 60;
+
+function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { label: string; color: string; slaBreached: boolean } | null {
   if (!isUnread || !lastMessageDate) return null;
   const diffMs = Date.now() - new Date(lastMessageDate).getTime();
   const diffMin = Math.floor(diffMs / 60_000);
   if (diffMin < 15) return null;
-  if (diffMin < 60) return { label: `há ${diffMin}m`, color: 'text-yellow-600' };
+  const slaBreached = diffMin >= SLA_THRESHOLD_MINUTES;
+  if (diffMin < 60) return { label: `há ${diffMin}m`, color: 'text-yellow-600', slaBreached };
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return { label: `há ${diffH}h`, color: diffH >= 2 ? 'text-red-500' : 'text-orange-500' };
-  return { label: `há ${Math.floor(diffH / 24)}d`, color: 'text-red-600' };
+  if (diffH < 24) return { label: `há ${diffH}h`, color: diffH >= 2 ? 'text-red-500' : 'text-orange-500', slaBreached };
+  return { label: `há ${Math.floor(diffH / 24)}d`, color: 'text-red-600', slaBreached: true };
 }
 
 export default function ChatPage() {
@@ -66,15 +109,26 @@ export default function ChatPage() {
     onConversationUpdated,
   } = useConversations();
 
+  // Story 3.3 — sort by SLA risk: breached first, then by wait time desc
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const wtA = waitingTime(a.last_message_date, a.is_unread);
+    const wtB = waitingTime(b.last_message_date, b.is_unread);
+    if (wtA?.slaBreached && !wtB?.slaBreached) return -1;
+    if (!wtA?.slaBreached && wtB?.slaBreached) return 1;
+    const tA = a.last_message_date ? new Date(a.last_message_date).getTime() : 0;
+    const tB = b.last_message_date ? new Date(b.last_message_date).getTime() : 0;
+    return tA - tB; // oldest unread first within same risk tier
+  });
+
   const filteredConversations = searchQuery.trim()
-    ? conversations.filter(c => {
+    ? sortedConversations.filter(c => {
         const q = searchQuery.toLowerCase();
         return (
           c.contact.name?.toLowerCase().includes(q) ||
           c.contact.channel_identifier?.toLowerCase().includes(q)
         );
       })
-    : conversations;
+    : sortedConversations;
 
   const {
     messages,
@@ -334,14 +388,16 @@ export default function ChatPage() {
                     )}>
                       {conv.last_message || 'No messages'}
                     </p>
-                    {/* Waiting time indicator — P1-1 */}
+                    {/* SLA risk indicator — Stories 3.2/3.3 */}
                     {(() => {
                       const wt = waitingTime(conv.last_message_date, conv.is_unread);
-                      return wt ? (
-                        <span className={cn("text-[10px] font-semibold shrink-0", wt.color)}>
+                      if (!wt) return null;
+                      return (
+                        <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-semibold shrink-0", wt.color)}>
+                          {wt.slaBreached && <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>}
                           {wt.label}
                         </span>
-                      ) : null;
+                      );
                     })()}
                   </div>
                 </div>
@@ -644,7 +700,28 @@ export default function ChatPage() {
                       {activeConversation.status}
                     </span>
                   </div>
+                  {/* SLA first-response time */}
+                  {activeConversation.first_response_at && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">First Response</span>
+                      <span className="text-xs text-slate-600">
+                        {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
+                      </span>
+                    </div>
+                  )}
                 </div>
+              </div>
+
+              {/* Assigned Agent (Story 3.5) */}
+              <div className="p-5 border-b border-outline-variant">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Assigned Agent</h3>
+                <AssignmentPanel
+                  conversation={activeConversation}
+                  onAssign={async (userId) => {
+                    await conversationsApi.assignConversation(activeConversation.id, userId);
+                    fetchConversations();
+                  }}
+                />
               </div>
 
               {/* Cross-channel history — P1-2 */}

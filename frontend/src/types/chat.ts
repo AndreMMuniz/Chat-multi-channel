@@ -16,6 +16,13 @@ export interface Contact {
   created_at?: string;
 }
 
+export interface AssignedUser {
+  id: string;
+  full_name: string;
+  email: string;
+  avatar?: string;
+}
+
 export interface Conversation {
   id: string;
   contact_id: string;
@@ -25,6 +32,9 @@ export interface Conversation {
   is_unread: boolean;
   last_message?: string;
   last_message_date?: string;
+  first_response_at?: string;
+  assigned_user_id?: string;
+  assigned_user?: AssignedUser;
   thread_id?: string;
   created_at: string;
   updated_at: string;
@@ -94,4 +104,11 @@ export interface DashboardStats {
   prev_period_conversations: number;
   current_period_messages: number;
   prev_period_messages: number;
+  // Epic 3 — SLA & Queue Health
+  sla_at_risk: number;
+  sla_threshold_minutes: number;
+  sla_compliance_pct: number;
+  avg_first_response_minutes: number | null;
+  queue_by_channel: Record<string, number>;
+  unassigned_open: number;
 }

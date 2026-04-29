@@ -6,7 +6,7 @@ Encapsulates: sequence assignment, idempotency, external channel dispatch
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, TYPE_CHECKING
 from uuid import UUID
 from sqlalchemy import func
@@ -211,6 +211,11 @@ class MessageService:
             idempotency_key=idempotency_key,
         )
         message.delivery_status = DeliveryStatus.PENDING
+
+        # Set first_response_at when this is the first outbound message (Story 3.6)
+        if conversation.first_response_at is None:
+            conversation.first_response_at = datetime.now(timezone.utc)
+
         self.db.commit()
 
         try:
