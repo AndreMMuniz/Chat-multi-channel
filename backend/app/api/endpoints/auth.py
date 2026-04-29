@@ -61,20 +61,21 @@ class LoginResponse(BaseModel):
 @limiter.limit("10/minute")
 async def login(data: LoginRequest, request: Request, response: Response, repos: RepositoryFactory = Depends(get_repositories)) -> Dict[str, Any]:
     """Authenticate via Supabase, set HttpOnly cookies and return tokens."""
-    print(f"DEBUG LOGIN: Attempting login for email: {data.email}")
+    import logging
+    logging.warning(f"DEBUG LOGIN: Attempting login for email: {data.email}")
 
     supabase = get_supabase()
-    print(f"DEBUG LOGIN: Supabase client created")
+    logging.warning(f"DEBUG LOGIN: Supabase client created")
 
     try:
-        print(f"DEBUG LOGIN: Calling sign_in_with_password")
+        logging.warning(f"DEBUG LOGIN: Calling sign_in_with_password")
         auth_response = supabase.auth.sign_in_with_password({
             "email": data.email,
             "password": data.password,
         })
-        print(f"DEBUG LOGIN: Supabase auth successful")
+        logging.warning(f"DEBUG LOGIN: Supabase auth successful")
     except Exception as e:
-        print(f"DEBUG LOGIN: Supabase auth failed: {str(e)}")
+        logging.warning(f"DEBUG LOGIN: Supabase auth failed: {str(e)}")
         error_response, status = create_error_response(
             code="INVALID_CREDENTIALS",
             message="Invalid email or password",
@@ -83,7 +84,7 @@ async def login(data: LoginRequest, request: Request, response: Response, repos:
         raise HTTPException(status_code=status, detail=error_response)
 
     if not auth_response.session:
-        print(f"DEBUG LOGIN: No session in auth response")
+        logging.warning(f"DEBUG LOGIN: No session in auth response")
         error_response, status = create_error_response(
             code="INVALID_CREDENTIALS",
             message="Invalid email or password",
@@ -92,12 +93,12 @@ async def login(data: LoginRequest, request: Request, response: Response, repos:
         raise HTTPException(status_code=status, detail=error_response)
 
     auth_id = str(auth_response.user.id)
-    print(f"DEBUG LOGIN: Auth ID: {auth_id}")
+    logging.warning(f"DEBUG LOGIN: Auth ID: {auth_id}")
 
     # Use repository to find user
-    print(f"DEBUG LOGIN: Looking up user in database")
+    logging.warning(f"DEBUG LOGIN: Looking up user in database")
     user = await repos.users.find_by_auth_id(auth_id)
-    print(f"DEBUG LOGIN: User found: {user is not None}")
+    logging.warning(f"DEBUG LOGIN: User found: {user is not None}")
 
     if not user:
         print(f"DEBUG LOGIN: User not found in local database")
