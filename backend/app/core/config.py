@@ -24,6 +24,8 @@ class Settings(BaseModel):
     # Deployment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    WEBHOOK_BASE_URL: str = os.getenv("WEBHOOK_BASE_URL", "")
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
 
     @property
     def supabase_key(self) -> str:
