@@ -9,3 +9,4 @@ export * as dashboardApi from "./dashboard";
 export * as uploadApi from "./upload";
 export * as aiApi from "./ai";
 export * as quickRepliesApi from "./quickReplies";
+export * as auditApi from "./audit";

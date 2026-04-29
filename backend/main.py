@@ -1,3 +1,4 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -12,15 +13,51 @@ from app.services.telegram_service import telegram_service
 
 limiter = Limiter(key_func=get_remote_address)
 
+_EMAIL_POLL_INTERVAL = int(os.getenv("EMAIL_POLL_INTERVAL_SECONDS", "60"))
+
+
+async def _email_poll_loop() -> None:
+    """Background task: poll IMAP every EMAIL_POLL_INTERVAL_SECONDS for new emails."""
+    from app.core.database import SessionLocal
+    from app.services.email_service import EmailService
+
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                svc = EmailService.from_settings(db)
+                if svc:
+                    await svc.poll_and_process(db)
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[EmailPoller] Error: {e}")
+        await asyncio.sleep(_EMAIL_POLL_INTERVAL)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Auto-register Telegram webhook on startup if WEBHOOK_BASE_URL is set."""
+    """Startup: register Telegram webhook + start Email IMAP polling + agent workers."""
     base_url = settings.WEBHOOK_BASE_URL.rstrip("/")
     if base_url and settings.TELEGRAM_BOT_TOKEN:
         webhook_url = f"{base_url}/api/v1/telegram/webhook"
         await telegram_service.set_webhook(webhook_url)
+
+    email_task = asyncio.create_task(_email_poll_loop())
+
+    # Start AI agent workers
+    from src.worker.consumer import start_workers, stop_workers
+    agent_worker_tasks = await start_workers()
+
     yield
+
+    email_task.cancel()
+    try:
+        await email_task
+    except asyncio.CancelledError:
+        pass
+
+    await stop_workers(agent_worker_tasks)
 
 
 app = FastAPI(title="Multi-Channel Chat API", version="1.0.0", lifespan=lifespan)

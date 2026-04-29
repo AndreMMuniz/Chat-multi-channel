@@ -21,8 +21,11 @@ class ConversationStatus(enum.Enum):
 
 class ConversationTag(enum.Enum):
     SUPPORT = "support"
+    BILLING = "billing"
+    FEEDBACK = "feedback"
     SALES = "sales"
     GENERAL = "general"
+    SPAM = "spam"
 
 class MessageType(enum.Enum):
     TEXT = "text"

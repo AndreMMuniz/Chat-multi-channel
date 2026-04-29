@@ -166,6 +166,7 @@ class MessageService:
         Full inbound message flow (channel → dashboard):
         1. Persist with sequence number
         2. Broadcast via WebSocket
+        3. Enqueue to agent worker for AI processing
         """
         message = self.create_message(
             conversation=conversation,
@@ -175,7 +176,26 @@ class MessageService:
             idempotency_key=idempotency_key,
         )
         await self.broadcast_new_message(message)
+        await self._enqueue_for_agent(message, conversation)
         return message
+
+    async def _enqueue_for_agent(self, message: Message, conversation: Conversation) -> None:
+        """Fire-and-forget: enqueue message to the AI agent worker."""
+        try:
+            from src.shared.queue import agent_queue
+            from src.shared.models import AgentTask, ChannelType as AgentChannel
+
+            task = AgentTask(
+                message_id=str(message.id),
+                conversation_id=str(conversation.id),
+                channel=AgentChannel(conversation.channel.value.upper()),
+                content=message.content or "",
+            )
+            q = agent_queue()
+            q.put_nowait(task)
+        except Exception:
+            # Never fail inbound processing because the agent queue is full or unavailable
+            pass
 
 
 def get_message_service(db: Session) -> MessageService:
