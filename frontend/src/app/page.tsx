@@ -45,7 +45,11 @@ export default function ChatPage() {
     fetchConversations,
     selectConversation,
     updateConversation,
+    notifCounts,
+    activeViewers,
     onNewMessage,
+    onConversationNotification,
+    onPresenceUpdate,
     onConversationUpdated,
   } = useConversations();
 
@@ -61,11 +65,13 @@ export default function ChatPage() {
 
   const {
     messages,
+    sendStatus,
     sending,
     fetchMessages,
     sendText,
     sendFile,
     sendAudio,
+    retryMessage,
     appendMessage,
   } = useMessages(scrollToBottom);
 
@@ -87,12 +93,17 @@ export default function ChatPage() {
       if (activeConversationRef.current?.id === msg.conversation_id) {
         appendMessage(msg);
       }
+    } else if (event.type === 'conversation_notification') {
+      onConversationNotification(event.conversation_id);
+    } else if (event.type === 'presence_update') {
+      const { conversation_id, viewers } = event.data as { conversation_id: string; viewers: string[] };
+      onPresenceUpdate(conversation_id, viewers);
     } else if (event.type === 'conversation_updated') {
       onConversationUpdated();
     }
-  }, [onNewMessage, onConversationUpdated, fetchConversations, appendMessage, activeConversationRef]);
+  }, [onNewMessage, onConversationNotification, onPresenceUpdate, onConversationUpdated, fetchConversations, appendMessage, activeConversationRef]);
 
-  const { subscribe, unsubscribe } = useWebSocket(handleWsEvent);
+  const { subscribe, unsubscribe, connectionState } = useWebSocket(handleWsEvent);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
@@ -181,6 +192,17 @@ export default function ChatPage() {
         <span className="text-[18px] font-semibold text-slate-900">Inbox</span>
       </header>
 
+      {/* Connection state banner — P0-2 */}
+      {connectionState !== 'connected' && (
+        <div className={cn(
+          "shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium",
+          connectionState === 'reconnecting' ? "bg-yellow-50 text-yellow-700 border-b border-yellow-200" : "bg-red-50 text-red-700 border-b border-red-200"
+        )}>
+          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+          {connectionState === 'connecting' ? 'Connecting to server…' : 'Connection lost — reconnecting…'}
+        </div>
+      )}
+
       {/* Main Workspace (3-Column Layout) */}
       <main className="flex-1 flex overflow-hidden">
         {/* Left Column: Conversation List (Fixed 320px) */}
@@ -245,9 +267,17 @@ export default function ChatPage() {
                     )}>
                       {conv.contact.name || conv.contact.channel_identifier}
                     </span>
-                    <span className="font-body-sm text-body-sm text-on-surface-variant">
-                      {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Notification badge — P0-3 */}
+                      {notifCounts[conv.id] > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#7C4DFF] text-white text-[10px] font-bold">
+                          {notifCounts[conv.id] > 99 ? '99+' : notifCounts[conv.id]}
+                        </span>
+                      )}
+                      <span className="font-body-sm text-body-sm text-on-surface-variant">
+                        {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
                   </div>
                   <p className={cn(
                     "font-body-sm text-body-sm truncate",
@@ -284,6 +314,15 @@ export default function ChatPage() {
                         {activeConversation.channel === 'TELEGRAM' ? 'send' : activeConversation.channel === 'WHATSAPP' ? 'chat_bubble' : activeConversation.channel === 'EMAIL' ? 'mail' : activeConversation.channel === 'SMS' ? 'sms' : 'language'}
                       </span>
                       <span className="capitalize">{activeConversation.channel.toLowerCase()}</span>
+                      {/* Presence indicator — P0-1 */}
+                      {activeViewers.length > 0 && (
+                        <span className="ml-2 flex items-center gap-1 text-amber-600 font-medium">
+                          <span className="material-symbols-outlined text-[14px]">visibility</span>
+                          {activeViewers.length === 1
+                            ? `${activeViewers[0]} está visualizando`
+                            : `${activeViewers.slice(0, 2).join(', ')} estão visualizando`}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -329,9 +368,10 @@ export default function ChatPage() {
                       
                       <div className={cn(
                         "p-md rounded-xl text-body-md shadow-sm",
-                        !msg.inbound 
+                        !msg.inbound
                           ? "bg-primary-fixed rounded-tr-sm text-on-primary-fixed"
-                          : "bg-surface-container-lowest border border-outline-variant rounded-tl-sm text-on-surface"
+                          : "bg-surface-container-lowest border border-outline-variant rounded-tl-sm text-on-surface",
+                        sendStatus[msg.id] === 'failed' && "opacity-60 border-red-300"
                       )}>
                         <p>{msg.content}</p>
                         {msg.image && <img src={msg.image} alt="Attachment" className="mt-2 rounded-lg max-w-xs cursor-zoom-in" />}
@@ -344,6 +384,24 @@ export default function ChatPage() {
                             <span className="text-sm truncate max-w-[180px]">{msg.file.split('/').pop()}</span>
                             <span className="material-symbols-outlined text-[16px] ml-auto opacity-50">download</span>
                           </a>
+                        )}
+                        {/* Send failure indicator + retry — P0-2 */}
+                        {sendStatus[msg.id] === 'failed' && (
+                          <div className="mt-1.5 flex items-center gap-2 text-red-500 text-xs">
+                            <span className="material-symbols-outlined text-[14px]">error</span>
+                            <span>Falha no envio</span>
+                            <button
+                              onClick={() => retryMessage(msg.conversation_id, msg.id)}
+                              className="underline hover:text-red-700 transition-colors"
+                            >
+                              Tentar novamente
+                            </button>
+                          </div>
+                        )}
+                        {sendStatus[msg.id] === 'sending' && (
+                          <div className="mt-1 flex justify-end">
+                            <span className="material-symbols-outlined text-[12px] opacity-50 animate-spin">progress_activity</span>
+                          </div>
                         )}
                       </div>
                     </div>

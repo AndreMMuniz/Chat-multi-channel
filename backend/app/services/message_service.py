@@ -87,27 +87,40 @@ class MessageService:
     ) -> None:
         """Send outbound message to the external channel via ChannelService."""
         from app.services.channel_service import ChannelService
-        await ChannelService(self.db).send(conversation, content)
+        try:
+            await ChannelService(self.db).send(conversation, content)
+        except Exception as exc:
+            # Broadcast send_error to all subscribers so the UI can show retry
+            await manager.broadcast_to_conversation(
+                conversation_id=str(conversation.id),
+                event_type="send_error",
+                data={
+                    "conversation_id": str(conversation.id),
+                    "reason": str(exc) or "channel_unavailable",
+                },
+            )
+            raise
 
     # ── WebSocket broadcast ───────────────────────────────────────────────────
 
     async def broadcast_new_message(self, message: Message) -> None:
-        """Emit sequenced new_message event to all subscribed dashboard clients."""
-        await manager.broadcast_to_conversation(
+        """Broadcast message to subscribers + lightweight notification to all other clients."""
+        data = {
+            "id": str(message.id),
+            "sequence": message.conversation_sequence,
+            "conversation_id": str(message.conversation_id),
+            "content": message.content,
+            "inbound": message.inbound,
+            "message_type": message.message_type.value if message.message_type else "text",
+            "image": message.image,
+            "file": message.file,
+            "owner_id": str(message.owner_id) if message.owner_id else None,
+            "created_at": message.created_at.isoformat() if message.created_at else None,
+        }
+        await manager.notify_new_message(
             conversation_id=str(message.conversation_id),
-            event_type="new_message",
-            data={
-                "id": str(message.id),
-                "sequence": message.conversation_sequence,
-                "conversation_id": str(message.conversation_id),
-                "content": message.content,
-                "inbound": message.inbound,
-                "message_type": message.message_type.value if message.message_type else "text",
-                "image": message.image,
-                "file": message.file,
-                "owner_id": str(message.owner_id) if message.owner_id else None,
-                "created_at": message.created_at.isoformat() if message.created_at else None,
-            },
+            message_data=data,
+            preview=message.content or "",
         )
 
     # ── Combined: create + dispatch + broadcast ───────────────────────────────

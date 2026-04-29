@@ -32,7 +32,15 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_json()
             msg_type = data.get("type")
 
-            if msg_type == "subscribe":
+            if msg_type == "identify":
+                # Operator sends their identity once after connecting
+                manager.identify(
+                    client_id,
+                    user_id=data.get("user_id", ""),
+                    display_name=data.get("display_name", ""),
+                )
+
+            elif msg_type == "subscribe":
                 conv_id = data.get("conversation_id", "")
                 manager.subscribe(client_id, conv_id)
                 await manager.send_personal(client_id, "subscribed", {"conversation_id": conv_id})

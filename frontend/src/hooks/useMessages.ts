@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+
 import { conversationsApi, uploadApi } from "@/lib/api/index";
 import { getStoredUser } from "@/lib/api";
 import type { Message, MessageType, SendMessageRequest } from "@/types/chat";
@@ -33,13 +34,17 @@ async function compressImage(file: File, maxDim = 1920, quality = 0.82): Promise
   });
 }
 
+export type MessageSendStatus = "sending" | "sent" | "failed";
+
 export interface UseMessagesReturn {
   messages: Message[];
+  sendStatus: Record<string, MessageSendStatus>;
   sending: boolean;
   fetchMessages: (conversationId: string) => Promise<void>;
   sendText: (conversationId: string, content: string) => Promise<void>;
   sendFile: (conversationId: string, file: File) => Promise<void>;
   sendAudio: (conversationId: string, blob: Blob) => Promise<void>;
+  retryMessage: (conversationId: string, tempId: string) => void;
   /** Append a message received via WebSocket (deduplicates + keeps order) */
   appendMessage: (msg: Message) => void;
 }
@@ -47,6 +52,9 @@ export interface UseMessagesReturn {
 export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<Record<string, MessageSendStatus>>({});
+  // Stores pending payloads for retry keyed by tempId
+  const pendingRef = useRef<Record<string, { conversationId: string; payload: Omit<SendMessageRequest, "conversation_id"> }>>({});
 
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
@@ -88,7 +96,10 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
       file: payload.file,
     };
 
+    // Store payload for potential retry
+    pendingRef.current[tempId] = { conversationId, payload };
     setMessages(prev => [...prev, optimistic]);
+    setSendStatus(prev => ({ ...prev, [tempId]: "sending" }));
     scrollToBottom();
 
     try {
@@ -97,6 +108,12 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
         owner_id: user?.id,
         inbound: false,
       });
+      delete pendingRef.current[tempId];
+      setSendStatus(prev => {
+        const next = { ...prev };
+        delete next[tempId];
+        return next;
+      });
       setMessages(prev => {
         if (prev.some(m => m.id === real.id)) return prev.filter(m => m.id !== tempId);
         return prev
@@ -104,9 +121,23 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
           .sort((a, b) => a.conversation_sequence - b.conversation_sequence);
       });
     } catch {
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setSendStatus(prev => ({ ...prev, [tempId]: "failed" }));
     }
   }, [scrollToBottom]);
+
+  const retryMessage = useCallback((conversationId: string, tempId: string) => {
+    const pending = pendingRef.current[tempId];
+    if (!pending) return;
+    // Remove failed message, re-send
+    setMessages(prev => prev.filter(m => m.id !== tempId));
+    setSendStatus(prev => {
+      const next = { ...prev };
+      delete next[tempId];
+      return next;
+    });
+    delete pendingRef.current[tempId];
+    sendCore(conversationId, pending.payload);
+  }, []);
 
   // ── Public send actions ────────────────────────────────────────────────────
 
@@ -154,5 +185,5 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
     } finally { setSending(false); }
   }, [sendCore]);
 
-  return { messages, sending, fetchMessages, sendText, sendFile, sendAudio, appendMessage };
+  return { messages, sendStatus, sending, fetchMessages, sendText, sendFile, sendAudio, retryMessage, appendMessage };
 }
