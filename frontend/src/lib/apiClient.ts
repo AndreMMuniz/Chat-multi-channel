@@ -9,19 +9,32 @@ import type { ApiResponse, ApiErrorResponse } from '@/types/api';
 // Re-export for convenience
 export type { ApiResponse, ApiMeta } from '@/types/api';
 
-// Alias for backward compat
-type ApiError = ApiErrorResponse;
+/** Extract message from FastAPI responses (handles both our envelope and HTTPException format) */
+function extractMsg(body: unknown, status: number): string {
+  if (!body || typeof body !== "object") return `HTTP ${status}`;
+  const b = body as Record<string, unknown>;
+  // Our format: {error: {message}}
+  if (typeof (b.error as Record<string,unknown>)?.message === "string")
+    return (b.error as Record<string,unknown>).message as string;
+  // FastAPI HTTPException with dict: {detail: {error: {message}}}
+  if (b.detail && typeof b.detail === "object") {
+    const d = b.detail as Record<string, unknown>;
+    if (typeof (d.error as Record<string,unknown>)?.message === "string")
+      return (d.error as Record<string,unknown>).message as string;
+  }
+  // FastAPI HTTPException with string: {detail: "..."}
+  if (typeof b.detail === "string") return b.detail;
+  return `HTTP ${status}`;
+}
 
 // ── Core unwrap helpers ──────────────────────────────────────────────────────
 
 /** Fetch and unwrap a single {data, meta} response. Throws on error. */
-/** Fetch and unwrap a single {data, meta} response. Throws on error. */
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await apiFetch(path);
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
-    const msg = (body as ApiError).error?.message ?? `Request failed (${res.status})`;
-    throw new Error(msg);
+    const body = await res.json().catch(() => null);
+    throw new Error(extractMsg(body, res.status));
   }
   const json = (await res.json()) as ApiResponse<T>;
   return json.data;
@@ -31,9 +44,8 @@ export async function apiGet<T>(path: string): Promise<T> {
 export async function apiGetList<T>(path: string): Promise<ApiResponse<T[]>> {
   const res = await apiFetch(path);
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
-    const msg = (body as ApiError).error?.message ?? `Request failed (${res.status})`;
-    throw new Error(msg);
+    const body = await res.json().catch(() => null);
+    throw new Error(extractMsg(body, res.status));
   }
   return res.json() as Promise<ApiResponse<T[]>>;
 }
@@ -49,9 +61,8 @@ export async function apiMutate<TBody, TResult>(
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {
-    const json = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
-    const msg = (json as ApiError).error?.message ?? `Request failed (${res.status})`;
-    throw new Error(msg);
+    const json = await res.json().catch(() => null);
+    throw new Error(extractMsg(json, res.status));
   }
   const json = (await res.json()) as ApiResponse<TResult>;
   return json.data;

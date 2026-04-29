@@ -5,6 +5,31 @@ import type { AuthPayload } from "@/types/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+/**
+ * Extract human-readable error message from FastAPI responses.
+ *
+ * FastAPI error shapes:
+ *   Our custom:  {error: {message: "..."}}
+ *   HTTPException with dict detail: {detail: {error: {message: "..."}}}
+ *   HTTPException with string detail: {detail: "..."}
+ */
+function extractError(json: unknown, fallback: string): string {
+  if (!json || typeof json !== "object") return fallback;
+  const j = json as Record<string, unknown>;
+  // Our envelope format: {error: {message}}
+  if (typeof (j.error as Record<string,unknown>)?.message === "string")
+    return (j.error as Record<string,unknown>).message as string;
+  // FastAPI HTTPException with dict detail: {detail: {error: {message}}}
+  if (j.detail && typeof j.detail === "object") {
+    const d = j.detail as Record<string, unknown>;
+    if (typeof (d.error as Record<string,unknown>)?.message === "string")
+      return (d.error as Record<string,unknown>).message as string;
+  }
+  // FastAPI HTTPException with string detail
+  if (typeof j.detail === "string") return j.detail;
+  return fallback;
+}
+
 export async function login(email: string, password: string): Promise<AuthPayload> {
   const res = await fetch(`${BASE}/auth/login`, {
     method: "POST",
@@ -13,7 +38,7 @@ export async function login(email: string, password: string): Promise<AuthPayloa
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(json?.error?.message ?? json?.detail ?? "Login failed");
+    throw new Error(extractError(json, "Invalid email or password"));
   }
   const payload: AuthPayload = json?.data ?? json;
   if (!payload?.access_token) throw new Error("No token received");
@@ -38,7 +63,7 @@ export async function signup(data: {
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(json?.error?.message ?? json?.detail ?? "Signup failed");
+    throw new Error(extractError(json, "Signup failed"));
   }
 }
 
@@ -50,7 +75,7 @@ export async function forgotPassword(email: string): Promise<void> {
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(json?.error?.message ?? json?.detail ?? "Failed to send reset email");
+    throw new Error(extractError(json, "Failed to send reset email"));
   }
 }
 
@@ -65,6 +90,6 @@ export async function setPassword(token: string, newPassword: string): Promise<v
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(json?.error?.message ?? json?.detail ?? "Failed to set password");
+    throw new Error(extractError(json, "Failed to set password"));
   }
 }
