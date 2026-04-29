@@ -1,4 +1,3 @@
-import os
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
@@ -11,11 +10,12 @@ from app.schemas.user import UserResponse, UserSignup
 from app.schemas.common import create_response, create_error_response
 from app.api.endpoints.users import seed_default_user_types
 from app.repositories import RepositoryFactory, get_repositories
+from app.core.config import settings as app_settings
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-_IS_PROD = os.getenv("ENVIRONMENT", "development") == "production"
+_IS_PROD = app_settings.is_production
 
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
@@ -207,7 +207,7 @@ async def forgot_password(data: dict, request: Request) -> Dict[str, Any]:
     supabase = get_supabase()
     try:
         supabase.auth.reset_password_for_email(email, {
-            "redirect_to": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password"
+            "redirect_to": f"{app_settings.FRONTEND_URL}/reset-password"
         })
     except Exception as e:
         error_response, status = create_error_response(
