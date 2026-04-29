@@ -1,12 +1,13 @@
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, text
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.models import Conversation, Message, ConversationStatus, ChannelType
+from app.models.models import Conversation, Message, ConversationStatus, ChannelType, AISuggestion, User
 from app.schemas.common import create_response
 
 router = APIRouter()
@@ -164,7 +165,68 @@ async def get_dashboard_stats(
         Conversation.assigned_user_id.is_(None),
     ).scalar() or 0
 
-    import os
+    # ── Story 6.4: P50 / P90 resolution times ────────────────────────────────
+    # percentile_cont is a PostgreSQL ordered-set aggregate — use raw SQL
+    percentile_rows = db.execute(text("""
+        SELECT
+            percentile_cont(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600
+            ) AS p50_hours,
+            percentile_cont(0.9) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600
+            ) AS p90_hours
+        FROM conversations
+        WHERE status = 'closed'
+          AND updated_at >= :since
+          AND created_at IS NOT NULL
+          AND updated_at > created_at
+    """), {"since": period_start}).fetchone()
+
+    p50_hours = round(float(percentile_rows[0]), 2) if percentile_rows and percentile_rows[0] else None
+    p90_hours = round(float(percentile_rows[1]), 2) if percentile_rows and percentile_rows[1] else None
+
+    # ── Story 6.5: Per-agent performance ─────────────────────────────────────
+    agent_rows = db.execute(text("""
+        SELECT
+            u.id,
+            u.full_name,
+            COUNT(c.id) AS conversations_handled,
+            AVG(EXTRACT(EPOCH FROM (c.first_response_at - c.created_at)) / 60) AS avg_first_response_min,
+            SUM(CASE WHEN c.status = 'closed' THEN 1 ELSE 0 END) AS resolved
+        FROM users u
+        LEFT JOIN conversations c ON c.assigned_user_id = u.id
+            AND c.created_at >= :since
+        WHERE u.is_active = true AND u.is_approved = true
+        GROUP BY u.id, u.full_name
+        HAVING COUNT(c.id) > 0
+        ORDER BY conversations_handled DESC
+        LIMIT 10
+    """), {"since": period_start}).fetchall()
+
+    agent_stats = [
+        {
+            "id": str(row[0]),
+            "full_name": row[1],
+            "conversations_handled": int(row[2]),
+            "avg_first_response_min": round(float(row[3]), 1) if row[3] else None,
+            "resolved": int(row[4]),
+            "resolution_rate": round(int(row[4]) / int(row[2]) * 100, 1) if int(row[2]) > 0 else 0,
+        }
+        for row in agent_rows
+    ]
+
+    # ── Story 6.5: AI suggestion usage ───────────────────────────────────────
+    ai_suggestions_generated = db.query(func.count(AISuggestion.id)).scalar() or 0
+
+    # Conversations that have at least one AI suggestion
+    convs_with_ai = db.query(
+        func.count(func.distinct(AISuggestion.conversation_id))
+    ).scalar() or 0
+
+    ai_adoption_pct = round(
+        (convs_with_ai / total * 100) if total > 0 else 0, 1
+    )
+
     return create_response({
         "total_conversations": total,
         "open_conversations": open_count,
@@ -191,4 +253,11 @@ async def get_dashboard_stats(
         "avg_first_response_minutes": avg_first_response_min,
         "queue_by_channel": queue_by_channel,
         "unassigned_open": unassigned_open,
+        # Analytics (Epic 6)
+        "p50_resolution_hours": p50_hours,
+        "p90_resolution_hours": p90_hours,
+        "agent_stats": agent_stats,
+        "ai_suggestions_generated": ai_suggestions_generated,
+        "convs_with_ai": convs_with_ai,
+        "ai_adoption_pct": ai_adoption_pct,
     })

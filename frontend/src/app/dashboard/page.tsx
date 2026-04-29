@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getStoredUser } from "@/lib/api";
 import { dashboardApi } from "@/lib/api/index";
-import type { DashboardStats, DayPoint } from "@/types/chat";
+import type { DashboardStats, DayPoint, AgentStat } from "@/types/chat";
 import type { StoredUser } from "@/types/auth";
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -136,6 +136,46 @@ function BarChart({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Channel Donut (Story 6.3) ─────────────────────────────────────────────────
+
+const CHANNEL_COLORS: Record<string, string> = {
+  TELEGRAM: "#0088CC",
+  WHATSAPP: "#25D366",
+  EMAIL:    "#F97316",
+  SMS:      "#8B5CF6",
+  WEB:      "#64748B",
+};
+
+function ChannelDonut({ channels }: { channels: Record<string, number> }) {
+  const total = Object.values(channels).reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    return (
+      <div className="w-24 h-24 rounded-full border-[10px] border-slate-100 flex items-center justify-center shrink-0">
+        <span className="text-[10px] text-slate-400">No data</span>
+      </div>
+    );
+  }
+  const entries = Object.entries(channels).sort(([,a],[,b]) => b - a);
+  let cursor = 0;
+  const stops = entries.map(([ch, count]) => {
+    const pct = (count / total) * 100;
+    const color = CHANNEL_COLORS[ch] ?? "#94A3B8";
+    const stop = `${color} ${cursor}% ${cursor + pct}%`;
+    cursor += pct;
+    return stop;
+  });
+  const gradient = `conic-gradient(${stops.join(", ")})`;
+
+  return (
+    <div className="w-24 h-24 rounded-full flex items-center justify-center shrink-0" style={{ background: gradient }}>
+      <div className="w-14 h-14 bg-white rounded-full flex flex-col items-center justify-center">
+        <p className="text-sm font-bold text-slate-900 leading-none">{total}</p>
+        <p className="text-[9px] text-slate-400">total</p>
+      </div>
     </div>
   );
 }
@@ -500,6 +540,128 @@ export default function DashboardPage() {
                   {stats.current_period_messages} mensagens neste período
                 </div>
               </div>
+            </div>
+
+            {/* ── Resolution Percentiles + Channel Donut (Stories 6.3, 6.4) ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+              {/* P50 / P90 resolution times */}
+              <div className="bg-white rounded-2xl border border-[#E9ECEF] p-5">
+                <h2 className="text-sm font-semibold text-slate-900 mb-4">Resolution Time Percentiles</h2>
+                <div className="space-y-4">
+                  {[
+                    { label: "Average", value: stats.avg_resolution_hours, color: "#7C4DFF", width: 60 },
+                    { label: "P50 (median)", value: stats.p50_resolution_hours, color: "#3B82F6", width: 50 },
+                    { label: "P90", value: stats.p90_resolution_hours, color: "#F97316", width: 80 },
+                  ].map(({ label, value, color, width }) => (
+                    <div key={label}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-slate-600">{label}</span>
+                        <span className="text-sm font-semibold text-slate-900">{formatResolutionTime(value)}</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: value !== null ? `${Math.min(width, 100)}%` : "0%", backgroundColor: color }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-slate-400 pt-1">Based on closed conversations in the last {days} days.</p>
+                </div>
+              </div>
+
+              {/* Channel distribution donut (Story 6.3) */}
+              <div className="bg-white rounded-2xl border border-[#E9ECEF] p-5">
+                <h2 className="text-sm font-semibold text-slate-900 mb-4">Channel Distribution</h2>
+                <div className="flex items-center gap-6">
+                  <ChannelDonut channels={stats.channels} />
+                  <div className="flex-1 space-y-2.5">
+                    {Object.entries(stats.channels).sort(([,a],[,b]) => b - a).map(([ch, count]) => {
+                      const meta = CHANNEL_META[ch] ?? { label: ch, color: "#64748B", bg: "bg-slate-50", icon: "chat" };
+                      const pct = totalChannels > 0 ? Math.round(count / totalChannels * 100) : 0;
+                      return (
+                        <div key={ch} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: meta.color }} />
+                            <span className="text-slate-600">{meta.label}</span>
+                          </div>
+                          <span className="font-semibold text-slate-900">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Agent Performance Table (Story 6.5) ───────────────── */}
+            {(stats.agent_stats ?? []).length > 0 && (
+              <div className="bg-white rounded-2xl border border-[#E9ECEF] overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-[#E9ECEF] bg-slate-50/50">
+                  <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Agent Performance</h2>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#F1F3F5]">
+                      {["Agent", "Handled", "Resolved", "Resolution Rate", "Avg 1st Response"].map(h => (
+                        <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F8F9FA]">
+                    {(stats.agent_stats ?? []).map(agent => (
+                      <tr key={agent.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-purple-100 text-[#7C4DFF] flex items-center justify-center text-xs font-bold">
+                              {agent.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                            </div>
+                            <span className="font-medium text-slate-800">{agent.full_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 font-semibold text-slate-700">{agent.conversations_handled}</td>
+                        <td className="px-5 py-3 text-slate-600">{agent.resolved}</td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-1.5 rounded-full bg-slate-100">
+                              <div className="h-full rounded-full bg-green-500" style={{ width: `${agent.resolution_rate}%` }} />
+                            </div>
+                            <span className={`text-xs font-semibold ${agent.resolution_rate >= 80 ? "text-green-600" : agent.resolution_rate >= 50 ? "text-yellow-600" : "text-red-500"}`}>
+                              {agent.resolution_rate}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-slate-600">
+                          {agent.avg_first_response_min !== null ? `${agent.avg_first_response_min}m` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* ── AI Adoption (Story 6.5) ───────────────────────────── */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <KpiCard
+                icon="auto_awesome"   label="AI Suggestions Generated"
+                value={(stats.ai_suggestions_generated ?? 0).toLocaleString()}
+                iconBg="bg-purple-50" color="#7C4DFF"
+              />
+              <KpiCard
+                icon="smart_toy"      label="Conversations with AI"
+                value={(stats.convs_with_ai ?? 0).toLocaleString()}
+                sub={`of ${stats.total_conversations} total`}
+                iconBg="bg-indigo-50" color="#6366F1"
+              />
+              <KpiCard
+                icon="psychology"     label="AI Adoption Rate"
+                value={`${stats.ai_adoption_pct ?? 0}%`}
+                sub="conversas com pelo menos 1 sugestão"
+                iconBg={(stats.ai_adoption_pct ?? 0) >= 50 ? "bg-green-50" : "bg-slate-50"}
+                color={(stats.ai_adoption_pct ?? 0) >= 50 ? "#10B981" : "#94A3B8"}
+              />
             </div>
           </>
         )}

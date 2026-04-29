@@ -111,4 +111,20 @@ export interface DashboardStats {
   avg_first_response_minutes: number | null;
   queue_by_channel: Record<string, number>;
   unassigned_open: number;
+  // Epic 6 — Analytics
+  p50_resolution_hours: number | null;
+  p90_resolution_hours: number | null;
+  agent_stats: AgentStat[];
+  ai_suggestions_generated: number;
+  convs_with_ai: number;
+  ai_adoption_pct: number;
+}
+
+export interface AgentStat {
+  id: string;
+  full_name: string;
+  conversations_handled: number;
+  avg_first_response_min: number | null;
+  resolved: number;
+  resolution_rate: number;
 }
