@@ -157,8 +157,8 @@ export default function QuickRepliesPage() {
 
       {/* Create modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto p-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-5">New Quick Reply</h2>
             <form onSubmit={handleCreate} className="flex flex-col gap-4">
               <FieldGroup label="Shortcut">
@@ -204,8 +204,8 @@ export default function QuickRepliesPage() {
 
       {/* Delete confirmation */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto p-6 text-center">
             <span className="material-symbols-outlined text-4xl text-red-400 mb-3 block">delete</span>
             <h2 className="text-lg font-semibold text-slate-900 mb-2">Delete shortcut?</h2>
             <p className="text-sm text-slate-500 mb-6">
