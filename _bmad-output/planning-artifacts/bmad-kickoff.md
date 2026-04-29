@@ -4,7 +4,7 @@
 **O que é o projeto?**
 O Omnichat é uma plataforma de comunicação multi-canal unificada projetada para consolidar mensagens de diversas origens (WhatsApp, Telegram, E-mail e SMS) em uma única interface inteligente. O sistema resolve a fragmentação de canais de suporte, permitindo que equipes gerenciem todas as interações de um único lugar.
 
-O valor principal está na orquestração de agentes de IA via LangGraph, que classificam mensagens automaticamente, sugerem respostas contextuais e automatizam fluxos de trabalho, aumentando a eficiência operacional e a velocidade de resposta das empresas.
+O valor principal está na orquestração de agentes de IA via LangGraph, que classificam mensagens automaticamente, sugerem respostas contextuais e automatizam fluxos de trabalho, aumentando a eficiência operacional e a velocidade de resposta das empresas. 
 
 ## 2. Público-Alvo (Target Audience)
 **Quem vai usar o sistema?**
