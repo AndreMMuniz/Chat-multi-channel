@@ -48,7 +48,7 @@ Omnichat is an internal B2B SaaS platform for managing multi-channel customer su
 4. **Audit Review:** View logs for governance
 5. **Settings:** Adjust platform configurations
 
-### Error Handling Flow
+### Error Handling Flow.
 
 1. **Delivery Failure:** Agent sees red status, retries or escalates
 2. **SLA Breach:** Manager alerted, intervenes
