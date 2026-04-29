@@ -1,5 +1,6 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Literal
 from uuid import UUID
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
@@ -375,6 +376,55 @@ async def delete_user(
 
     UserService(db).delete_user(user, actor_id=current_user.id, ip_address=get_client_ip(request))
     return create_response({"detail": "User deleted"})
+
+
+# ─── Bulk Actions (Story 7.1) ────────────────────────────────────────────────
+
+class BulkActionRequest(BaseModel):
+    action: Literal["enable", "disable", "delete"]
+    user_ids: List[UUID]
+
+
+@router.post("/users/bulk")
+async def bulk_user_action(
+    body: BulkActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_manage_users")),
+) -> Dict[str, Any]:
+    """
+    Perform bulk enable / disable / delete on a list of users.
+    The calling user is always excluded from destructive actions.
+    """
+    svc = UserService(db)
+    processed: List[str] = []
+    skipped: List[str] = []
+
+    for uid in body.user_ids:
+        if uid == current_user.id:
+            skipped.append(str(uid))
+            continue
+        user = db.query(User).filter(User.id == uid).first()
+        if not user:
+            skipped.append(str(uid))
+            continue
+        try:
+            if body.action == "enable":
+                svc.enable_user(user, actor_id=current_user.id, ip_address=get_client_ip(request))
+            elif body.action == "disable":
+                svc.disable_user(user, actor_id=current_user.id, ip_address=get_client_ip(request))
+            elif body.action == "delete":
+                svc.delete_user(user, actor_id=current_user.id, ip_address=get_client_ip(request))
+            processed.append(str(uid))
+        except Exception:
+            skipped.append(str(uid))
+
+    return create_response({
+        "action": body.action,
+        "processed": len(processed),
+        "skipped": len(skipped),
+        "processed_ids": processed,
+    })
 
 
 # ─── Self-signup approval flow ────────────────────────────────────────────

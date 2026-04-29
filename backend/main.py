@@ -130,13 +130,43 @@ async def root():
 @app.get("/health")
 async def health_check():
     """
-    Lightweight liveness probe for Railway healthcheck.
-    Always returns 200 if the app is running — external dependency
-    failures (Supabase, DB) are handled at the request level, not here.
+    Liveness + readiness probe with operational metrics (Story 7.4).
+    Used by Railway healthcheck and internal monitoring.
     """
+    from app.core.database import engine
+    from app.core.websocket import manager
+    from src.shared.queue import agent_queue
+
+    # DB pool stats (SQLAlchemy pool)
+    pool_status: dict = {}
+    db_ok = True
+    if engine:
+        try:
+            pool = engine.pool
+            pool_status = {
+                "size": pool.size(),
+                "checked_in": pool.checkedin(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+            }
+        except Exception:
+            db_ok = False
+
+    # WebSocket connections
+    ws_connections = len(manager._clients)
+
+    # Agent queue depth
+    try:
+        queue_size = agent_queue().qsize()
+    except Exception:
+        queue_size = -1
+
     return {
-        "status": "ok",
+        "status": "ok" if db_ok else "degraded",
         "environment": settings.ENVIRONMENT,
+        "db": {"ok": db_ok, "pool": pool_status},
+        "websocket_connections": ws_connections,
+        "agent_queue_size": queue_size,
     }
 
 

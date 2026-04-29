@@ -10,7 +10,17 @@ if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 if db_url:
-    engine = create_engine(db_url, pool_pre_ping=True)
+    # Sized for ~100 concurrent operators (NFR2).
+    # pool_size=20 base connections + max_overflow=30 burst = 50 total.
+    # pool_timeout=30s before raising; pool_recycle=1800s prevents stale TCP.
+    engine = create_engine(
+        db_url,
+        pool_pre_ping=True,
+        pool_size=int(__import__("os").getenv("DB_POOL_SIZE", "20")),
+        max_overflow=int(__import__("os").getenv("DB_MAX_OVERFLOW", "30")),
+        pool_timeout=30,
+        pool_recycle=1800,
+    )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 else:
     engine = None

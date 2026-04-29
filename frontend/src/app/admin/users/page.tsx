@@ -54,7 +54,30 @@ export default function UsersPage() {
   const [editLoading, setEditLoading] = useState(false);
 
   const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
-const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+
+  // Bulk selection (Story 7.1)
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const toggleSelect = (id: string) =>
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const toggleSelectAll = () =>
+    setSelected(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(u => u.id)));
+
+  const handleBulk = async (action: "enable" | "disable" | "delete") => {
+    if (selected.size === 0) return;
+    if (action === "delete" && !confirm(`Delete ${selected.size} user(s)? This cannot be undone.`)) return;
+    setBulkLoading(true);
+    try {
+      await usersApi.bulkUserAction(action, [...selected]);
+      setSelected(new Set());
+      loadData();
+    } catch { /* ignore */ } finally {
+      setBulkLoading(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -231,10 +254,45 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
               />
             </div>
 
+            {/* Bulk action bar */}
+            {selected.size > 0 && (
+              <div className="mb-3 flex items-center gap-3 px-4 py-2.5 bg-purple-50 border border-purple-200 rounded-xl">
+                <span className="text-sm font-semibold text-purple-800">{selected.size} selected</span>
+                <div className="flex items-center gap-2 ml-auto">
+                  {[
+                    { label: "Enable", action: "enable" as const, icon: "check_circle", cls: "text-green-700 bg-green-50 hover:bg-green-100 border-green-200" },
+                    { label: "Disable", action: "disable" as const, icon: "block", cls: "text-slate-600 bg-white hover:bg-slate-50 border-slate-200" },
+                    { label: "Delete", action: "delete" as const, icon: "delete", cls: "text-red-700 bg-red-50 hover:bg-red-100 border-red-200" },
+                  ].map(({ label, action, icon, cls }) => (
+                    <button
+                      key={action}
+                      onClick={() => handleBulk(action)}
+                      disabled={bulkLoading}
+                      className={`flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${cls}`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">{icon}</span>
+                      {label}
+                    </button>
+                  ))}
+                  <button onClick={() => setSelected(new Set())} className="text-slate-400 hover:text-slate-600 ml-1">
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-xl border border-[#E9ECEF] overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[#E9ECEF] bg-slate-50">
+                    <th className="px-4 py-3.5 w-10">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-[#7C4DFF] focus:ring-[#7C4DFF]/25 cursor-pointer"
+                        checked={filtered.length > 0 && selected.size === filtered.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
                     <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3.5">User</th>
                     <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Role</th>
                     <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3.5">Status</th>
@@ -245,20 +303,28 @@ const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
+                      <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
                         <span className="material-symbols-outlined text-3xl animate-spin block mb-2">progress_activity</span>
                         Loading users...
                       </td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
+                      <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
                         {search ? "No users match your search." : "No users yet. Create the first one."}
                       </td>
                     </tr>
                   ) : (
                     filtered.map((u) => (
-                      <tr key={u.id} className="border-b border-[#F1F3F5] last:border-0 hover:bg-slate-50/50 transition-colors">
+                      <tr key={u.id} className={`border-b border-[#F1F3F5] last:border-0 hover:bg-slate-50/50 transition-colors ${selected.has(u.id) ? "bg-purple-50/30" : ""}`}>
+                        <td className="px-4 py-3.5">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 text-[#7C4DFF] focus:ring-[#7C4DFF]/25 cursor-pointer"
+                            checked={selected.has(u.id)}
+                            onChange={() => toggleSelect(u.id)}
+                          />
+                        </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             {u.avatar ? (

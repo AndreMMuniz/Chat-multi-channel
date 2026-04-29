@@ -50,6 +50,13 @@ export async function disableUser(userId: string): Promise<void> {
   await apiMutate(`/admin/users/${userId}/disable`, "POST");
 }
 
+export async function bulkUserAction(
+  action: "enable" | "disable" | "delete",
+  userIds: string[]
+): Promise<{ processed: number; skipped: number }> {
+  return apiMutate("/admin/users/bulk", "POST", { action, user_ids: userIds });
+}
+
 export async function changeUserPassword(
   userId: string,
   newPassword: string
