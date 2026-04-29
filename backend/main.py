@@ -32,6 +32,9 @@ origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()] or [
     "http://localhost:3001",
 ]
 
+print(f"DEBUG: ALLOWED_ORIGINS env var: '{allowed_origins_env}'")
+print(f"DEBUG: CORS allowed origins: {origins}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -45,6 +48,20 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/")
 async def root():
     return {"message": "Multi-Channel Chat API is running"}
+
+@app.get("/cors-debug")
+async def cors_debug():
+    """Debug endpoint to check CORS configuration."""
+    allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+    origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()] or [
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+    return {
+        "allowed_origins_env": allowed_origins_env,
+        "configured_origins": origins,
+        "is_production": os.getenv("ENVIRONMENT", "development") == "production"
+    }
 
 @app.get("/health")
 async def health_check():
