@@ -15,8 +15,11 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "CREATE TYPE IF NOT EXISTS deliverystatus AS ENUM "
-        "('pending', 'sent', 'delivered', 'failed')"
+        "DO $ BEGIN "
+        "IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deliverystatus') THEN "
+        "CREATE TYPE deliverystatus AS ENUM ('pending', 'sent', 'delivered', 'failed'); "
+        "END IF; "
+        "END $"
     )
     op.add_column('messages', sa.Column(
         'delivery_status',
