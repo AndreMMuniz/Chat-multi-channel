@@ -24,7 +24,7 @@ class MessageRepository(BaseRepository[Message]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def find_from_sequence(
@@ -38,13 +38,13 @@ class MessageRepository(BaseRepository[Message]):
             .order_by(Message.conversation_sequence.asc())
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def find_by_idempotency_key(self, idempotency_key: str) -> Optional[Message]:
         """Return existing message if this idempotency key was already used."""
         stmt = select(Message).where(Message.idempotency_key == idempotency_key)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().first()
 
     async def next_sequence(self, conversation_id: str) -> int:
@@ -52,7 +52,7 @@ class MessageRepository(BaseRepository[Message]):
         stmt = select(func.coalesce(func.max(Message.conversation_sequence), 0)).where(
             Message.conversation_id == conversation_id
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return (result.scalar() or 0) + 1
 
     async def create_sequenced(
@@ -107,7 +107,7 @@ class MessageRepository(BaseRepository[Message]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def find_by_type(
@@ -121,7 +121,7 @@ class MessageRepository(BaseRepository[Message]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def count_by_conversation(self, conversation_id: str) -> int:
@@ -129,16 +129,16 @@ class MessageRepository(BaseRepository[Message]):
         stmt = select(func.count(Message.id)).where(
             Message.conversation_id == conversation_id
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalar() or 0
 
     async def delete_by_conversation(self, conversation_id: str) -> int:
         """Delete all messages in a conversation (used when deleting conversation)."""
         stmt = select(Message).where(Message.conversation_id == conversation_id)
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         messages = result.scalars().all()
 
         for msg in messages:
-            await self.session.delete(msg)
+            self.session.delete(msg)
         self.session.commit()
         return len(messages)

@@ -21,7 +21,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def find_by_channel(self, channel: str, skip: int = 0, limit: int = 20) -> List[Conversation]:
@@ -32,7 +32,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def find_by_status(self, status: str, skip: int = 0, limit: int = 20) -> List[Conversation]:
@@ -43,7 +43,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def find_open_conversations(self, skip: int = 0, limit: int = 20) -> List[Conversation]:
@@ -54,7 +54,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def find_by_tag(self, tag: str, skip: int = 0, limit: int = 20) -> List[Conversation]:
@@ -65,7 +65,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             .offset(skip)
             .limit(limit)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         return result.scalars().all()
 
     async def close_conversation(self, conversation_id: str) -> Optional[Conversation]:
