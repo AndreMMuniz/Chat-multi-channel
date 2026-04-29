@@ -61,21 +61,14 @@ class LoginResponse(BaseModel):
 @limiter.limit("10/minute")
 async def login(data: LoginRequest, request: Request, response: Response, repos: RepositoryFactory = Depends(get_repositories)) -> Dict[str, Any]:
     """Authenticate via Supabase, set HttpOnly cookies and return tokens."""
-    import logging
-    logging.warning(f"DEBUG LOGIN: Attempting login for email: {data.email}")
-
     supabase = get_supabase()
-    logging.warning(f"DEBUG LOGIN: Supabase client created")
 
     try:
-        logging.warning(f"DEBUG LOGIN: Calling sign_in_with_password")
         auth_response = supabase.auth.sign_in_with_password({
             "email": data.email,
             "password": data.password,
         })
-        logging.warning(f"DEBUG LOGIN: Supabase auth successful")
-    except Exception as e:
-        logging.warning(f"DEBUG LOGIN: Supabase auth failed: {str(e)}")
+    except Exception:
         error_response, status = create_error_response(
             code="INVALID_CREDENTIALS",
             message="Invalid email or password",
@@ -84,7 +77,6 @@ async def login(data: LoginRequest, request: Request, response: Response, repos:
         raise HTTPException(status_code=status, detail=error_response)
 
     if not auth_response.session:
-        logging.warning(f"DEBUG LOGIN: No session in auth response")
         error_response, status = create_error_response(
             code="INVALID_CREDENTIALS",
             message="Invalid email or password",
@@ -93,12 +85,9 @@ async def login(data: LoginRequest, request: Request, response: Response, repos:
         raise HTTPException(status_code=status, detail=error_response)
 
     auth_id = str(auth_response.user.id)
-    logging.warning(f"DEBUG LOGIN: Auth ID: {auth_id}")
 
     # Use repository to find user
-    logging.warning(f"DEBUG LOGIN: Looking up user in database")
     user = await repos.users.find_by_auth_id(auth_id)
-    logging.warning(f"DEBUG LOGIN: User found: {user is not None}")
 
     if not user:
         print(f"DEBUG LOGIN: User not found in local database")
