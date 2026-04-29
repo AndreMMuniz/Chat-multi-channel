@@ -86,17 +86,42 @@ async def login(data: LoginRequest, request: Request, response: Response, repos:
 
     auth_id = str(auth_response.user.id)
 
-    # Use repository to find user
+    # Find local profile
     user = await repos.users.find_by_auth_id(auth_id)
 
+    # Auto-provision local profile on first login (fresh deployment scenario)
     if not user:
-        print(f"DEBUG LOGIN: User not found in local database")
-        error_response, status = create_error_response(
-            code="USER_NOT_FOUND",
-            message="User profile not found. Contact an administrator.",
-            status_code=403
-        )
-        raise HTTPException(status_code=status, detail=error_response)
+        from app.models.models import User as UserModel
+        seed_default_user_types(db)
+
+        user_count = db.query(UserModel).count()
+        is_first_user = user_count == 0
+
+        # First user ever → Admin (approved + active immediately)
+        # Subsequent users from Supabase Auth → pending approval
+        role_name = "Admin" if is_first_user else "User"
+        role = db.query(UserType).filter(
+            UserType.name == role_name, UserType.is_system == True
+        ).first()
+
+        if role:
+            email = auth_response.user.email or data.email
+            full_name = email.split("@")[0].replace(".", " ").title()
+            user = await repos.users.create({
+                "auth_id": auth_id,
+                "email": email,
+                "full_name": full_name,
+                "user_type_id": role.id,
+                "is_active": is_first_user,
+                "is_approved": is_first_user,
+            })
+        else:
+            error_response, status = create_error_response(
+                code="USER_NOT_FOUND",
+                message="User profile not found. Contact an administrator.",
+                status_code=403
+            )
+            raise HTTPException(status_code=status, detail=error_response)
 
     if not user.is_approved:
         error_response, status = create_error_response(
