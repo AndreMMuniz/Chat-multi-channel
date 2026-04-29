@@ -35,6 +35,9 @@ origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()] or [
 print(f"DEBUG: ALLOWED_ORIGINS env var: '{allowed_origins_env}'")
 print(f"DEBUG: CORS allowed origins: {origins}")
 
+# Temporary: Allow all origins for debugging
+origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -57,10 +60,14 @@ async def cors_debug():
         "http://localhost:3000",
         "http://localhost:3001",
     ]
+    # Current actual configuration (may be overridden for debugging)
+    current_origins = ["*"]  # Temporarily allowing all for debugging
     return {
         "allowed_origins_env": allowed_origins_env,
-        "configured_origins": origins,
-        "is_production": os.getenv("ENVIRONMENT", "development") == "production"
+        "intended_origins": origins,
+        "current_origins": current_origins,
+        "is_production": os.getenv("ENVIRONMENT", "development") == "production",
+        "debug_mode": True
     }
 
 @app.get("/health")
