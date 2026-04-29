@@ -250,7 +250,7 @@ async def retry_message(
         )
         raise HTTPException(status_code=status, detail=error_response)
 
-    if message.delivery_status != DeliveryStatus.FAILED:
+    if message.delivery_status != "failed":
         error_response, status = create_error_response(
             code="NOT_FAILED", message="Message is not in failed state", status_code=400
         )
