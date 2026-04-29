@@ -70,6 +70,7 @@ async def diagnostics():
     """Detailed diagnostics for debugging."""
     from app.core.database import get_supabase, get_db
     from app.core.config import settings
+    from sqlalchemy import text
 
     diagnostics = {
         "environment": settings.ENVIRONMENT,
@@ -82,7 +83,8 @@ async def diagnostics():
     # Test Supabase connection
     try:
         supabase = get_supabase()
-        auth_settings = supabase.auth.get_settings()
+        # Try a simple auth operation instead of get_settings
+        supabase.auth.get_session()
         diagnostics["checks"]["supabase"] = "ok"
     except Exception as e:
         diagnostics["checks"]["supabase"] = f"error: {str(e)}"
@@ -90,7 +92,7 @@ async def diagnostics():
     # Test database connection
     try:
         db = next(get_db())
-        result = db.execute("SELECT 1 as test").fetchone()
+        result = db.execute(text("SELECT 1 as test")).fetchone()
         diagnostics["checks"]["database"] = "ok" if result else "error: no result"
     except Exception as e:
         diagnostics["checks"]["database"] = f"error: {str(e)}"
