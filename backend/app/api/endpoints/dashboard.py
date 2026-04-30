@@ -176,7 +176,7 @@ async def get_dashboard_stats(
                 ORDER BY EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600
             ) AS p90_hours
         FROM conversations
-        WHERE status = 'closed'
+        WHERE status = 'CLOSED'
           AND updated_at >= :since
           AND created_at IS NOT NULL
           AND updated_at > created_at
@@ -192,7 +192,7 @@ async def get_dashboard_stats(
             u.full_name,
             COUNT(c.id) AS conversations_handled,
             AVG(EXTRACT(EPOCH FROM (c.first_response_at - c.created_at)) / 60) AS avg_first_response_min,
-            SUM(CASE WHEN c.status = 'closed' THEN 1 ELSE 0 END) AS resolved
+            SUM(CASE WHEN c.status = 'CLOSED' THEN 1 ELSE 0 END) AS resolved
         FROM users u
         LEFT JOIN conversations c ON c.assigned_user_id = u.id
             AND c.created_at >= :since
