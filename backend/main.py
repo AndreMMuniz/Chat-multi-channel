@@ -13,6 +13,34 @@ from app.services.telegram_service import telegram_service
 
 limiter = Limiter(key_func=get_remote_address)
 
+
+def _validate_encryption_key() -> None:
+    """Fail fast if DATABASE_ENCRYPTION_KEY is missing or malformed in production."""
+    key_hex = os.getenv("DATABASE_ENCRYPTION_KEY", "")
+    env = os.getenv("ENVIRONMENT", "development")
+    if env == "production" and not key_hex:
+        import sys
+        print(
+            "CRITICAL: DATABASE_ENCRYPTION_KEY is not set in production. "
+            "Channel credentials would be stored unencrypted. "
+            "Generate a key with: python3 -c \"import secrets; print(secrets.token_hex(32))\" "
+            "and set it as DATABASE_ENCRYPTION_KEY. Exiting.",
+            flush=True,
+        )
+        sys.exit(1)
+    if key_hex:
+        try:
+            key = bytes.fromhex(key_hex)
+            if len(key) != 32:
+                raise ValueError(f"Expected 32 bytes (64 hex chars), got {len(key)} bytes")
+        except Exception as exc:
+            import sys
+            print(f"CRITICAL: Invalid DATABASE_ENCRYPTION_KEY: {exc}. Exiting.", flush=True)
+            sys.exit(1)
+
+
+_validate_encryption_key()
+
 _EMAIL_POLL_INTERVAL = int(os.getenv("EMAIL_POLL_INTERVAL_SECONDS", "60"))
 _SLA_CHECK_INTERVAL = int(os.getenv("SLA_CHECK_INTERVAL_SECONDS", "120"))
 _SLA_THRESHOLD_MINUTES = int(os.getenv("SLA_THRESHOLD_MINUTES", "60"))

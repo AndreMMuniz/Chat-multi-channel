@@ -5,6 +5,7 @@ from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.core.encryption import EncryptedString
 
 # Enums
 class ChannelType(enum.Enum):
@@ -235,8 +236,8 @@ class GeneralSettings(Base):
     # WhatsApp (Meta Cloud API)
     whatsapp_phone_id = Column(String, nullable=True)
     whatsapp_account_id = Column(String, nullable=True)
-    whatsapp_access_token = Column(String, nullable=True)
-    whatsapp_webhook_token = Column(String, nullable=True)
+    whatsapp_access_token = Column(EncryptedString, nullable=True)
+    whatsapp_webhook_token = Column(EncryptedString, nullable=True)
 
     # Email (IMAP/SMTP)
     email_imap_host = Column(String, nullable=True)
@@ -244,11 +245,11 @@ class GeneralSettings(Base):
     email_smtp_host = Column(String, nullable=True)
     email_smtp_port = Column(Integer, nullable=True, default=587)
     email_address = Column(String, nullable=True)
-    email_password = Column(String, nullable=True)
+    email_password = Column(EncryptedString, nullable=True)
 
     # SMS (Twilio)
     twilio_account_sid = Column(String, nullable=True)
-    twilio_auth_token = Column(String, nullable=True)
+    twilio_auth_token = Column(EncryptedString, nullable=True)
     twilio_phone_number = Column(String, nullable=True)
 
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

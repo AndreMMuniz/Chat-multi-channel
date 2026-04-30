@@ -1,5 +1,5 @@
-# generated: 2026-04-29
-# last_updated: 2026-04-29
+# generated: 2026-04-30
+# last_updated: 2026-04-30
 # project: Chat-multi-channel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -34,8 +34,8 @@
 # - Developer typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-04-29
-last_updated: 2026-04-29
+generated: 2026-04-30
+last_updated: 2026-04-30
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
   2-1-unified-inbox-view: done
   2-2-conversation-thread-opening: done
   2-3-outbound-message-sending: done
-  2-4-inbound-message-ingestion: done        # story file exists in implementation-artifacts
+  2-4-inbound-message-ingestion: done
   2-5-conversation-status-updates: done
   2-6-read-unread-management: done
   2-7-conversation-summaries: done
@@ -150,3 +150,21 @@ development_status:
   7-4-concurrent-user-support: done
 
   epic-7-retrospective: optional
+
+  # ── Epic 8: Production Hardening ────────────────────────────────────────────
+  # Post-retro action items — security, reliability, observability, test coverage
+  # Source: Retrospective 2026-04-29 (10 action items, 4 critical / 4 important / 2 nice-to-have)
+  epic-8: in-progress
+
+  8-1-staging-migration-validation: backlog        # CRITICAL — 5 pts
+  8-2-environment-variables-documentation: review # CRITICAL — 3 pts
+  8-3-aes-256-credential-encryption: review # CRITICAL — 8 pts
+  8-4-redis-streams-queue-migration: backlog       # CRITICAL — 8 pts
+  8-5-pytest-suite-for-critical-services: backlog  # Important — 13 pts
+  8-6-playwright-e2e-tests: backlog                # Important — 8 pts
+  8-7-granular-rate-limiting: backlog              # Important — 5 pts
+  8-8-api-key-startup-validation: backlog          # Important — 2 pts
+  8-9-messageservice-refactoring: backlog          # Nice-to-have — 5 pts
+  8-10-telegram-bot-configuration-ui: backlog      # Nice-to-have — 5 pts
+
+  epic-8-retrospective: optional

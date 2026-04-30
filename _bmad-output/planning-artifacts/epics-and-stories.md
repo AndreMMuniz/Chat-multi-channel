@@ -437,6 +437,113 @@ This document outlines the epics and user stories derived from the Product Requi
 **Estimation:** 13 story points  
 **Covers FR:** FR46
 
+## Epic 8: Production Hardening
+**Derived from:** Post-MVP Retrospective (2026-04-29) action items  
+**Description:** Address critical security gaps, infrastructure reliability, and test coverage before production deployment with real users.
+
+### Story 8.1: Staging Migration Validation
+**As the system,** I want all 5 Alembic migrations validated on staging so that schema correctness is confirmed before production.  
+**Acceptance Criteria:**
+- All 5 migrations applied cleanly on a staging Supabase instance.
+- Schema matches expected models (User, Conversation, Message, AuditLog, GeneralSettings).
+- Any syntax or ordering issues resolved.
+- Migration rollback tested at least once.  
+**Estimation:** 5 story points  
+**Priority:** Critical
+
+### Story 8.2: Environment Variables Documentation
+**As a developer,** I want a complete `.env.example` file so that deployment is reproducible without tribal knowledge.  
+**Acceptance Criteria:**
+- All env vars present: `DELIVERY_ALERT_THRESHOLD`, `DELIVERY_ALERT_WINDOW_MINUTES`, `SLA_CHECK_INTERVAL_SECONDS`, `SLA_THRESHOLD_MINUTES`, `EMAIL_POLL_INTERVAL_SECONDS`, `AGENT_AUTO_REPLY`, `AGENT_AUTO_REPLY_CONFIDENCE`, `WORKER_CONCURRENCY`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, plus all existing vars.
+- Each var has: description comment, type hint, and safe default.
+- `.env.example` committed to repo root.
+- `README` updated with pointer to `.env.example`.  
+**Estimation:** 3 story points  
+**Priority:** Critical
+
+### Story 8.3: AES-256 Credential Encryption
+**As the system,** I want channel credentials encrypted at rest using AES-256 so that `whatsapp_access_token`, `email_password`, and `twilio_auth_token` are not stored in plaintext.  
+**Acceptance Criteria:**
+- `DATABASE_ENCRYPTION_KEY` env var consumed at startup.
+- `GeneralSettings` model encrypts/decrypts sensitive fields transparently.
+- Existing plaintext values migrated via Alembic data migration.
+- No plaintext secrets appear in DB, logs, or API responses.
+- App refuses to start if `DATABASE_ENCRYPTION_KEY` is missing.  
+**Estimation:** 8 story points  
+**Priority:** Critical
+
+### Story 8.4: Redis Streams Queue Migration
+**As the system,** I want the agent task queue backed by Redis Streams so that Railway restarts do not lose in-flight tasks.  
+**Acceptance Criteria:**
+- `src/shared/queue.py` implements `RedisStreamQueue` using `aiomqtt` or `redis-py` streams.
+- `asyncio.Queue` fallback retained for local dev when `REDIS_URL` is absent.
+- Worker consumes from Redis Streams with consumer group and ack on completion.
+- Failed messages land in a dead-letter stream, not silently dropped.
+- `REDIS_URL` documented in `.env.example`.  
+**Estimation:** 8 story points  
+**Priority:** Critical
+
+### Story 8.5: Pytest Suite for Critical Services
+**As a developer,** I want pytest coverage for 5 critical services so that regressions are caught automatically.  
+**Acceptance Criteria:**
+- Test files for: `MessageService`, `ChannelService`, `UserService`, `AIService`, `DeliveryAlertService`.
+- 80%+ line coverage per service.
+- Tests use real DB (test schema) — no mocks for DB layer.
+- CI step added to run pytest on every push.  
+**Estimation:** 13 story points  
+**Priority:** Important
+
+### Story 8.6: Playwright E2E Tests
+**As a developer,** I want Playwright tests for critical user flows so that UI regressions are caught in CI.  
+**Acceptance Criteria:**
+- Flow covered: login → inbox load → open conversation → send message → message visible.
+- Tests run headless in CI (GitHub Actions or Railway build hook).
+- Screenshots on failure saved as artifacts.
+- Test suite passes on current codebase before merge.  
+**Estimation:** 8 story points  
+**Priority:** Important
+
+### Story 8.7: Granular Rate Limiting
+**As the system,** I want per-endpoint rate limits configured so that abuse is mitigated.  
+**Acceptance Criteria:**
+- Login: 10 requests/min per IP.
+- Signup: 5 requests/min per IP.
+- General API: 60 requests/min per authenticated user.
+- Rate limit headers (`X-RateLimit-*`) returned on all limited endpoints.
+- 429 response with `Retry-After` header on breach.  
+**Estimation:** 5 story points  
+**Priority:** Important
+
+### Story 8.8: API Key Startup Validation
+**As the system,** I want the application to fail fast on startup if required API keys are missing so that silent misconfiguration is prevented.  
+**Acceptance Criteria:**
+- `OPENAI_API_KEY` validated at startup; app exits with clear error if absent.
+- Same pattern applied to `DATABASE_ENCRYPTION_KEY` (Story 8.3).
+- Validation runs before any route registration.
+- Error message names the missing variable and links to `.env.example`.  
+**Estimation:** 2 story points  
+**Priority:** Important
+
+### Story 8.9: MessageService Refactoring
+**As a developer,** I want `MessageService` split into focused sub-services so that each file respects SRP and is under 150 lines.  
+**Acceptance Criteria:**
+- `MessageService` decomposed into at least: `MessageCreationService`, `DeliveryService`, `BroadcastService`.
+- No existing public interface broken (same method signatures, same behavior).
+- All existing tests (Story 8.5) pass after refactor.
+- Each new file < 150 lines.  
+**Estimation:** 5 story points  
+**Priority:** Nice-to-have
+
+### Story 8.10: Telegram Bot Configuration UI
+**As an admin,** I want to configure the Telegram bot token from the settings UI so that it no longer requires an env var restart.  
+**Acceptance Criteria:**
+- Telegram section in settings page includes bot token field.
+- Save stores token via existing `GeneralSettings` (encrypted per Story 8.3).
+- Bot re-initializes on token update without server restart.
+- Test connection button verifies the token against Telegram API.  
+**Estimation:** 5 story points  
+**Priority:** Nice-to-have
+
 ## FR to Epic/Story Mapping
 
 | FR  | Epic | Story |
