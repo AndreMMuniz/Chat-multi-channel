@@ -56,6 +56,7 @@ class AIService:
         model = (cfg.ai_model if cfg and cfg.ai_model else "gpt-4o-mini")
         provider = (cfg.ai_provider if cfg and cfg.ai_provider else "openrouter")
         api_key = settings.OPENAI_API_KEY
+        print(f"[AIService] provider={provider} api_key_present={bool(api_key)} api_key_prefix={api_key[:10] if api_key else 'EMPTY'}...")
 
         if provider == "openrouter":
             return ChatOpenAI(
