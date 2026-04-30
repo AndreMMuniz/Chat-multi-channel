@@ -1,6 +1,6 @@
 # Story 8.1: Staging Migration Validation
 
-**Status:** review  
+**Status:** done  
 **Epic:** 8 — Production Hardening  
 **Story Points:** 5  
 **Priority:** Critical  
@@ -330,3 +330,11 @@ The runbook for Andre to execute against Supabase staging manually.
 - `MIGRATIONS.md` covers: upgrade steps, schema verification SQL, rollback procedure, migration 9 encryption caveats, quick reference.
 - 88/88 tests passing — zero regressions.
 - **Andre must run steps 2-5 of MIGRATIONS.md manually against Supabase staging** to complete the "applied on staging" acceptance criterion.
+
+---
+
+### Review Findings
+
+- [x] [Review][Patch] `--test-downgrade` sem `--run-upgrade` é silenciosamente ignorado [`backend/scripts/validate_migrations.py:138`]
+- [x] [Review][Defer] FK constraint names não confirmados contra o DB real — risco de falha no downgrade se a naming convention diferir [`backend/alembic/versions/bf57d943ecd0_add_rbac_and_missing_columns.py:89,96`] — deferred, pre-existing
+- [x] [Review][Defer] `head -50` no Quick Reference não é nativo no Windows [`backend/MIGRATIONS.md:175`] — deferred, pre-existing

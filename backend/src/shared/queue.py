@@ -109,15 +109,15 @@ class RedisStreamQueue:
         self._consumer_id = consumer_id
         self._maxsize = cfg.WORKER_QUEUE_MAXSIZE
         self._pending_entry_id: str | None = None
-        self._redis = None  # lazy-initialised
 
     async def _get_redis(self):
-        if self._redis is None:
+        global _shared_redis_client
+        if _shared_redis_client is None:
             import redis.asyncio as aioredis
-            self._redis = await aioredis.from_url(
+            _shared_redis_client = await aioredis.from_url(
                 self._redis_url, decode_responses=True
             )
-        return self._redis
+        return _shared_redis_client
 
     async def setup(self) -> None:
         """Create consumer group. MKSTREAM creates the stream if absent."""
@@ -194,6 +194,7 @@ class RedisStreamQueue:
 # ── Factory ───────────────────────────────────────────────────────────────────
 
 _asyncio_queue: AsyncioQueue | None = None
+_shared_redis_client = None  # single connection pool shared across all RedisStreamQueue instances
 
 
 def get_queue(consumer_id: str = "monitoring") -> AsyncioQueue | RedisStreamQueue:

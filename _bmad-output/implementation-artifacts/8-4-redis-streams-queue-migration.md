@@ -1,6 +1,6 @@
 # Story 8.4: Redis Streams Queue Migration
 
-**Status:** review  
+**Status:** done  
 **Epic:** 8 — Production Hardening  
 **Story Points:** 8  
 **Priority:** Critical  
@@ -464,6 +464,14 @@ For an accurate async queue size in the `/health` endpoint (future improvement),
 - [x] Tests pass — `AsyncioQueue` all methods; `RedisStreamQueue` put/get/task_done/drain with mocked Redis.
 - [x] App boots without `REDIS_URL` (falls back to asyncio.Queue).
 - [x] Sprint status: `8-4-redis-streams-queue-migration: review`.
+
+---
+
+### Review Findings
+
+- [x] [Review][Patch] `get_queue()` criava nova `RedisStreamQueue` por chamada — pool de conexão Redis não fechado por producers (`webhook.py`, `admin.py`). Corrigido: `_get_redis()` agora usa `_shared_redis_client` a nível de módulo [`backend/src/shared/queue.py`]
+- [x] [Review][Patch] Testes usavam `q._redis = mock_redis` (atributo removido) — atualizados para `queue_mod._shared_redis_client` com fixture `autouse` para reset entre testes [`backend/tests/test_queue.py`]
+- [x] [Review][Defer] Sem teste para `put_nowait` no `RedisStreamQueue` — deferred, pre-existing
 
 ---
 

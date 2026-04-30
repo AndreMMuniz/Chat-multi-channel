@@ -136,12 +136,21 @@ def _make_redis_queue(consumer_id: str = "worker-0") -> "RedisStreamQueue":
 
 
 class TestRedisStreamQueue:
+    @pytest.fixture(autouse=True)
+    def reset_shared_redis_client(self):
+        """Reset the module-level shared Redis client between tests."""
+        import src.shared.queue as queue_mod
+        queue_mod._shared_redis_client = None
+        yield
+        queue_mod._shared_redis_client = None
+
     @pytest.mark.asyncio
     async def test_setup_creates_consumer_group(self):
+        import src.shared.queue as queue_mod
         q = _make_redis_queue()
         mock_redis = AsyncMock()
         mock_redis.xgroup_create = AsyncMock(return_value="OK")
-        q._redis = mock_redis
+        queue_mod._shared_redis_client = mock_redis
 
         await q.setup()
         mock_redis.xgroup_create.assert_called_once_with(
@@ -150,20 +159,22 @@ class TestRedisStreamQueue:
 
     @pytest.mark.asyncio
     async def test_setup_ignores_busygroup_error(self):
+        import src.shared.queue as queue_mod
         q = _make_redis_queue()
         mock_redis = AsyncMock()
         mock_redis.xgroup_create = AsyncMock(
             side_effect=Exception("BUSYGROUP Consumer Group name already exists")
         )
-        q._redis = mock_redis
+        queue_mod._shared_redis_client = mock_redis
         await q.setup()  # must not raise
 
     @pytest.mark.asyncio
     async def test_put_calls_xadd(self):
+        import src.shared.queue as queue_mod
         q = _make_redis_queue()
         mock_redis = AsyncMock()
         mock_redis.xadd = AsyncMock(return_value="1234567890-0")
-        q._redis = mock_redis
+        queue_mod._shared_redis_client = mock_redis
 
         task = _task()
         await q.put(task)
@@ -174,6 +185,7 @@ class TestRedisStreamQueue:
 
     @pytest.mark.asyncio
     async def test_get_reads_from_consumer_group(self):
+        import src.shared.queue as queue_mod
         q = _make_redis_queue()
         mock_redis = AsyncMock()
 
@@ -182,7 +194,7 @@ class TestRedisStreamQueue:
         mock_redis.xreadgroup = AsyncMock(
             return_value=[("agent_queue", [("1234567890-0", {"payload": payload})])]
         )
-        q._redis = mock_redis
+        queue_mod._shared_redis_client = mock_redis
 
         result = await q.get()
         assert result.conversation_id == task.conversation_id
@@ -190,10 +202,11 @@ class TestRedisStreamQueue:
 
     @pytest.mark.asyncio
     async def test_task_done_schedules_xack(self):
+        import src.shared.queue as queue_mod
         q = _make_redis_queue()
         mock_redis = AsyncMock()
         mock_redis.xack = AsyncMock(return_value=1)
-        q._redis = mock_redis
+        queue_mod._shared_redis_client = mock_redis
         q._pending_entry_id = "1234567890-0"
 
         q.task_done()
@@ -204,11 +217,12 @@ class TestRedisStreamQueue:
 
     @pytest.mark.asyncio
     async def test_drain_trims_stream(self):
+        import src.shared.queue as queue_mod
         q = _make_redis_queue()
         mock_redis = AsyncMock()
         mock_redis.xlen = AsyncMock(return_value=7)
         mock_redis.xtrim = AsyncMock(return_value=7)
-        q._redis = mock_redis
+        queue_mod._shared_redis_client = mock_redis
 
         drained = await q.drain()
         assert drained == 7

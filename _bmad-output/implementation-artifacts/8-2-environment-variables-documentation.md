@@ -1,6 +1,6 @@
 # Story 8.2: Environment Variables Documentation
 
-**Status:** review  
+**Status:** done  
 **Epic:** 8 — Production Hardening  
 **Story Points:** 3  
 **Priority:** Critical  
@@ -196,3 +196,13 @@ Read the current file. It currently has `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_W
 | `backend/.env.example` | Rewritten — 7 → 28 vars, 9 sections |
 | `frontend/.env.local.example` | Verified — no changes |
 | `.gitignore` | Verified — no changes |
+
+---
+
+### Review Findings
+
+- [x] [Review][Patch] `DATABASE_ENCRYPTION_KEY` documentada como "future" mas já é ativa — risco de deploy em produção [`backend/.env.example:Section 9`]
+- [x] [Review][Patch] `REDIS_URL` documentada como "future" mas já é ativa [`backend/.env.example:Section 9`]
+- [x] [Review][Patch] Comentário do `OPENROUTER_API_KEY` invertido — diz que config.py prefere `OPENAI_API_KEY`, mas é o contrário [`backend/.env.example:41-42`]
+- [x] [Review][Patch] `REDIS_STREAM_KEY`, `REDIS_CONSUMER_GROUP`, `REDIS_MAX_RETRIES` ausentes do `.env.example` (violação da AC "every env var consumed") [`backend/src/shared/config.py:31-33`]
+- [x] [Review][Defer] `src/shared/config.py` lê `OPENAI_API_KEY` diretamente, sem fallback OPENROUTER — inconsistência arquitetural pre-existente — deferred, pre-existing

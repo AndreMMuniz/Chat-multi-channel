@@ -149,3 +149,145 @@ class TestSendFromDashboard:
             msg = await MessageService(db).receive_from_channel(conv, "Customer says hi")
 
         assert msg.inbound is True
+
+
+# ── retry_message ─────────────────────────────────────────────────────────────
+
+class TestRetryMessage:
+    @pytest.mark.asyncio
+    async def test_retry_only_allowed_on_failed_messages(self, db):
+        from app.models.models import DeliveryStatus
+        conv = make_conversation(db)
+        svc = MessageService(db)
+        msg = svc.create_message(conv, "hello", inbound=False)
+        msg.delivery_status = DeliveryStatus.SENT
+        db.commit()
+
+        with pytest.raises(ValueError, match="FAILED"):
+            await svc.retry_message(msg, conv)
+
+    @pytest.mark.asyncio
+    async def test_retry_increments_retry_count(self, db):
+        from app.models.models import DeliveryStatus
+        conv = make_conversation(db)
+        svc = MessageService(db)
+        msg = svc.create_message(conv, "hello", inbound=False)
+        msg.delivery_status = DeliveryStatus.FAILED
+        db.commit()
+
+        with patch(
+            "app.services.channel_service.ChannelService.send",
+            new_callable=AsyncMock,
+        ), patch(
+            "app.services.message_service.manager.broadcast_to_conversation",
+            new_callable=AsyncMock,
+        ), patch(
+            "app.services.message_service.manager.notify_new_message",
+            new_callable=AsyncMock,
+        ):
+            await svc.retry_message(msg, conv)
+
+        db.refresh(msg)
+        assert msg.retry_count == 1
+
+    @pytest.mark.asyncio
+    async def test_retry_blocked_after_max_retries(self, db):
+        from app.models.models import DeliveryStatus
+        conv = make_conversation(db)
+        svc = MessageService(db)
+        msg = svc.create_message(conv, "hello", inbound=False)
+        msg.delivery_status = DeliveryStatus.FAILED
+        msg.retry_count = 3  # already at max
+        db.commit()
+
+        with pytest.raises(ValueError, match="Max retries"):
+            await svc.retry_message(msg, conv)
+
+
+# ── dispatch_to_channel delivery status ───────────────────────────────────────
+
+class TestDispatchDeliveryStatus:
+    @pytest.mark.asyncio
+    async def test_successful_dispatch_marks_sent(self, db):
+        from app.models.models import DeliveryStatus
+        conv = make_conversation(db, channel=ChannelType.TELEGRAM)
+        svc = MessageService(db)
+        msg = svc.create_message(conv, "hello")
+
+        with patch(
+            "app.services.channel_service.ChannelService.send",
+            new_callable=AsyncMock,
+        ):
+            await svc.dispatch_to_channel(conv, "hello", msg)
+
+        db.refresh(msg)
+        assert msg.delivery_status == DeliveryStatus.SENT
+
+    @pytest.mark.asyncio
+    async def test_failed_dispatch_marks_failed(self, db):
+        from app.models.models import DeliveryStatus
+        from app.services.channel_service import ChannelDeliveryError
+        conv = make_conversation(db, channel=ChannelType.TELEGRAM)
+        svc = MessageService(db)
+        msg = svc.create_message(conv, "hello")
+
+        with patch(
+            "app.services.channel_service.ChannelService.send",
+            new_callable=AsyncMock,
+            side_effect=ChannelDeliveryError("timeout"),
+        ), patch(
+            "app.services.message_service.manager.broadcast_to_conversation",
+            new_callable=AsyncMock,
+        ), pytest.raises(ChannelDeliveryError):
+            await svc.dispatch_to_channel(conv, "hello", msg)
+
+        db.refresh(msg)
+        assert msg.delivery_status == DeliveryStatus.FAILED
+        assert "timeout" in msg.delivery_error
+
+
+# ── first_response_at (SLA) ───────────────────────────────────────────────────
+
+class TestFirstResponseAt:
+    @pytest.mark.asyncio
+    async def test_send_from_dashboard_sets_first_response_at(self, db):
+        conv = make_conversation(db, channel=ChannelType.TELEGRAM)
+        assert conv.first_response_at is None
+
+        with patch(
+            "app.services.channel_service.ChannelService.send",
+            new_callable=AsyncMock,
+        ), patch(
+            "app.services.message_service.manager.broadcast_to_conversation",
+            new_callable=AsyncMock,
+        ), patch(
+            "app.services.message_service.manager.notify_new_message",
+            new_callable=AsyncMock,
+        ):
+            await MessageService(db).send_from_dashboard(conv, "Hi!")
+
+        db.refresh(conv)
+        assert conv.first_response_at is not None
+
+    @pytest.mark.asyncio
+    async def test_second_send_does_not_overwrite_first_response_at(self, db):
+        from datetime import datetime, timezone
+        conv = make_conversation(db, channel=ChannelType.TELEGRAM)
+        original_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        conv.first_response_at = original_time
+        db.commit()
+
+        with patch(
+            "app.services.channel_service.ChannelService.send",
+            new_callable=AsyncMock,
+        ), patch(
+            "app.services.message_service.manager.broadcast_to_conversation",
+            new_callable=AsyncMock,
+        ), patch(
+            "app.services.message_service.manager.notify_new_message",
+            new_callable=AsyncMock,
+        ):
+            await MessageService(db).send_from_dashboard(conv, "Second reply")
+
+        db.refresh(conv)
+        assert conv.first_response_at == original_time

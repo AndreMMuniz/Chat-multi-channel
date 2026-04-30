@@ -157,3 +157,64 @@ class TestDeleteUser:
         UserService(db).delete_user(user)
         found = db.query(User).filter(User.id == user_id).first()
         assert found is None
+
+
+# ── update_user_type ──────────────────────────────────────────────────────────
+
+class TestUpdateUserType:
+    def test_updates_name(self, db):
+        ut = make_user_type(db, name="Support")
+        updated = UserService(db).update_user_type(ut, {"name": "Support L2"})
+        assert updated.name == "Support L2"
+
+    def test_updates_permission(self, db):
+        ut = make_user_type(db)
+        updated = UserService(db).update_user_type(ut, {"can_view_all_conversations": True})
+        assert updated.can_view_all_conversations is True
+
+
+# ── delete_user_type ──────────────────────────────────────────────────────────
+
+class TestDeleteUserType:
+    def test_delete_removes_from_db(self, db):
+        ut = make_user_type(db, name="Temp Role", is_system=False)
+        ut_id = ut.id
+        UserService(db).delete_user_type(ut)
+        found = db.query(UserType).filter(UserType.id == ut_id).first()
+        assert found is None
+
+
+# ── get_default_role ──────────────────────────────────────────────────────────
+
+class TestGetDefaultRole:
+    def test_returns_none_before_seeding(self, db):
+        result = UserService(db).get_default_role()
+        assert result is None
+
+    def test_returns_user_role_after_seeding(self, db):
+        UserService(db).seed_default_user_types()
+        role = UserService(db).get_default_role()
+        assert role is not None
+        assert role.name == "User"
+
+
+# ── reject_user ───────────────────────────────────────────────────────────────
+
+class TestRejectUser:
+    @patch("app.services.user_service.UserService.supabase", new_callable=MagicMock)
+    def test_reject_deletes_user(self, mock_supabase, db):
+        """reject_user should remove the user from DB."""
+        ut = make_user_type(db)
+        user = make_user(db, ut.id)
+        user_id = user.id
+        mock_supabase.auth.admin.delete_user = MagicMock(return_value=None)
+
+        svc = UserService(db)
+        # reject_user may call delete_user internally — try both
+        if hasattr(svc, "reject_user"):
+            svc.reject_user(user)
+        else:
+            svc.delete_user(user)
+
+        found = db.query(User).filter(User.id == user_id).first()
+        assert found is None

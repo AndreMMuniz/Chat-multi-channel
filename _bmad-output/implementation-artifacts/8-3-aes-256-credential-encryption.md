@@ -1,6 +1,6 @@
 # Story 8.3: AES-256 Credential Encryption
 
-**Status:** review  
+**Status:** done  
 **Epic:** 8 — Production Hardening  
 **Story Points:** 8  
 **Priority:** Critical  
@@ -337,6 +337,13 @@ Output is a 64-character hex string (32 bytes → AES-256).
 - [x] App starts without `DATABASE_ENCRYPTION_KEY` set (dev mode).
 - [x] App exits with clear message if `ENVIRONMENT=production` and key is absent.
 - [x] Sprint status updated: `8-3-aes-256-credential-encryption: review`.
+
+---
+
+### Review Findings
+
+- [x] [Review][Patch] `decrypt()` não captura `InvalidTag` — rotação de chave ou ciphertext corrompido crasharia leituras de `GeneralSettings` [`backend/app/core/encryption.py:65-68`]
+- [x] [Review][Patch] Testes faltando para `decrypt()` com chave errada, base64 inválido e payload truncado [`backend/tests/test_encryption.py`]
 
 ---
 

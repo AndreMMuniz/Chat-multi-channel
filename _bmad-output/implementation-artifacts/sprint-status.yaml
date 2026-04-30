@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-04-30
+last_updated: 2026-04-30  # code-review 8-1
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -156,14 +156,14 @@ development_status:
   # Source: Retrospective 2026-04-29 (10 action items, 4 critical / 4 important / 2 nice-to-have)
   epic-8: in-progress
 
-  8-1-staging-migration-validation: review         # CRITICAL — 5 pts
-  8-2-environment-variables-documentation: review # CRITICAL — 3 pts
-  8-3-aes-256-credential-encryption: review # CRITICAL — 8 pts
-  8-4-redis-streams-queue-migration: review         # CRITICAL — 8 pts
-  8-5-pytest-suite-for-critical-services: backlog  # Important — 13 pts
-  8-6-playwright-e2e-tests: backlog                # Important — 8 pts
-  8-7-granular-rate-limiting: backlog              # Important — 5 pts
-  8-8-api-key-startup-validation: backlog          # Important — 2 pts
+  8-1-staging-migration-validation: done           # CRITICAL — 5 pts
+  8-2-environment-variables-documentation: done   # CRITICAL — 3 pts
+  8-3-aes-256-credential-encryption: done   # CRITICAL — 8 pts
+  8-4-redis-streams-queue-migration: done           # CRITICAL — 8 pts
+  8-5-pytest-suite-for-critical-services: ready-for-dev  # Important — 13 pts
+  8-6-playwright-e2e-tests: ready-for-dev                # Important — 8 pts
+  8-7-granular-rate-limiting: ready-for-dev              # Important — 5 pts
+  8-8-api-key-startup-validation: ready-for-dev          # Important — 2 pts
   8-9-messageservice-refactoring: backlog          # Nice-to-have — 5 pts
   8-10-telegram-bot-configuration-ui: backlog      # Nice-to-have — 5 pts
 

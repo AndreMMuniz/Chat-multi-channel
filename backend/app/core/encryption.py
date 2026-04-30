@@ -65,7 +65,14 @@ def decrypt(ciphertext: str | None) -> str | None:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     raw = base64.urlsafe_b64decode(ciphertext[len(_PREFIX):])
     nonce, ct = raw[:12], raw[12:]
-    return AESGCM(_KEY).decrypt(nonce, ct, None).decode("utf-8")
+    try:
+        return AESGCM(_KEY).decrypt(nonce, ct, None).decode("utf-8")
+    except Exception as exc:
+        log.error(
+            "Decryption failed (wrong key or corrupted ciphertext): %s — returning raw value",
+            exc,
+        )
+        return ciphertext
 
 
 # ── SQLAlchemy TypeDecorator ──────────────────────────────────────────────────

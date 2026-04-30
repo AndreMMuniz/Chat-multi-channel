@@ -168,3 +168,34 @@ class TestKeyValidation:
         import app.core.encryption as enc_mod
         importlib.reload(enc_mod)
         assert enc_mod._KEY is None
+
+
+# ── Resilience ────────────────────────────────────────────────────────────────
+
+class TestDecryptResilience:
+    def test_wrong_key_returns_raw_ciphertext(self, monkeypatch):
+        """decrypt() with the wrong key must not raise — returns raw ciphertext."""
+        key_a = _make_key().hex()
+        key_b = _make_key().hex()
+        enc_a = _reload_with_key(monkeypatch, key_a)
+        ciphertext = enc_a.encrypt("secret-value")
+
+        enc_b = _reload_with_key(monkeypatch, key_b)
+        result = enc_b.decrypt(ciphertext)
+        # Must not raise; returns the raw ciphertext (not plaintext, not crash)
+        assert result == ciphertext
+
+    def test_corrupted_ciphertext_returns_raw(self, monkeypatch):
+        """decrypt() with a malformed base64 payload must not raise."""
+        enc = _reload_with_key(monkeypatch, _make_key().hex())
+        corrupted = "enc:v1:!!not-valid-base64!!"
+        result = enc.decrypt(corrupted)
+        assert result == corrupted
+
+    def test_truncated_ciphertext_returns_raw(self, monkeypatch):
+        """decrypt() with a payload too short for nonce+tag must not raise."""
+        enc = _reload_with_key(monkeypatch, _make_key().hex())
+        import base64
+        too_short = "enc:v1:" + base64.urlsafe_b64encode(b"tooshort").decode()
+        result = enc.decrypt(too_short)
+        assert result == too_short

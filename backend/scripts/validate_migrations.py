@@ -137,6 +137,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.test_downgrade and not args.run_upgrade:
+        parser.error("--test-downgrade requires --run-upgrade")
+
     # ── Step 1: Chain integrity ───────────────────────────────────────────────
     _section("Step 1: Migration Chain Integrity")
     sys.path.insert(0, str(BACKEND_DIR))
