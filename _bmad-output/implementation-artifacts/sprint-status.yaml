@@ -156,10 +156,10 @@ development_status:
   # Source: Retrospective 2026-04-29 (10 action items, 4 critical / 4 important / 2 nice-to-have)
   epic-8: in-progress
 
-  8-1-staging-migration-validation: backlog        # CRITICAL — 5 pts
+  8-1-staging-migration-validation: review         # CRITICAL — 5 pts
   8-2-environment-variables-documentation: review # CRITICAL — 3 pts
   8-3-aes-256-credential-encryption: review # CRITICAL — 8 pts
-  8-4-redis-streams-queue-migration: backlog       # CRITICAL — 8 pts
+  8-4-redis-streams-queue-migration: review         # CRITICAL — 8 pts
   8-5-pytest-suite-for-critical-services: backlog  # Important — 13 pts
   8-6-playwright-e2e-tests: backlog                # Important — 8 pts
   8-7-granular-rate-limiting: backlog              # Important — 5 pts

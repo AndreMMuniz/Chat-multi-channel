@@ -9,7 +9,7 @@ import asyncio
 import logging
 
 from src.shared.config import get_settings
-from src.shared.queue import agent_queue
+from src.shared.queue import get_queue
 
 log = logging.getLogger(__name__)
 
@@ -18,8 +18,9 @@ async def _worker(worker_id: int) -> None:
     """Single worker coroutine — loops forever processing tasks from the queue."""
     from src.worker.processor import process
 
-    q = agent_queue()
-    log.info("Worker %d started", worker_id)
+    q = get_queue(consumer_id=f"worker-{worker_id}")
+    await q.setup()  # no-op for AsyncioQueue; creates consumer group for Redis
+    log.info("Worker %d started (consumer_id=worker-%d)", worker_id, worker_id)
 
     while True:
         task = await q.get()

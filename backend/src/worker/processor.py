@@ -16,9 +16,38 @@ from src.shared.models import AgentTask
 
 log = logging.getLogger(__name__)
 
+# In-process retry counter: message_id → consecutive failure count.
+# Resets on process restart (acceptable for MVP — avoids external state).
+_retry_counts: dict[str, int] = {}
+
 
 async def process(task: AgentTask) -> None:
-    """Process a single AgentTask end-to-end."""
+    """Process a single AgentTask end-to-end.
+
+    On repeated failure, sends the task to the dead-letter stream
+    (agent_queue:dlq) after REDIS_MAX_RETRIES consecutive errors.
+    """
+    from src.shared.config import get_settings
+    cfg = get_settings()
+
+    try:
+        await _process_inner(task)
+        _retry_counts.pop(task.message_id, None)  # clear on success
+    except Exception as exc:
+        count = _retry_counts.get(task.message_id, 0) + 1
+        _retry_counts[task.message_id] = count
+        log.error(
+            "processor error (attempt %d/%d) [conv=%s]: %s",
+            count, cfg.REDIS_MAX_RETRIES, task.conversation_id, exc,
+        )
+        if count >= cfg.REDIS_MAX_RETRIES and cfg.REDIS_URL:
+            await _send_to_dlq(task, str(exc), cfg)
+            _retry_counts.pop(task.message_id, None)
+        raise
+
+
+async def _process_inner(task: AgentTask) -> None:
+    """Core processing logic — unchanged from original process()."""
     from app.core.database import SessionLocal
     from src.agents.loader import get_agent
 
@@ -42,9 +71,10 @@ async def process(task: AgentTask) -> None:
 
         await _persist_results(db, task, result)
 
-    except Exception as exc:
-        log.error("processor.process error [conv=%s]: %s", task.conversation_id, exc)
-    finally:
+    except Exception:
+        db.close()
+        raise  # propagate to process() for retry counting
+    else:
         db.close()
 
 
@@ -126,3 +156,19 @@ async def _send_auto_reply(db, task: AgentTask, reply: str) -> None:
         log.info("Auto-reply sent [conv=%s]", task.conversation_id)
     except Exception as exc:
         log.error("Auto-reply failed [conv=%s]: %s", task.conversation_id, exc)
+
+
+async def _send_to_dlq(task: AgentTask, error: str, cfg) -> None:
+    """Write a failed task to the dead-letter stream after max retries."""
+    try:
+        import redis.asyncio as aioredis
+        r = await aioredis.from_url(cfg.REDIS_URL, decode_responses=True)
+        dlq_key = f"{cfg.REDIS_STREAM_KEY}:dlq"
+        await r.xadd(dlq_key, {"payload": task.model_dump_json(), "error": error})
+        await r.aclose()
+        log.warning(
+            "Task sent to DLQ '%s' [conv=%s] after %d failures",
+            dlq_key, task.conversation_id, cfg.REDIS_MAX_RETRIES,
+        )
+    except Exception as dlq_exc:
+        log.error("DLQ write failed [conv=%s]: %s", task.conversation_id, dlq_exc)

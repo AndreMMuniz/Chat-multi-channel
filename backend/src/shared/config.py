@@ -26,6 +26,12 @@ class AgentSettings(BaseSettings):
     WORKER_CONCURRENCY: int = int(os.getenv("WORKER_CONCURRENCY", "4"))
     WORKER_QUEUE_MAXSIZE: int = int(os.getenv("WORKER_QUEUE_MAXSIZE", "1000"))
 
+    # Redis Streams (optional — falls back to asyncio.Queue when unset)
+    REDIS_URL: str = os.getenv("REDIS_URL", "")
+    REDIS_STREAM_KEY: str = os.getenv("REDIS_STREAM_KEY", "agent_queue")
+    REDIS_CONSUMER_GROUP: str = os.getenv("REDIS_CONSUMER_GROUP", "workers")
+    REDIS_MAX_RETRIES: int = int(os.getenv("REDIS_MAX_RETRIES", "3"))
+
 
 @lru_cache
 def get_settings() -> AgentSettings:

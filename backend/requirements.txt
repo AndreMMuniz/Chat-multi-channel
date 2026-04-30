@@ -19,3 +19,4 @@ alembic
 email-validator
 slowapi
 cryptography
+redis
