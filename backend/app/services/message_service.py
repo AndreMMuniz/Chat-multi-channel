@@ -98,7 +98,7 @@ class MessageService:
             await ChannelService(self.db).send(conversation, content)
             # Mark as sent
             if message:
-                message.delivery_status = "SENT"
+                message.delivery_status = DeliveryStatus.SENT
                 message.delivery_error = None
                 self.db.commit()
             # Reset failure counter for this channel
@@ -111,7 +111,7 @@ class MessageService:
             # Persist failure
             if message:
                 from datetime import timezone
-                message.delivery_status = "FAILED"
+                message.delivery_status = DeliveryStatus.FAILED
                 message.delivery_error = reason
                 self.db.commit()
             # Track failure for threshold alerts
@@ -166,14 +166,14 @@ class MessageService:
         from app.models.models import DeliveryStatus
         from datetime import timezone
 
-        if message.delivery_status != "FAILED":
+        if message.delivery_status != DeliveryStatus.FAILED:
             raise ValueError("Only FAILED messages can be retried")
         if message.retry_count >= self.MAX_RETRIES:
             raise ValueError(f"Max retries ({self.MAX_RETRIES}) reached")
 
         message.retry_count += 1
         message.last_retry_at = datetime.now(timezone.utc)
-        message.delivery_status = "PENDING"
+        message.delivery_status = DeliveryStatus.PENDING
         self.db.commit()
 
         await self.dispatch_to_channel(conversation, message.content, message)
@@ -210,7 +210,7 @@ class MessageService:
             file=file,
             idempotency_key=idempotency_key,
         )
-        message.delivery_status = "PENDING"
+        message.delivery_status = DeliveryStatus.PENDING
 
         # Set first_response_at when this is the first outbound message (Story 3.6)
         if conversation.first_response_at is None:

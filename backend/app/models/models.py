@@ -186,7 +186,10 @@ class Message(Base):
     idempotency_key = Column(String(255), nullable=True, unique=True)
 
     # Delivery tracking (Story 4.1)
-    delivery_status = Column(Enum(DeliveryStatus), nullable=True)          # null = inbound (no delivery)
+    delivery_status = Column(
+        Enum(DeliveryStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=True,
+    )  # null = inbound (no delivery)
     delivery_error  = Column(Text, nullable=True)                           # last error reason
     retry_count     = Column(Integer, nullable=False, default=0)
     last_retry_at   = Column(DateTime(timezone=True), nullable=True)
