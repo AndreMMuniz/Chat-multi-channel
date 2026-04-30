@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-load_dotenv()
+load_dotenv(override=False)
 
 class Settings(BaseModel):
     PROJECT_NAME: str = "Multi-Channel Chat API"
