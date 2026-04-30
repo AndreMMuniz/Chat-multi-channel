@@ -14,12 +14,12 @@ The API key comes from OPENAI_API_KEY env var (used for both OpenAI and OpenRout
 """
 
 import json
-import os
 from typing import List, Optional, TypedDict
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.models import Message, AISuggestion, GeneralSettings, Conversation
 
 
@@ -55,7 +55,7 @@ class AIService:
         cfg = self.db.query(GeneralSettings).first()
         model = (cfg.ai_model if cfg and cfg.ai_model else "gpt-4o-mini")
         provider = (cfg.ai_provider if cfg and cfg.ai_provider else "openrouter")
-        api_key = os.getenv("OPENAI_API_KEY", "")
+        api_key = settings.OPENAI_API_KEY
 
         if provider == "openrouter":
             return ChatOpenAI(
