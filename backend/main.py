@@ -165,10 +165,6 @@ async def health_check():
     from app.core.websocket import manager
     from src.shared.queue import agent_queue
 
-    # Debug: log env var presence for AI key troubleshooting
-    import os
-    print(f"[HEALTH] OPENAI_API_KEY present={bool(os.getenv('OPENAI_API_KEY'))} | OPENROUTER_API_KEY present={bool(os.getenv('OPENROUTER_API_KEY'))} | settings.OPENAI_API_KEY present={bool(settings.OPENAI_API_KEY)}")
-
     # DB pool stats (SQLAlchemy pool)
     pool_status: dict = {}
     db_ok = True

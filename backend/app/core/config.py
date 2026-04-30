@@ -16,7 +16,7 @@ class Settings(BaseModel):
 
     # AI — supports both OPENAI_API_KEY and OPENROUTER_API_KEY
     # When using OpenRouter, set OPENROUTER_API_KEY (preferred) or OPENAI_API_KEY
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "")
+    OPENAI_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
