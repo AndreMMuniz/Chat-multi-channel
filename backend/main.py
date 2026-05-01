@@ -3,15 +3,13 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import uvicorn
 from app.api.api import api_router
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.services.telegram_service import telegram_service
-
-limiter = Limiter(key_func=get_remote_address)
 
 
 def _validate_encryption_key() -> None:
@@ -39,7 +37,25 @@ def _validate_encryption_key() -> None:
             sys.exit(1)
 
 
+def _validate_ai_key() -> None:
+    """Warn (dev) or exit (production) if no LLM API key is configured."""
+    env = os.getenv("ENVIRONMENT", "development")
+    if not settings.OPENAI_API_KEY:
+        msg = (
+            "AI API key is not set. AI suggestions will not work. "
+            "Set OPENROUTER_API_KEY or OPENAI_API_KEY — see backend/.env.example."
+        )
+        if env == "production":
+            import sys
+            print(f"CRITICAL: {msg} Exiting.", flush=True)
+            sys.exit(1)
+        else:
+            import logging
+            logging.getLogger(__name__).warning(msg)
+
+
 _validate_encryption_key()
+_validate_ai_key()
 
 _EMAIL_POLL_INTERVAL = int(os.getenv("EMAIL_POLL_INTERVAL_SECONDS", "60"))
 _SLA_CHECK_INTERVAL = int(os.getenv("SLA_CHECK_INTERVAL_SECONDS", "120"))

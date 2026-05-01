@@ -1,12 +1,13 @@
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, text
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
+from app.core.limiter import limiter
 from app.models.models import Conversation, Message, ConversationStatus, ChannelType, AISuggestion, User
 from app.schemas.common import create_response
 
@@ -14,7 +15,9 @@ router = APIRouter()
 
 
 @router.get("/stats")
+@limiter.limit("60/minute")
 async def get_dashboard_stats(
+    request: Request,
     days: int = Query(7, ge=1, le=90),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),

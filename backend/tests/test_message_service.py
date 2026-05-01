@@ -290,4 +290,5 @@ class TestFirstResponseAt:
             await MessageService(db).send_from_dashboard(conv, "Second reply")
 
         db.refresh(conv)
-        assert conv.first_response_at == original_time
+        # SQLite strips timezone info — compare naive values
+        assert conv.first_response_at == original_time.replace(tzinfo=None)

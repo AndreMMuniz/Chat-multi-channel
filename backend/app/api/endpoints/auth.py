@@ -2,9 +2,9 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session, joinedload
-from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.core.database import get_db, get_supabase
+from app.core.limiter import limiter
 from app.models.models import User, UserType
 from app.schemas.user import UserResponse, UserSignup
 from app.schemas.common import create_response, create_error_response
@@ -13,7 +13,6 @@ from app.repositories import RepositoryFactory, get_repositories
 from app.core.config import settings as app_settings
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 _IS_PROD = app_settings.is_production
 
@@ -58,7 +57,7 @@ class LoginResponse(BaseModel):
 
 
 @router.post("/login")
-@limiter.limit("10/minute")
+@limiter.limit("10/minute", key_func=get_remote_address)
 async def login(data: LoginRequest, request: Request, response: Response, repos: RepositoryFactory = Depends(get_repositories)) -> Dict[str, Any]:
     """Authenticate via Supabase, set HttpOnly cookies and return tokens."""
     supabase = get_supabase()
@@ -149,7 +148,7 @@ async def login(data: LoginRequest, request: Request, response: Response, repos:
 
 
 @router.post("/signup")
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=get_remote_address)
 async def signup(data: UserSignup, request: Request, repos: RepositoryFactory = Depends(get_repositories), db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Self-service registration — creates account pending admin approval."""
     seed_default_user_types(db)
@@ -217,7 +216,7 @@ class SetPasswordRequest(BaseModel):
 
 
 @router.post("/forgot-password")
-@limiter.limit("3/minute")
+@limiter.limit("3/minute", key_func=get_remote_address)
 async def forgot_password(data: dict, request: Request) -> Dict[str, Any]:
     """Send password reset email via Supabase."""
     email = data.get("email")

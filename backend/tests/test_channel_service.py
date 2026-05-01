@@ -7,7 +7,7 @@ Strategy: create real DB fixtures, mock private _send_* methods.
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.channel_service import ChannelService, ChannelDeliveryError
 from app.models.models import Contact, Conversation, ChannelType
 
@@ -145,3 +145,78 @@ class TestInternalDispatchers:
         svc = ChannelService(db)
         with pytest.raises(ChannelDeliveryError, match="missing_phone"):
             await svc._send_sms(contact, "hi")
+
+
+# ── Actual external dispatch (mock real service calls) ────────────────────────
+
+class TestActualDispatchers:
+    @pytest.mark.asyncio
+    async def test_telegram_send_failed_raises(self, db):
+        _, contact = _make_conv(db, ChannelType.TELEGRAM)
+        svc = ChannelService(db)
+        with patch("app.services.telegram_service.telegram_service") as mock_tg:
+            mock_tg.send_message = AsyncMock(return_value=False)
+            with pytest.raises(ChannelDeliveryError, match="send_failed"):
+                await svc._send_telegram(contact, "hi")
+
+    @pytest.mark.asyncio
+    async def test_telegram_send_succeeds(self, db):
+        _, contact = _make_conv(db, ChannelType.TELEGRAM)
+        svc = ChannelService(db)
+        with patch("app.services.telegram_service.telegram_service") as mock_tg:
+            mock_tg.send_message = AsyncMock(return_value=True)
+            await svc._send_telegram(contact, "hi")  # must not raise
+
+    @pytest.mark.asyncio
+    async def test_whatsapp_not_configured_raises(self, db):
+        _, contact = _make_conv(db, ChannelType.WHATSAPP)
+        svc = ChannelService(db)
+        with patch("app.services.whatsapp_service.WhatsAppService.from_settings", return_value=None):
+            with pytest.raises(ChannelDeliveryError, match="not_configured"):
+                await svc._send_whatsapp(contact, "hi")
+
+    @pytest.mark.asyncio
+    async def test_whatsapp_send_failed_raises(self, db):
+        _, contact = _make_conv(db, ChannelType.WHATSAPP)
+        svc = ChannelService(db)
+        mock_wa = MagicMock()
+        mock_wa.send_message = AsyncMock(return_value=False)
+        with patch("app.services.whatsapp_service.WhatsAppService.from_settings", return_value=mock_wa):
+            with pytest.raises(ChannelDeliveryError, match="send_failed"):
+                await svc._send_whatsapp(contact, "hi")
+
+    @pytest.mark.asyncio
+    async def test_email_not_configured_raises(self, db):
+        _, contact = _make_conv(db, ChannelType.EMAIL, email="test@test.com")
+        svc = ChannelService(db)
+        with patch("app.services.email_service.EmailService.from_settings", return_value=None):
+            with pytest.raises(ChannelDeliveryError, match="not_configured"):
+                await svc._send_email(contact, "hi")
+
+    @pytest.mark.asyncio
+    async def test_email_send_failed_raises(self, db):
+        _, contact = _make_conv(db, ChannelType.EMAIL, email="test@test.com")
+        svc = ChannelService(db)
+        mock_email = MagicMock()
+        mock_email.send_email = AsyncMock(return_value=False)
+        with patch("app.services.email_service.EmailService.from_settings", return_value=mock_email):
+            with pytest.raises(ChannelDeliveryError, match="send_failed"):
+                await svc._send_email(contact, "hi")
+
+    @pytest.mark.asyncio
+    async def test_sms_not_configured_raises(self, db):
+        _, contact = _make_conv(db, ChannelType.SMS, phone="+1234567890")
+        svc = ChannelService(db)
+        with patch("app.services.sms_service.SMSService.from_settings", return_value=None):
+            with pytest.raises(ChannelDeliveryError, match="not_configured"):
+                await svc._send_sms(contact, "hi")
+
+    @pytest.mark.asyncio
+    async def test_sms_send_failed_raises(self, db):
+        _, contact = _make_conv(db, ChannelType.SMS, phone="+1234567890")
+        svc = ChannelService(db)
+        mock_sms = MagicMock()
+        mock_sms.send_message = AsyncMock(return_value=False)
+        with patch("app.services.sms_service.SMSService.from_settings", return_value=mock_sms):
+            with pytest.raises(ChannelDeliveryError, match="send_failed"):
+                await svc._send_sms(contact, "hi")

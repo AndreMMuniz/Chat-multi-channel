@@ -1,9 +1,10 @@
 import uuid as _uuid
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.models import Conversation, Message
 from app.schemas.chat import ConversationResponse, ConversationUpdate, MessageResponse, AISuggestionResponse
 from app.schemas.common import create_response, create_paginated_response, create_error_response
@@ -64,7 +65,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # --- REST Endpoints ---
 @router.get("/conversations")
+@limiter.limit("60/minute")
 async def get_conversations(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     status: Optional[str] = None,
@@ -101,7 +104,8 @@ async def get_conversations(
     )
 
 @router.get("/conversations/{conversation_id}/messages")
-async def get_conversation_messages(conversation_id: UUID, skip: int = 0, limit: int = 50, db: Session = Depends(get_db)) -> Dict[str, Any]:
+@limiter.limit("60/minute")
+async def get_conversation_messages(request: Request, conversation_id: UUID, skip: int = 0, limit: int = 50, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Get all messages for a specific conversation."""
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
@@ -149,7 +153,9 @@ async def update_conversation(
 
 
 @router.post("/conversations/{conversation_id}/messages")
+@limiter.limit("60/minute")
 async def send_message(
+    request: Request,
     conversation_id: UUID,
     message_data: MessageCreate,
     db: Session = Depends(get_db),
@@ -282,7 +288,9 @@ async def get_suggestions(
 
 
 @router.post("/conversations/{conversation_id}/suggestions/generate")
+@limiter.limit("30/minute")
 async def generate_suggestions(
+    request: Request,
     conversation_id: UUID,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:

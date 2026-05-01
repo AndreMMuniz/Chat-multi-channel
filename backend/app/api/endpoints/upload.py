@@ -1,7 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from app.services.storage_service import storage_service
 from typing import Dict, Any
 from app.schemas.common import create_response, create_error_response
+from app.core.limiter import limiter
 
 router = APIRouter()
 
@@ -14,7 +15,8 @@ _MAX_SIZES: Dict[str, int] = {
 }
 
 @router.post("")
-async def upload_file(file: UploadFile = File(...)) -> Dict[str, Any]:
+@limiter.limit("30/minute")
+async def upload_file(request: Request, file: UploadFile = File(...)) -> Dict[str, Any]:
     if not file:
         error_response, status = create_error_response(
             code="VALIDATION_ERROR",

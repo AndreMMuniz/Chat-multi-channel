@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, Any
@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
+from app.core.limiter import limiter
 from app.models.models import GeneralSettings, User
 
 router = APIRouter()
@@ -75,7 +76,9 @@ def _get_or_create(db: Session) -> GeneralSettings:
 
 
 @router.get("/settings", response_model=SettingsOut)
+@limiter.limit("60/minute")
 def get_settings(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -83,7 +86,9 @@ def get_settings(
 
 
 @router.patch("/settings", response_model=SettingsOut)
+@limiter.limit("30/minute")
 def update_settings(
+    request: Request,
     body: SettingsIn,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

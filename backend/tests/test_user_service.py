@@ -218,3 +218,116 @@ class TestRejectUser:
 
         found = db.query(User).filter(User.id == user_id).first()
         assert found is None
+
+    @patch("app.services.user_service.UserService.supabase", new_callable=MagicMock)
+    def test_reject_user_with_actor_logs_audit(self, mock_supabase, db):
+        from app.models.models import AuditLog
+        actor_ut = make_user_type(db, "Admin2", DefaultRole.ADMIN)
+        actor = make_user(db, actor_ut.id, email="actor2@example.com")
+        ut = make_user_type(db, "Temp1", is_system=False)
+        user = make_user(db, ut.id, email="reject2@example.com")
+        mock_supabase.auth.admin.delete_user = MagicMock(return_value=None)
+        UserService(db).reject_user(user, actor_id=actor.id)
+        log = db.query(AuditLog).filter(AuditLog.action == "reject_user").first()
+        assert log is not None
+
+    @patch("app.services.user_service.UserService.supabase", new_callable=MagicMock)
+    def test_reject_user_survives_supabase_exception(self, mock_supabase, db):
+        ut = make_user_type(db, "Temp2", is_system=False)
+        user = make_user(db, ut.id, email="reject3@example.com")
+        user_id = user.id
+        mock_supabase.auth.admin.delete_user = MagicMock(side_effect=Exception("Supabase down"))
+        UserService(db).reject_user(user)  # must not raise
+        assert db.query(User).filter(User.id == user_id).first() is None
+
+
+# ── delete_user extended ──────────────────────────────────────────────────────
+
+class TestDeleteUserExtended:
+    @patch("app.services.user_service.UserService.supabase", new_callable=MagicMock)
+    def test_delete_user_with_actor_logs_audit(self, mock_supabase, db):
+        from app.models.models import AuditLog
+        actor_ut = make_user_type(db, "Admin3", DefaultRole.ADMIN)
+        actor = make_user(db, actor_ut.id, email="actor3@example.com")
+        ut = make_user_type(db, "Temp3", is_system=False)
+        user = make_user(db, ut.id, email="delete2@example.com")
+        mock_supabase.auth.admin.delete_user = MagicMock(return_value=None)
+        UserService(db).delete_user(user, actor_id=actor.id)
+        log = db.query(AuditLog).filter(AuditLog.action == "delete_user").first()
+        assert log is not None
+
+    @patch("app.services.user_service.UserService.supabase", new_callable=MagicMock)
+    def test_delete_user_survives_supabase_exception(self, mock_supabase, db):
+        ut = make_user_type(db, "Temp4", is_system=False)
+        user = make_user(db, ut.id, email="delete3@example.com")
+        user_id = user.id
+        mock_supabase.auth.admin.delete_user = MagicMock(side_effect=Exception("Supabase down"))
+        UserService(db).delete_user(user)  # must not raise
+        assert db.query(User).filter(User.id == user_id).first() is None
+
+
+# ── approve_user with actor ───────────────────────────────────────────────────
+
+class TestApproveUserExtended:
+    @patch("app.services.user_service.send_approval_email")
+    def test_approve_user_with_actor_logs_audit(self, mock_email, db):
+        from app.models.models import AuditLog
+        actor_ut = make_user_type(db, "Admin4", DefaultRole.ADMIN)
+        actor = make_user(db, actor_ut.id, email="actor4@example.com")
+        ut = make_user_type(db, "Temp5", is_system=False)
+        user = make_user(db, ut.id, email="approve2@example.com")
+        user.is_approved = False
+        user.is_active = False
+        db.commit()
+        UserService(db).approve_user(user, actor_id=actor.id)
+        log = db.query(AuditLog).filter(AuditLog.action == "approve_user").first()
+        assert log is not None
+
+
+# ── enable/disable with actor ─────────────────────────────────────────────────
+
+class TestEnableDisableUserExtended:
+    def test_enable_user_with_actor_logs_audit(self, db):
+        from app.models.models import AuditLog
+        actor_ut = make_user_type(db, "Admin5", DefaultRole.ADMIN)
+        actor = make_user(db, actor_ut.id, email="actor5@example.com")
+        ut = make_user_type(db, "Temp6", is_system=False)
+        user = make_user(db, ut.id, email="enable2@example.com")
+        user.is_active = False
+        db.commit()
+        UserService(db).enable_user(user, actor_id=actor.id)
+        log = db.query(AuditLog).filter(AuditLog.action == "enable_user").first()
+        assert log is not None
+
+    def test_disable_user_with_actor_logs_audit(self, db):
+        from app.models.models import AuditLog
+        actor_ut = make_user_type(db, "Admin6", DefaultRole.ADMIN)
+        actor = make_user(db, actor_ut.id, email="actor6@example.com")
+        ut = make_user_type(db, "Temp7", is_system=False)
+        user = make_user(db, ut.id, email="disable2@example.com")
+        db.commit()
+        UserService(db).disable_user(user, actor_id=actor.id)
+        log = db.query(AuditLog).filter(AuditLog.action == "disable_user").first()
+        assert log is not None
+
+
+# ── change_password ───────────────────────────────────────────────────────────
+
+class TestChangePassword:
+    @patch("app.services.user_service.UserService.supabase", new_callable=MagicMock)
+    def test_change_password_calls_supabase(self, mock_supabase, db):
+        ut = make_user_type(db, "Temp8", is_system=False)
+        user = make_user(db, ut.id, email="pwchange@example.com")
+        mock_supabase.auth.admin.update_user_by_id = MagicMock(return_value=None)
+        UserService(db).change_password(user, "NewPass123!")
+        mock_supabase.auth.admin.update_user_by_id.assert_called_once_with(
+            user.auth_id, {"password": "NewPass123!"}
+        )
+
+
+# ── get_user_service factory ──────────────────────────────────────────────────
+
+def test_get_user_service_returns_instance(db):
+    from app.services.user_service import get_user_service
+    svc = get_user_service(db)
+    assert isinstance(svc, UserService)
