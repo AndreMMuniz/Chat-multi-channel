@@ -164,7 +164,7 @@ development_status:
   8-6-playwright-e2e-tests: done                         # Important — 8 pts
   8-7-granular-rate-limiting: done                       # Important — 5 pts
   8-8-api-key-startup-validation: done                   # Important — 2 pts
-  8-9-messageservice-refactoring: backlog          # Nice-to-have — 5 pts
+  8-9-messageservice-refactoring: review            # Nice-to-have — 5 pts
   8-10-telegram-bot-configuration-ui: backlog      # Nice-to-have — 5 pts
 
   epic-8-retrospective: optional

@@ -1,3 +1,101 @@
+# Story 8.9: MessageService Refactoring
+
+**Status:** review
+**Epic:** 8 — Production Hardening
+**Story Points:** 5
+**Priority:** Nice-to-have
+**Created:** 2026-05-01
+
+---
+
+## User Story
+
+**As a developer,** I want `MessageService` split into focused sub-services so that each file respects SRP, is under 150 lines, and is easier to test and maintain independently.
+
+---
+
+## Background & Context
+
+`backend/app/services/message_service.py` is currently **274 lines** with 5 distinct responsibilities:
+
+1. **Message creation** — sequencing, idempotency, DB persistence (lines 27-83)
+2. **Channel dispatch** — sends via ChannelService, tracks delivery status, alert tasks (lines 87-133)
+3. **WebSocket broadcast** — fan-out via `manager` (lines 137-155)
+4. **Retry logic** — orchestrates dispatch + broadcast for failed messages (lines 159-181)
+5. **Flow orchestration** — `send_from_dashboard`, `receive_from_channel`, agent queue enqueue (lines 185-274)
+
+**Key constraint — ALL 8 callers use `MessageService` directly. Public API must not change:**
+- `backend/app/api/endpoints/chat.py:130,271`
+- `backend/app/services/email_service.py:145`
+- `backend/app/services/sms_service.py:90`
+- `backend/app/services/telegram_service.py:60`
+- `backend/app/services/whatsapp_service.py:121`
+- `backend/src/worker/processor.py:141`
+- `backend/tests/test_message_service.py:9`
+
+---
+
+## Design
+
+`MessageService` stays as a **thin orchestrating facade**. All its public methods remain with identical signatures but delegate to focused sub-services. No caller needs to change.
+
+### Decomposition
+
+| File | Class | Responsibility | Est. Lines |
+|------|-------|----------------|------------|
+| `message_creation_service.py` | `MessageCreationService` | DB persistence, sequencing, idempotency | ~55 |
+| `message_delivery_service.py` | `DeliveryService` | Channel dispatch, delivery status, alert tasks | ~55 |
+| `message_broadcast_service.py` | `BroadcastService` | WebSocket fan-out | ~25 |
+| `message_service.py` | `MessageService` (orchestrator) | Delegation + `send_from_dashboard`, `receive_from_channel`, retry, enqueue | ~95 |
+
+---
+
+## Files to Create / Modify
+
+| File | Action |
+|------|--------|
+| `backend/app/services/message_creation_service.py` | **CREATE** |
+| `backend/app/services/message_delivery_service.py` | **CREATE** |
+| `backend/app/services/message_broadcast_service.py` | **CREATE** |
+| `backend/app/services/message_service.py` | **REWRITE** |
+
+**Do NOT modify any caller file.** No import changes anywhere else.
+
+---
+
+## Implementation
+
+### `message_creation_service.py`
+
+Exact copy of the creation logic from current `message_service.py` (lines 27-83), encapsulated in a class:
+
+- `__init__(self, db: Session)`
+- `_next_sequence(self, conversation_id: UUID) -> int`
+- `_find_by_idempotency_key(self, key: str) -> Optional[Message]`
+- `create_message(self, conversation, content, inbound, owner_id, message_type, image, file, idempotency_key) -> Message`
+
+No behavioral changes — copy the logic verbatim.
+
+### `message_delivery_service.py`
+
+Exact copy of `dispatch_to_channel` (lines 87-133):
+
+- `__init__(self, db: Session)`
+- `async dispatch_to_channel(self, conversation, content, message=None) -> None`
+
+Note: `manager` import moves inside the except block (it's already a lazy import in the exception path).
+
+### `message_broadcast_service.py`
+
+Exact copy of `broadcast_new_message` (lines 137-155):
+
+- `async broadcast_new_message(self, message: Message) -> None`
+
+No `db` needed — only uses `manager`.
+
+### `message_service.py` (rewritten)
+
+```python
 """
 MessageService — thin orchestrator that composes creation, delivery, and broadcast.
 
@@ -9,7 +107,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.models import Conversation, Message
-from app.core.websocket import manager  # re-exported to preserve existing patch targets in tests
 from app.services.message_creation_service import MessageCreationService
 from app.services.message_delivery_service import DeliveryService
 from app.services.message_broadcast_service import BroadcastService
@@ -134,5 +231,27 @@ class MessageService:
 
 
 def get_message_service(db: Session) -> MessageService:
-    """FastAPI dependency factory."""
     return MessageService(db)
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] `message_creation_service.py` created — contains `MessageCreationService` with `create_message`, `_next_sequence`, `_find_by_idempotency_key`.
+- [ ] `message_delivery_service.py` created — contains `DeliveryService` with `dispatch_to_channel`.
+- [ ] `message_broadcast_service.py` created — contains `BroadcastService` with `broadcast_new_message`.
+- [ ] `message_service.py` rewritten as thin orchestrator — all public methods preserved with identical signatures and behavior.
+- [ ] Each new file is < 150 lines (`wc -l` to verify).
+- [ ] No caller file modified.
+- [ ] `pytest tests/` exits 0 — all 175 existing tests pass unchanged.
+
+---
+
+## Definition of Done
+
+- [ ] 3 new service files created, `message_service.py` rewritten.
+- [ ] All files < 150 lines.
+- [ ] All 175 tests pass with no test file modifications.
+- [ ] No import changes in any caller.
+- [ ] Sprint status updated: `8-9-messageservice-refactoring: done`.
