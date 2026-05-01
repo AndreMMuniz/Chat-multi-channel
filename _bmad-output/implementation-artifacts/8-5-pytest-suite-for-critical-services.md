@@ -474,3 +474,10 @@ jobs:
 - [ ] CI workflow created; would pass on current codebase.
 - [ ] No changes to application code (tests only + CI config).
 - [ ] Sprint status updated: `8-5-pytest-suite-for-critical-services: review`.
+
+---
+
+### Review Findings (2026-04-30)
+
+- [x] [Review][Defer] Coverage gate 70% vs DoD 80% — CI uses `--cov-fail-under=70`; all 5 services already exceed 80% locally. Gate kept conservative to prevent regression without false CI failures. [`.github/workflows/pytest.yml:33`] — deferred, intentional per implementation guide; 80% is the per-service aspirational target, 70% is the CI regression floor
+- [x] [Review][Defer] SQLite timezone stripping in `test_second_send_does_not_overwrite_first_response_at` gives false confidence vs PostgreSQL production behavior [`backend/tests/test_message_service.py:293`] — deferred, pre-existing test environment limitation

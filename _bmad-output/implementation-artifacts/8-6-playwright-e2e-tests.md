@@ -439,3 +439,9 @@ npm install --save-dev wait-on
 - [ ] GitHub Actions workflow created.
 - [ ] `npx playwright test` exits 0 locally.
 - [ ] Sprint status updated: `8-6-playwright-e2e-tests: review`.
+
+---
+
+### Review Findings (2026-04-30)
+
+- [x] [Review][Defer] `mockMessages` glob `"*/messages**"` also matches POST /messages — in tests without `mockSendMessage`, a send call silently returns `{data:[], total:0}` via catch-all [`frontend/e2e/fixtures.ts:95`] — deferred, no current test exercises this path

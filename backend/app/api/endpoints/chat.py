@@ -130,7 +130,9 @@ from app.services.conversation_service import ConversationService, get_conversat
 from app.services.message_service import MessageService, get_message_service
 
 @router.patch("/conversations/{conversation_id}")
+@limiter.limit("60/minute")
 async def update_conversation(
+    request: Request,
     conversation_id: UUID,
     update_data: ConversationUpdate,
     db: Session = Depends(get_db),
@@ -187,7 +189,9 @@ async def send_message(
 # ── Conversation Assignment (Story 3.5) ──────────────────────────────────────
 
 @router.patch("/conversations/{conversation_id}/assign")
+@limiter.limit("60/minute")
 async def assign_conversation(
+    request: Request,
     conversation_id: UUID,
     body: Dict[str, Any],
     db: Session = Depends(get_db),
@@ -231,7 +235,9 @@ async def assign_conversation(
 # ── Message Retry (Story 4.3) ─────────────────────────────────────────────────
 
 @router.post("/conversations/{conversation_id}/messages/{message_id}/retry")
+@limiter.limit("20/minute")
 async def retry_message(
+    request: Request,
     conversation_id: UUID,
     message_id: UUID,
     db: Session = Depends(get_db),
@@ -276,7 +282,9 @@ async def retry_message(
 # ── AI Suggestions ────────────────────────────────────────────────────────────
 
 @router.get("/conversations/{conversation_id}/suggestions")
+@limiter.limit("60/minute")
 async def get_suggestions(
+    request: Request,
     conversation_id: UUID,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:

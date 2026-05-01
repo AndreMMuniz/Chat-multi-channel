@@ -261,3 +261,12 @@ async def login(request: Request, ...):
 - [ ] App starts without errors.
 - [ ] Manual test: 11 rapid login attempts → 429 on 11th.
 - [ ] Sprint status updated: `8-7-granular-rate-limiting: review`.
+
+---
+
+### Review Findings (2026-04-30)
+
+- [x] [Review][Patch] Raw auth token stored verbatim as rate-limit store key — **FIXED**: token now hashed with sha256 before use as key [`backend/app/core/limiter.py`]
+- [x] [Review][Patch] Malformed/empty Bearer or whitespace cookie collapses to key `"user:"` — **FIXED**: token stripped and validated non-empty before hashing [`backend/app/core/limiter.py`]
+- [x] [Review][Patch] PATCH /conversations, PATCH /assign, POST /retry (20/min), GET /suggestions — **FIXED**: `@limiter.limit` decorators added to all 4 endpoints [`backend/app/api/endpoints/chat.py`]
+- [x] [Review][Defer] IP-based limiting on auth endpoints bypassable via proxy/IP cycling — pre-existing behavior, not introduced by this story — deferred, pre-existing
