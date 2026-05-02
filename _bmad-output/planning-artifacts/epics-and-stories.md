@@ -544,6 +544,50 @@ This document outlines the epics and user stories derived from the Product Requi
 **Estimation:** 5 story points  
 **Priority:** Nice-to-have
 
+## Epic 11: Projects / Pipeline Kanban
+**Derived from:** Post-Epic 10 navigation expansion and pipeline workspace direction  
+**Description:** Turn `Projects` into a real pipeline workspace with kanban management, deal editing, filters, and high-level sales/project visibility.
+
+### Story 11.1: Projects Workspace Shell and Header
+**As an operator,** I want the `Projects` area to open into a real workspace shell so that the domain feels active and ready for pipeline work instead of acting like a placeholder.  
+**Acceptance Criteria:**
+- Projects page includes a real workspace header and shell.
+- View toggles and primary CTA are visible.
+- Filters and KPI areas have defined placement.
+- All visible labels are in English.  
+**Estimation:** 3 story points  
+**Priority:** High
+
+### Story 11.2: Kanban Board Columns and Deal Cards
+**As an operator,** I want to see opportunities organized by stage in a kanban board so that I can understand the pipeline at a glance.  
+**Acceptance Criteria:**
+- Default Projects view renders a kanban board.
+- Initial stages include Lead, Qualification, Proposal, Negotiation, Closed.
+- Cards surface title, value, owner, channel, priority, tags, due date, and progress.
+- Card hierarchy supports fast scanning.  
+**Estimation:** 5 story points  
+**Priority:** High
+
+### Story 11.3: Deal Create/Edit and Stage Movement
+**As an operator,** I want to create, edit, and move deals between stages so that the pipeline is operational rather than static.  
+**Acceptance Criteria:**
+- New deal flow exists from the Projects workspace.
+- Existing deal can be opened and edited.
+- Deals can move between stages.
+- Stage movement gives clear visual feedback.  
+**Estimation:** 5 story points  
+**Priority:** High
+
+### Story 11.4: Pipeline Filters, KPIs, and Secondary Views
+**As an operator or manager,** I want to filter the pipeline and see high-level project metrics so that I can quickly focus on the right deals.  
+**Acceptance Criteria:**
+- Filters exist for search, owner, priority, and channel.
+- KPI strip surfaces pipeline totals and health.
+- Secondary views such as List and Timeline are available if included in scope.
+- Layout remains aligned with the new Omnichat visual system.  
+**Estimation:** 5 story points  
+**Priority:** Medium
+
 ## FR to Epic/Story Mapping
 
 | FR  | Epic | Story |

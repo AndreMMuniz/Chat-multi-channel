@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-02  # epic 10 implementation completed after tag foundation finalization
+last_updated: 2026-05-02  # epic 11 created for Projects / Pipeline Kanban planning
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -154,7 +154,7 @@ development_status:
   # ── Epic 8: Production Hardening ────────────────────────────────────────────
   # Post-retro action items — security, reliability, observability, test coverage
   # Source: Retrospective 2026-04-29 (10 action items, 4 critical / 4 important / 2 nice-to-have)
-  epic-8: in-progress
+  epic-8: done
 
   8-1-staging-migration-validation: done           # CRITICAL — 5 pts
   8-2-environment-variables-documentation: done   # CRITICAL — 3 pts
@@ -164,7 +164,7 @@ development_status:
   8-6-playwright-e2e-tests: done                         # Important — 8 pts
   8-7-granular-rate-limiting: done                       # Important — 5 pts
   8-8-api-key-startup-validation: done                   # Important — 2 pts
-  8-9-messageservice-refactoring: review            # Nice-to-have — 5 pts
+  8-9-messageservice-refactoring: done              # Nice-to-have — 5 pts
   8-10-telegram-bot-configuration-ui: done          # Nice-to-have — 5 pts
 
   epic-8-retrospective: optional
@@ -195,3 +195,16 @@ development_status:
   10-6-dashboard-consolidation-and-signal-prioritization: done
 
   epic-10-retrospective: optional
+
+  # —— Epic 11: Projects / Pipeline Kanban ———————————————————————————————
+  # Source: projects pipeline kanban spec + reference mock
+  # Scope: projects workspace shell, kanban board, deal modal, filters, KPI strip,
+  #        secondary list/timeline views
+  epic-11: in-progress
+
+  11-1-projects-workspace-shell-and-header: ready-for-dev
+  11-2-kanban-board-columns-and-deal-cards: ready-for-dev
+  11-3-deal-create-edit-and-stage-movement: ready-for-dev
+  11-4-pipeline-filters-kpis-and-secondary-views: ready-for-dev
+
+  epic-11-retrospective: optional
