@@ -137,7 +137,7 @@ function TagBadge({ tag, className }: { tag?: ConversationTag | null; className?
 }
 
 function getChannelMeta(channel: string) {
-  return CHANNEL_META[channel as ChannelType] ?? CHANNEL_META['WEB'];
+  return CHANNEL_META[channel.toUpperCase() as ChannelType] ?? CHANNEL_META['WEB'];
 }
 
 function ChannelBadge({ channel, compact = false }: { channel: ChannelType; compact?: boolean }) {
@@ -246,7 +246,7 @@ export default function ChatPage() {
     : selectedTag !== 'ALL'
       ? `No conversations match the ${selectedTagLabel} tag with the current filters`
       : selectedChannel !== 'ALL'
-        ? `No conversations match the ${CHANNEL_META[selectedChannel].label} channel with the current filters`
+        ? `No conversations match the ${getChannelMeta(selectedChannel).label} channel with the current filters`
         : 'No conversations match the current filters';
 
   const filteredConversations = sortedConversations.filter((c) => {
@@ -255,7 +255,7 @@ export default function ChatPage() {
       c.contact.name?.toLowerCase().includes(q) ||
       c.contact.channel_identifier?.toLowerCase().includes(q)
     );
-    const matchesChannel = selectedChannel === 'ALL' || c.channel === selectedChannel;
+    const matchesChannel = selectedChannel === 'ALL' || c.channel.toUpperCase() === selectedChannel;
     const matchesTag = selectedTag === 'ALL' || c.tag === selectedTag;
 
     return matchesSearch && matchesChannel && matchesTag;
