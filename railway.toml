@@ -1,0 +1,14 @@
+[build]
+# Root directory for the backend service
+watchPatterns = ["backend/**"]
+
+[deploy]
+# Migrations run BEFORE the new container receives traffic.
+# If migration fails, Railway aborts the deploy — old version stays live.
+# NEVER move alembic upgrade head into backend/main.py lifespan.
+releaseCommand = "cd backend && alembic upgrade head"
+startCommand = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

@@ -121,7 +121,9 @@ async def lifespan(app: FastAPI):
     base_url = settings.WEBHOOK_BASE_URL.rstrip("/")
     if base_url and settings.TELEGRAM_BOT_TOKEN:
         webhook_url = f"{base_url}/api/v1/telegram/webhook"
-        await telegram_service.set_webhook(webhook_url)
+        # Fire-and-forget: don't block startup waiting for Telegram API response.
+        # A slow/unavailable Telegram API was causing 4+ minute startup delays.
+        asyncio.create_task(telegram_service.set_webhook(webhook_url))
 
     email_task = asyncio.create_task(_email_poll_loop())
     sla_task = asyncio.create_task(_sla_check_loop())

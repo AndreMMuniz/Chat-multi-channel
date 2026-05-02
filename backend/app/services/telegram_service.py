@@ -76,14 +76,18 @@ class TelegramService:
             return response.status_code == 200
 
     async def set_webhook(self, url: str) -> bool:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.api_url}/setWebhook",
-                json={"url": url}
-            )
-            data = response.json()
-            print(f"Telegram setWebhook: {data}")
-            return data.get("ok", False)
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                response = await client.post(
+                    f"{self.api_url}/setWebhook",
+                    json={"url": url}
+                )
+                data = response.json()
+                print(f"Telegram setWebhook: {data}")
+                return data.get("ok", False)
+            except Exception as exc:
+                print(f"Telegram setWebhook failed (non-fatal): {exc}")
+                return False
 
     def reload(self, token: str) -> None:
         """Hot-reload the bot token without restarting. Called when token is updated via settings UI."""
