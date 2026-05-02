@@ -6,6 +6,7 @@
 docs/
 skills-lock.json
 .kilo
+.models-exemple
 
 # ─── Environment variables (NEVER commit these) ───────────────────────────────
 .env
