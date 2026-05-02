@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-02  # epic 9 done — mobile responsiveness complete
+last_updated: 2026-05-02  # epic 10 stories created for UX structural refresh
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -180,3 +180,18 @@ development_status:
   9-4-mobile-playwright-tests: done                   # High — 3 pts
 
   epic-9-retrospective: optional
+
+  # —— Epic 10: UX Structural Refresh ———————————————————————————————————————
+  # Source: visual identity brief + UX design specification + execution plan
+  # Scope: navigation architecture, messages filters, tags, dashboard consolidation,
+  #        Users/Config lateral navigation, indigo-based visual system
+  epic-10: in-progress
+
+  10-1-main-navigation-architecture-refresh: ready-for-dev
+  10-2-messages-workspace-filters-and-channel-identity: ready-for-dev
+  10-3-tag-system-foundation-for-crm-readiness: ready-for-dev
+  10-4-users-area-restructure-with-lateral-navigation: ready-for-dev
+  10-5-config-area-restructure-and-visual-system-baseline: ready-for-dev
+  10-6-dashboard-consolidation-and-signal-prioritization: ready-for-dev
+
+  epic-10-retrospective: optional

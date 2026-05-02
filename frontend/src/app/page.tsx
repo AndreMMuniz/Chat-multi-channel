@@ -4,6 +4,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { ChevronLeft } from 'lucide-react';
+import type { IconType } from 'react-icons';
+import { FaWhatsapp, FaCommentDots } from 'react-icons/fa';
+import { FaTelegram, FaEnvelope, FaGlobe } from 'react-icons/fa6';
 import { TbSparkles } from 'react-icons/tb';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useConversations } from '@/hooks/useConversations';
@@ -13,7 +16,7 @@ import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
 import { conversationsApi, usersApi } from '@/lib/api/index';
 import type { SequencedEvent } from '@/types/api';
-import type { Conversation, Message } from '@/types/chat';
+import type { ChannelType, Conversation, ConversationTag, Message } from '@/types/chat';
 import AudioMessage from '@/components/AudioMessage';
 import { useState as useLocalState, useEffect as useLocalEffect } from 'react';
 
@@ -60,6 +63,54 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const SLA_THRESHOLD_MINUTES = 60;
+const TAG_OPTIONS: ConversationTag[] = ['SUPPORT', 'BILLING', 'FEEDBACK', 'SALES', 'GENERAL', 'SPAM'];
+
+const CHANNEL_META: Record<ChannelType, {
+  label: string;
+  badgeClass: string;
+  iconClass: string;
+  icon: IconType;
+}> = {
+  TELEGRAM: {
+    label: 'Telegram',
+    badgeClass: 'bg-sky-50 text-sky-700 border-sky-100',
+    iconClass: 'text-sky-600',
+    icon: FaTelegram,
+  },
+  WHATSAPP: {
+    label: 'WhatsApp',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    iconClass: 'text-emerald-600',
+    icon: FaWhatsapp,
+  },
+  EMAIL: {
+    label: 'Email',
+    badgeClass: 'bg-orange-50 text-orange-700 border-orange-100',
+    iconClass: 'text-orange-500',
+    icon: FaEnvelope,
+  },
+  SMS: {
+    label: 'SMS',
+    badgeClass: 'bg-violet-50 text-violet-700 border-violet-100',
+    iconClass: 'text-violet-600',
+    icon: FaCommentDots,
+  },
+  WEB: {
+    label: 'Web Chat',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+    iconClass: 'text-slate-500',
+    icon: FaGlobe,
+  },
+};
+
+const TAG_META: Record<ConversationTag, { label: string; className: string }> = {
+  SUPPORT: { label: 'Support', className: 'bg-blue-50 text-blue-700 border-blue-100' },
+  BILLING: { label: 'Billing', className: 'bg-amber-50 text-amber-700 border-amber-100' },
+  FEEDBACK: { label: 'Feedback', className: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100' },
+  SALES: { label: 'Sales', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  GENERAL: { label: 'General', className: 'bg-slate-100 text-slate-700 border-slate-200' },
+  SPAM: { label: 'Spam', className: 'bg-rose-50 text-rose-700 border-rose-100' },
+};
 
 function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { label: string; color: string; slaBreached: boolean } | null {
   if (!isUnread || !lastMessageDate) return null;
@@ -73,10 +124,40 @@ function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { 
   return { label: `${Math.floor(diffH / 24)}d ago`, color: 'text-red-600', slaBreached: true };
 }
 
+function TagBadge({ tag, className }: { tag?: ConversationTag; className?: string }) {
+  if (!tag) return null;
+  const meta = TAG_META[tag];
+  return (
+    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold', meta.className, className)}>
+      {meta.label}
+    </span>
+  );
+}
+
+function ChannelBadge({ channel, compact = false }: { channel: ChannelType; compact?: boolean }) {
+  const meta = CHANNEL_META[channel];
+  const Icon = meta.icon;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center border font-medium',
+        compact ? 'gap-1 rounded-full px-2 py-1 text-[11px]' : 'gap-1.5 rounded-full px-2.5 py-1 text-xs',
+        meta.badgeClass
+      )}
+    >
+      <Icon className={compact ? 'text-[11px]' : 'text-[12px]'} />
+      <span>{meta.label}</span>
+    </span>
+  );
+}
+
 export default function ChatPage() {
   // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedChannel, setSelectedChannel] = useState<'ALL' | ChannelType>('ALL');
+  const [selectedTag, setSelectedTag] = useState<'ALL' | ConversationTag>('ALL');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -124,15 +205,20 @@ export default function ChatPage() {
     return tA - tB; // oldest unread first within same risk tier
   });
 
-  const filteredConversations = searchQuery.trim()
-    ? sortedConversations.filter(c => {
-        const q = searchQuery.toLowerCase();
-        return (
-          c.contact.name?.toLowerCase().includes(q) ||
-          c.contact.channel_identifier?.toLowerCase().includes(q)
-        );
-      })
-    : sortedConversations;
+  const availableChannels = Array.from(new Set(conversations.map((c) => c.channel)));
+  const availableTags = TAG_OPTIONS.filter((tag) => conversations.some((c) => c.tag === tag));
+
+  const filteredConversations = sortedConversations.filter((c) => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q || (
+      c.contact.name?.toLowerCase().includes(q) ||
+      c.contact.channel_identifier?.toLowerCase().includes(q)
+    );
+    const matchesChannel = selectedChannel === 'ALL' || c.channel === selectedChannel;
+    const matchesTag = selectedTag === 'ALL' || c.tag === selectedTag;
+
+    return matchesSearch && matchesChannel && matchesTag;
+  });
 
   const {
     messages,
@@ -187,10 +273,6 @@ export default function ChatPage() {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  // Reset mobile view to list when active conversation is cleared externally (e.g. WebSocket event)
-  useEffect(() => {
-    if (!activeConversation) setMobileView('list');
-  }, [activeConversation]);
 
   // ── Conversation selection ────────────────────────────────────────────────
   const handleSelectConversation = useCallback(async (conv: Conversation) => {
@@ -215,11 +297,11 @@ export default function ChatPage() {
   }, [isRecording]);
 
   // ── Attachment helpers ────────────────────────────────────────────────────
-  const cancelAttachment = () => {
+  function cancelAttachment() {
     setSelectedFile(null);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  }
 
   const handleFileSelect = () => fileInputRef.current?.click();
 
@@ -275,6 +357,7 @@ export default function ChatPage() {
   };
 
   const loading = sending;
+  const effectiveMobileView = activeConversation ? mobileView : 'list';
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -285,7 +368,7 @@ export default function ChatPage() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <header className="h-16 border-b border-[#E9ECEF] bg-white shrink-0 flex items-center px-6">
-        <span className="text-[18px] font-semibold text-slate-900">Inbox</span>
+        <span className="text-[18px] font-semibold text-slate-900">Messages</span>
       </header>
 
       {/* Connection state banner — P0-2 */}
@@ -337,7 +420,7 @@ export default function ChatPage() {
             // Mobile: absolute overlay, full width, slide transition
             "absolute inset-y-0 left-0 right-0 w-full z-10",
             "transition-transform duration-300 ease-in-out",
-            mobileView === 'chat' ? "-translate-x-full md:translate-x-0" : "translate-x-0"
+            effectiveMobileView === 'chat' ? "-translate-x-full md:translate-x-0" : "translate-x-0"
           )}
         >
           <div className="p-md border-surface-variant">
@@ -351,13 +434,69 @@ export default function ChatPage() {
                 onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setSelectedChannel('ALL')}
+                  className={cn(
+                    'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+                    selectedChannel === 'ALL'
+                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                  )}
+                >
+                  All Channels
+                </button>
+                {availableChannels.map((channel) => (
+                  <button
+                    key={channel}
+                    onClick={() => setSelectedChannel(channel)}
+                    className={cn(
+                      'shrink-0 rounded-full border px-2 py-1 transition-colors',
+                      selectedChannel === channel
+                        ? 'border-indigo-200 bg-indigo-50'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    )}
+                  >
+                    <ChannelBadge channel={channel} compact />
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setSelectedTag('ALL')}
+                  className={cn(
+                    'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+                    selectedTag === 'ALL'
+                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                  )}
+                >
+                  All Tags
+                </button>
+                {availableTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => setSelectedTag(tag)}
+                    className={cn(
+                      'shrink-0 rounded-full transition-colors',
+                      selectedTag === tag ? 'ring-2 ring-indigo-100 ring-offset-1' : ''
+                    )}
+                  >
+                    <TagBadge tag={tag} className="px-2.5 py-1" />
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           
           {/* List */}
           <div className="flex-1 overflow-y-auto p-sm space-y-sm">
             {filteredConversations.length === 0 && (
               <div className="p-4 text-center text-sm text-gray-500">
-                {searchQuery ? 'No results found' : 'No conversations yet'}
+                {searchQuery || selectedChannel !== 'ALL' || selectedTag !== 'ALL'
+                  ? 'No conversations match the current filters'
+                  : 'No conversations yet'}
               </div>
             )}
             {filteredConversations.map((conv) => (
@@ -384,10 +523,11 @@ export default function ChatPage() {
                     </div>
                   )}
                   {/* Channel icon badge */}
-                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-sm border border-outline-variant">
-                    <span className="material-symbols-outlined text-[10px] text-slate-500" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      {conv.channel === 'TELEGRAM' ? 'send' : conv.channel === 'WHATSAPP' ? 'chat_bubble' : conv.channel === 'EMAIL' ? 'mail' : conv.channel === 'SMS' ? 'sms' : 'language'}
-                    </span>
+                  <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm border border-outline-variant">
+                    {(() => {
+                      const Icon = CHANNEL_META[conv.channel].icon;
+                      return <Icon className={cn('text-[11px]', CHANNEL_META[conv.channel].iconClass)} />;
+                    })()}
                   </div>
                   {conv.is_unread && (
                     <div className="absolute -top-0.5 -left-0.5 w-3 h-3 border-2 border-surface-container-lowest rounded-full bg-green-500"></div>
@@ -412,6 +552,10 @@ export default function ChatPage() {
                         {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
+                  </div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <ChannelBadge channel={conv.channel} compact />
+                    <TagBadge tag={conv.tag} />
                   </div>
                   <div className="flex items-center justify-between gap-1">
                     <p className={cn(
@@ -448,7 +592,7 @@ export default function ChatPage() {
             // Mobile: absolute overlay, full width, slide transition
             "absolute inset-y-0 left-0 right-0 w-full",
             "transition-transform duration-300 ease-in-out",
-            mobileView === 'list' ? "translate-x-full md:translate-x-0" : "translate-x-0"
+            effectiveMobileView === 'list' ? "translate-x-full md:translate-x-0" : "translate-x-0"
           )}
         >
           {activeConversation ? (
@@ -476,11 +620,9 @@ export default function ChatPage() {
                   </div>
                   <div>
                     <h2 className="font-h2 text-h2 text-on-surface">{activeConversation.contact.name || activeConversation.contact.channel_identifier}</h2>
-                    <div className="flex items-center gap-xs text-on-surface-variant font-body-sm text-body-sm">
-                      <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                        {activeConversation.channel === 'TELEGRAM' ? 'send' : activeConversation.channel === 'WHATSAPP' ? 'chat_bubble' : activeConversation.channel === 'EMAIL' ? 'mail' : activeConversation.channel === 'SMS' ? 'sms' : 'language'}
-                      </span>
-                      <span className="capitalize">{activeConversation.channel.toLowerCase()}</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+                      <ChannelBadge channel={activeConversation.channel} />
+                      <TagBadge tag={activeConversation.tag} />
                       {/* Presence indicator — P0-1 */}
                       {activeViewers.length > 0 && (
                         <span className="ml-2 flex items-center gap-1 text-amber-600 font-medium">
@@ -556,8 +698,8 @@ export default function ChatPage() {
                         {(sendStatus[msg.id] === 'failed' || msg.delivery_status === 'failed') && (
                           <div className="mt-1.5 flex items-center gap-2 text-red-500 text-xs">
                             <span className="material-symbols-outlined text-[14px]">error</span>
-                            <span title={msg.delivery_error || 'Erro desconhecido'}>
-                              Falha no envio
+                            <span title={msg.delivery_error || 'Unknown error'}>
+                              Send failed
                               {msg.delivery_error && <span className="ml-1 opacity-60 font-mono">({msg.delivery_error.split(':').pop()})</span>}
                             </span>
                             {(msg.retry_count ?? 0) < 3 && (
@@ -565,11 +707,11 @@ export default function ChatPage() {
                                 onClick={() => retryMessage(msg.conversation_id, msg.id)}
                                 className="underline hover:text-red-700 transition-colors"
                               >
-                                Tentar novamente {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
+                                Retry {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
                               </button>
                             )}
                             {(msg.retry_count ?? 0) >= 3 && (
-                              <span className="opacity-60">Limite de tentativas atingido</span>
+                              <span className="opacity-60">Retry limit reached</span>
                             )}
                           </div>
                         )}
@@ -822,11 +964,11 @@ export default function ChatPage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500">Channel</span>
-                    <span className="text-slate-900 font-medium capitalize">{activeConversation.channel.toLowerCase()}</span>
+                    <ChannelBadge channel={activeConversation.channel} compact />
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500">Tag</span>
-                    <span className="text-slate-900 font-medium capitalize">{activeConversation.tag?.toLowerCase() || '-'}</span>
+                    {activeConversation.tag ? <TagBadge tag={activeConversation.tag} /> : <span className="text-slate-900 font-medium">-</span>}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500">Status</span>
@@ -869,9 +1011,6 @@ export default function ChatPage() {
                   c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
                 );
                 if (otherConvs.length === 0) return null;
-                const CHANNEL_ICON: Record<string, string> = {
-                  TELEGRAM: 'send', WHATSAPP: 'chat_bubble', EMAIL: 'mail', SMS: 'sms', WEB: 'language',
-                };
                 return (
                   <div className="p-5 border-b border-outline-variant">
                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
@@ -884,11 +1023,12 @@ export default function ChatPage() {
                           onClick={() => handleSelectConversation(c)}
                           className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 text-left transition-colors w-full"
                         >
-                          <span className="material-symbols-outlined text-[16px] text-slate-400" style={{ fontVariationSettings: "'FILL' 1" }}>
-                            {CHANNEL_ICON[c.channel] || 'chat'}
-                          </span>
+                          <ChannelBadge channel={c.channel} compact />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-slate-700 truncate capitalize">{c.channel.toLowerCase()}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-medium text-slate-700 truncate">{CHANNEL_META[c.channel].label}</p>
+                              <TagBadge tag={c.tag} />
+                            </div>
                             <p className="text-[11px] text-slate-400 truncate">{c.last_message || 'No messages'}</p>
                           </div>
                           <span className={cn(
