@@ -125,7 +125,7 @@ function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { 
   return { label: `${Math.floor(diffH / 24)}d ago`, color: 'text-red-600', slaBreached: true };
 }
 
-function TagBadge({ tag, className }: { tag?: ConversationTag; className?: string }) {
+function TagBadge({ tag, className }: { tag?: ConversationTag | null; className?: string }) {
   if (!tag) return null;
   const meta = TAG_META[tag];
   return (
