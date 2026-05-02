@@ -233,7 +233,7 @@ export default function ChatPage() {
     return tA - tB; // oldest unread first within same risk tier
   });
 
-  const availableChannels = Array.from(new Set(conversations.map((c) => c.channel)));
+  const availableChannels = Object.keys(CHANNEL_META) as ChannelType[];
   const tagCounts = TAG_OPTIONS.reduce<Record<ConversationTag, number>>((acc, tag) => {
     acc[tag] = conversations.filter((c) => c.tag === tag).length;
     return acc;
