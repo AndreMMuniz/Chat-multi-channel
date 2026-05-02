@@ -135,8 +135,12 @@ function TagBadge({ tag, className }: { tag?: ConversationTag | null; className?
   );
 }
 
+function getChannelMeta(channel: string) {
+  return CHANNEL_META[channel as ChannelType] ?? CHANNEL_META['WEB'];
+}
+
 function ChannelBadge({ channel, compact = false }: { channel: ChannelType; compact?: boolean }) {
-  const meta = CHANNEL_META[channel];
+  const meta = getChannelMeta(channel);
   const Icon = meta.icon;
 
   return (
@@ -591,8 +595,9 @@ export default function ChatPage() {
                   {/* Channel icon badge */}
                   <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm border border-outline-variant">
                     {(() => {
-                      const Icon = CHANNEL_META[conv.channel].icon;
-                      return <Icon className={cn('text-[11px]', CHANNEL_META[conv.channel].iconClass)} />;
+                      const chMeta = getChannelMeta(conv.channel);
+                      const Icon = chMeta.icon;
+                      return <Icon className={cn('text-[11px]', chMeta.iconClass)} />;
                     })()}
                   </div>
                   {conv.is_unread && (
@@ -1112,7 +1117,7 @@ export default function ChatPage() {
                           <ChannelBadge channel={c.channel} compact />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-xs font-medium text-slate-700 truncate">{CHANNEL_META[c.channel].label}</p>
+                              <p className="text-xs font-medium text-slate-700 truncate">{getChannelMeta(c.channel).label}</p>
                               <TagBadge tag={c.tag} />
                             </div>
                             <p className="text-[11px] text-slate-400 truncate">{c.last_message || 'No messages'}</p>
