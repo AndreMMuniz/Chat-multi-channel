@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, Any
@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
+from app.core.limiter import limiter
 from app.models.models import GeneralSettings, User
 
 router = APIRouter()
@@ -22,6 +23,7 @@ class SettingsOut(BaseModel):
     accent_color: Optional[str] = None
     ai_model: Optional[str] = None
     ai_provider: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
     whatsapp_phone_id: Optional[str] = None
     whatsapp_account_id: Optional[str] = None
     whatsapp_access_token: Optional[str] = None
@@ -49,6 +51,7 @@ class SettingsIn(BaseModel):
     accent_color: Optional[str] = None
     ai_model: Optional[str] = None
     ai_provider: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
     whatsapp_phone_id: Optional[str] = None
     whatsapp_account_id: Optional[str] = None
     whatsapp_access_token: Optional[str] = None
@@ -75,7 +78,9 @@ def _get_or_create(db: Session) -> GeneralSettings:
 
 
 @router.get("/settings", response_model=SettingsOut)
+@limiter.limit("60/minute")
 def get_settings(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -83,7 +88,9 @@ def get_settings(
 
 
 @router.patch("/settings", response_model=SettingsOut)
-def update_settings(
+@limiter.limit("30/minute")
+async def update_settings(
+    request: Request,
     body: SettingsIn,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -96,4 +103,16 @@ def update_settings(
     db.add(s)
     db.commit()
     db.refresh(s)
+    updates = body.model_dump(exclude_unset=True)
+    if "telegram_bot_token" in updates:
+        from app.services.telegram_service import telegram_service
+        from app.core.config import settings as app_cfg
+        new_token = s.telegram_bot_token or getattr(app_cfg, "TELEGRAM_BOT_TOKEN", "")
+        telegram_service.reload(new_token)
+        base_url = getattr(app_cfg, "WEBHOOK_BASE_URL", "").rstrip("/")
+        if base_url and new_token:
+            import asyncio
+            _webhook_task = asyncio.create_task(
+                telegram_service.set_webhook(f"{base_url}/api/v1/telegram/webhook")
+            )
     return s

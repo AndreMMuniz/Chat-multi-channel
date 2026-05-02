@@ -2,31 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
-import { apiFetch } from "@/lib/api";
+import { userTypesApi } from "@/lib/api/index";
 import Modal from "@/components/shared/Modal";
-
-interface UserType {
-  id: string;
-  name: string;
-  base_role: "ADMIN" | "MANAGER" | "USER";
-  is_system: boolean;
-  can_view_all_conversations: boolean;
-  can_delete_conversations: boolean;
-  can_edit_messages: boolean;
-  can_delete_messages: boolean;
-  can_manage_users: boolean;
-  can_assign_roles: boolean;
-  can_disable_users: boolean;
-  can_change_user_password: boolean;
-  can_change_settings: boolean;
-  can_change_branding: boolean;
-  can_change_ai_model: boolean;
-  can_view_audit_logs: boolean;
-  can_create_user_types: boolean;
-  created_at: string;
-}
-
-type PermKey = keyof Omit<UserType, "id" | "name" | "base_role" | "is_system" | "created_at">;
+import type { UserType, PermKey, BaseRole } from "@/types/auth";
 
 const PERMISSION_GROUPS: { label: string; items: { key: PermKey; label: string }[] }[] = [
   {
@@ -76,7 +54,7 @@ const BASE_ROLE_BADGE: Record<string, string> = {
   USER: "bg-slate-50 text-slate-600 border border-slate-200",
 };
 
-type FormState = { name: string; base_role: "ADMIN" | "MANAGER" | "USER" } & Record<PermKey, boolean>;
+type FormState = { name: string; base_role: BaseRole } & Record<PermKey, boolean>;
 
 function buildForm(t?: UserType): FormState {
   const perms = t
@@ -99,11 +77,10 @@ export default function UserTypesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/admin/user-types");
-      if (res.ok) setUserTypes(await res.json());
-      else setError("Failed to load user types.");
+      const { data } = await userTypesApi.listUserTypes();
+      setUserTypes(data);
     } catch {
-      setError("Connection error.");
+      setError("Connection error or insufficient permissions.");
     } finally {
       setLoading(false);
     }
@@ -130,31 +107,27 @@ export default function UserTypesPage() {
     setFormError("");
     setFormLoading(true);
     try {
-      const payload: Record<string, unknown> = { ...form };
-      const url = editingType ? `/admin/user-types/${editingType.id}` : "/admin/user-types";
-      const method = editingType ? "PATCH" : "POST";
-      const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
-        setFormError(errorMsg || "Operation failed.");
-        return;
+      if (editingType) {
+        await userTypesApi.updateUserType(editingType.id, form);
+      } else {
+        await userTypesApi.createUserType(form);
       }
       setShowModal(false);
       load();
-    } catch (err: any) {
-      setFormError("Connection error: " + (err.message || "Unknown error"));
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Operation failed.");
     } finally {
       setFormLoading(false);
     }
   };
 
   const handleDelete = async (t: UserType) => {
-    const res = await apiFetch(`/admin/user-types/${t.id}`, { method: "DELETE" });
-    if (res.ok) { setDeleteConfirm(null); load(); }
-    else {
-      const d = await res.json();
-      alert(d.detail || "Cannot delete this user type.");
+    try {
+      await userTypesApi.deleteUserType(t.id);
+      setDeleteConfirm(null);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Cannot delete this user type.");
     }
   };
 

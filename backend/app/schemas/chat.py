@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
-from app.models.models import ChannelType, ConversationStatus, ConversationTag, MessageType
+from app.models.models import ChannelType, ConversationStatus, ConversationTag, MessageType, DeliveryStatus
 
 # --- Contacts ---
 class ContactBase(BaseModel):
@@ -29,11 +29,16 @@ class MessageCreate(MessageBase):
     conversation_id: UUID
     owner_id: Optional[UUID] = None
     inbound: bool = False
+    idempotency_key: Optional[str] = None
 
 class MessageResponse(MessageBase):
     id: UUID
     conversation_id: UUID
     owner_id: Optional[UUID] = None
+    conversation_sequence: int = 0
+    delivery_status: Optional[DeliveryStatus] = None
+    delivery_error: Optional[str] = None
+    retry_count: int = 0
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +57,15 @@ class ConversationUpdate(BaseModel):
     status: Optional[ConversationStatus] = None
     tag: Optional[ConversationTag] = None
     is_unread: Optional[bool] = None
+    assigned_user_id: Optional[UUID] = None
+
+class AssignedUserSlim(BaseModel):
+    id: UUID
+    full_name: str
+    email: str
+    avatar: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ConversationResponse(ConversationBase):
     id: UUID
@@ -59,6 +73,9 @@ class ConversationResponse(ConversationBase):
     thread_id: Optional[str] = None
     last_message: Optional[str] = None
     last_message_date: Optional[datetime] = None
+    first_response_at: Optional[datetime] = None
+    assigned_user_id: Optional[UUID] = None
+    assigned_user: Optional[AssignedUserSlim] = None
     created_at: datetime
     updated_at: datetime
     contact: Optional[ContactResponse] = None
@@ -66,3 +83,8 @@ class ConversationResponse(ConversationBase):
 
 class ConversationWithMessagesResponse(ConversationResponse):
     messages: List[MessageResponse] = []
+
+class AISuggestionResponse(BaseModel):
+    suggestions: List[str]
+    conversation_id: UUID
+    model_config = ConfigDict(from_attributes=True)
