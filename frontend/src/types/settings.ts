@@ -11,6 +11,8 @@ export interface Settings {
   // AI
   ai_model: string;
   ai_provider: string;
+  // Telegram
+  telegram_bot_token: string;
   // WhatsApp (Meta Cloud API)
   whatsapp_phone_id: string;
   whatsapp_account_id: string;

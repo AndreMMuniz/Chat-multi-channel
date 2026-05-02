@@ -85,6 +85,11 @@ class TelegramService:
             print(f"Telegram setWebhook: {data}")
             return data.get("ok", False)
 
+    def reload(self, token: str) -> None:
+        """Hot-reload the bot token without restarting. Called when token is updated via settings UI."""
+        self.bot_token = token
+        self.api_url = f"https://api.telegram.org/bot{token}"
+
     async def get_webhook_info(self) -> dict:
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{self.api_url}/getWebhookInfo")

@@ -94,6 +94,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [telegramTestResult, setTelegramTestResult] = useState<{ ok: boolean; username?: string; error?: string } | null>(null);
+  const [testingTelegram, setTestingTelegram] = useState(false);
 
   useEffect(() => {
     settingsApi.getSettings()
@@ -101,6 +103,7 @@ export default function SettingsPage() {
         app_name: "", app_email: "", app_logo: "",
         primary_color: "#0F172A", secondary_color: "#3B82F6", accent_color: "#10B981",
         ai_model: "gpt-4o-mini", ai_provider: "openrouter",
+        telegram_bot_token: "",
         whatsapp_phone_id: "", whatsapp_account_id: "", whatsapp_access_token: "", whatsapp_webhook_token: "",
         email_imap_host: "", email_imap_port: "993", email_smtp_host: "", email_smtp_port: "587",
         email_address: "", email_password: "",
@@ -158,7 +161,28 @@ export default function SettingsPage() {
     );
   }
 
+  const handleTelegramTest = async () => {
+    if (!settings?.telegram_bot_token) return;
+    setTestingTelegram(true);
+    setTelegramTestResult(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/telegram/test-connection`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ token: settings.telegram_bot_token }),
+      });
+      const json = await res.json();
+      setTelegramTestResult(json.data ?? json);
+    } catch {
+      setTelegramTestResult({ ok: false, error: "Connection failed" });
+    } finally {
+      setTestingTelegram(false);
+    }
+  };
+
   const s = settings;
+  const telegramConfigured = !!s.telegram_bot_token;
   const whatsappConfigured = !!(s.whatsapp_phone_id && s.whatsapp_access_token);
   const emailConfigured    = !!(s.email_address && s.email_password);
   const smsConfigured      = !!(s.twilio_account_sid && s.twilio_auth_token);
@@ -303,6 +327,44 @@ export default function SettingsPage() {
                   <p className="text-sm text-slate-500">
                     Configure the credentials for each channel. Values are stored securely in the database.
                   </p>
+
+                  {/* Telegram */}
+                  <ApiGroup icon="send" label="Telegram" color="bg-sky-50 text-sky-800 border-b border-sky-100" configured={telegramConfigured}>
+                    <div className="md:col-span-2">
+                      <Field label="Bot Token" hint="Get from @BotFather: /newbot or /token">
+                        <PasswordInput
+                          value={s.telegram_bot_token}
+                          onChange={set("telegram_bot_token")}
+                          placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                        />
+                      </Field>
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleTelegramTest}
+                        disabled={!s.telegram_bot_token || testingTelegram}
+                        className="h-9 px-4 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-medium hover:bg-sky-100 disabled:opacity-50 transition-colors flex items-center gap-2"
+                      >
+                        {testingTelegram ? (
+                          <span className="w-3.5 h-3.5 border-2 border-sky-400/30 border-t-sky-600 rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]">wifi_tethering</span>
+                        )}
+                        Test Connection
+                      </button>
+                      {telegramTestResult && (
+                        <span className={`text-sm font-medium flex items-center gap-1.5 ${telegramTestResult.ok ? "text-emerald-600" : "text-red-500"}`}>
+                          <span className="material-symbols-outlined text-[16px]">
+                            {telegramTestResult.ok ? "check_circle" : "error"}
+                          </span>
+                          {telegramTestResult.ok
+                            ? `Connected as @${telegramTestResult.username}`
+                            : telegramTestResult.error}
+                        </span>
+                      )}
+                    </div>
+                  </ApiGroup>
 
                   {/* WhatsApp */}
                   <ApiGroup icon="chat" label="WhatsApp — Meta Cloud API" color="bg-green-50 text-green-800 border-b border-green-100" configured={whatsappConfigured}>

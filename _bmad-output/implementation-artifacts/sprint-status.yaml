@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-01  # code review patches applied
+last_updated: 2026-05-02  # story 8-10 implemented
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system

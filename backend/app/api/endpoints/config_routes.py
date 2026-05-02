@@ -23,6 +23,7 @@ class SettingsOut(BaseModel):
     accent_color: Optional[str] = None
     ai_model: Optional[str] = None
     ai_provider: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
     whatsapp_phone_id: Optional[str] = None
     whatsapp_account_id: Optional[str] = None
     whatsapp_access_token: Optional[str] = None
@@ -50,6 +51,7 @@ class SettingsIn(BaseModel):
     accent_color: Optional[str] = None
     ai_model: Optional[str] = None
     ai_provider: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
     whatsapp_phone_id: Optional[str] = None
     whatsapp_account_id: Optional[str] = None
     whatsapp_access_token: Optional[str] = None
@@ -87,7 +89,7 @@ def get_settings(
 
 @router.patch("/settings", response_model=SettingsOut)
 @limiter.limit("30/minute")
-def update_settings(
+async def update_settings(
     request: Request,
     body: SettingsIn,
     db: Session = Depends(get_db),
@@ -101,4 +103,14 @@ def update_settings(
     db.add(s)
     db.commit()
     db.refresh(s)
+    if "telegram_bot_token" in body.model_dump(exclude_unset=True) and s.telegram_bot_token:
+        from app.services.telegram_service import telegram_service
+        telegram_service.reload(s.telegram_bot_token)
+        from app.core.config import settings as app_cfg
+        base_url = getattr(app_cfg, "WEBHOOK_BASE_URL", "").rstrip("/")
+        if base_url:
+            import asyncio
+            asyncio.create_task(
+                telegram_service.set_webhook(f"{base_url}/api/v1/telegram/webhook")
+            )
     return s

@@ -250,6 +250,9 @@ class GeneralSettings(Base):
     email_address = Column(String, nullable=True)
     email_password = Column(EncryptedString, nullable=True)
 
+    # Telegram
+    telegram_bot_token = Column(EncryptedString, nullable=True)
+
     # SMS (Twilio)
     twilio_account_sid = Column(String, nullable=True)
     twilio_auth_token = Column(EncryptedString, nullable=True)
