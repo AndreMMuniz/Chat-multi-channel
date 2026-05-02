@@ -128,6 +128,38 @@ async def get_conversation_messages(request: Request, conversation_id: UUID, ski
 from app.schemas.chat import MessageCreate
 from app.services.conversation_service import ConversationService, get_conversation_service
 from app.services.message_service import MessageService, get_message_service
+from app.models.models import AISuggestion
+from app.core.auth import get_current_user
+from app.models.models import User
+
+@router.delete("/conversations/{conversation_id}")
+@limiter.limit("30/minute")
+async def delete_conversation(
+    request: Request,
+    conversation_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Delete a conversation and all its messages. Requires can_delete_conversations permission."""
+    if not current_user.user_type.can_delete_conversations:
+        error_response, status = create_error_response(
+            code="FORBIDDEN", message="Not enough permissions", status_code=403
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND", message="Conversation not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    db.query(AISuggestion).filter(AISuggestion.conversation_id == conversation_id).delete()
+    db.query(Message).filter(Message.conversation_id == conversation_id).delete()
+    db.delete(conversation)
+    db.commit()
+
+    return create_response({"deleted": True, "id": str(conversation_id)})
 
 @router.patch("/conversations/{conversation_id}")
 @limiter.limit("60/minute")

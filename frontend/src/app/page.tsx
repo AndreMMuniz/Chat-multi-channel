@@ -736,6 +736,22 @@ export default function ChatPage() {
                   >
                     <span className="material-symbols-outlined text-[20px]">mark_email_unread</span>
                   </button>
+                  <button
+                    title="Delete conversation"
+                    onClick={async () => {
+                      if (!window.confirm('Delete this conversation and all its messages? This cannot be undone.')) return;
+                      try {
+                        await conversationsApi.deleteConversation(activeConversation.id);
+                        handleMobileBack();
+                        await fetchConversations();
+                      } catch {
+                        alert('Failed to delete conversation. Check your permissions.');
+                      }
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                  </button>
                 </div>
               </div>
               

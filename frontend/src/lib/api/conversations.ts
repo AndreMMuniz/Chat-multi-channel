@@ -57,6 +57,13 @@ export async function assignConversation(
   );
 }
 
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await apiMutate<undefined, void>(
+    `/chat/conversations/${conversationId}`,
+    "DELETE"
+  );
+}
+
 export async function retryMessage(
   conversationId: string,
   messageId: string
