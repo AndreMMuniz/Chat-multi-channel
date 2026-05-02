@@ -1,4 +1,4 @@
-# Story 11.2: Kanban Board Columns and Deal Cards
+# Story 11.2: Kanban Board Columns and Project Cards
 
 **Status:** ready-for-dev  
 **Epic:** 11 — Projects / Pipeline Kanban  
@@ -10,7 +10,7 @@
 
 ## User Story
 
-**As an operator,** I want to see opportunities organized by stage in a kanban board so that I can understand the pipeline at a glance.
+**As an operator,** I want to see project cards organized by stage in a kanban board so that I can understand the pipeline at a glance.
 
 ---
 
@@ -24,16 +24,17 @@ Implement the first real kanban surface inside `Projects`, including:
   - `Proposal`
   - `Negotiation`
   - `Closed`
-- deal cards with:
+- project cards with:
   - title
   - id/ticket
-  - value
+  - work type or demand type
   - owner
   - channel
   - priority
   - tags
   - due date
   - progress
+  - linked conversation indicator when applicable
 
 ---
 
@@ -44,6 +45,7 @@ Implement the first real kanban surface inside `Projects`, including:
 - [ ] Cards present a readable hierarchy, with title and value emphasized
 - [ ] Channel, priority, and tags are visible but secondary
 - [ ] Overdue or time-sensitive cards are visually distinguishable
+- [ ] Cards created from `Messages` clearly show that they came from a conversation demand
 - [ ] The board is horizontally usable on smaller screens without breaking layout
 
 ---
@@ -52,4 +54,4 @@ Implement the first real kanban surface inside `Projects`, including:
 
 - Local or mocked state is acceptable if the backend project domain does not exist yet.
 - Use reusable metadata mapping for channel, priority, and tag presentation.
-
+- Treat `task-like demand from a message` as a valid first-class project card scenario.

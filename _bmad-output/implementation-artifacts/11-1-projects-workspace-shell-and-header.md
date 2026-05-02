@@ -20,7 +20,7 @@ Replace the current placeholder in `frontend/src/app/projects/page.tsx` with a p
 
 - page header
 - view toggle area
-- primary action for new project/deal
+- primary action for new project
 - filters row container
 - reserved area for KPI strip
 - reserved content area for the pipeline views
@@ -32,7 +32,8 @@ Replace the current placeholder in `frontend/src/app/projects/page.tsx` with a p
 - [ ] `Projects` no longer renders a placeholder-only page
 - [ ] The page header matches the new product language and indigo visual direction
 - [ ] The shell includes clear structure for `Kanban`, `List`, and `Timeline` views
-- [ ] The shell provides a visible `New Deal` primary action
+- [ ] The shell provides a visible `New Project` primary action
+- [ ] The shell makes room for projects created from conversation demands
 - [ ] All visible labels are in English
 - [ ] The layout works on desktop and remains usable on mobile
 
@@ -42,4 +43,4 @@ Replace the current placeholder in `frontend/src/app/projects/page.tsx` with a p
 
 - This story establishes structure only; real board behavior can land in follow-up stories.
 - Preserve the overall direction from `.models-exemple/Pipeline Kanban.html`, but adapt it to app conventions.
-
+- The header copy should make the domain read as project work, not sales-only deal management.

@@ -546,7 +546,7 @@ This document outlines the epics and user stories derived from the Product Requi
 
 ## Epic 11: Projects / Pipeline Kanban
 **Derived from:** Post-Epic 10 navigation expansion and pipeline workspace direction  
-**Description:** Turn `Projects` into a real pipeline workspace with kanban management, deal editing, filters, and high-level sales/project visibility.
+**Description:** Turn `Projects` into a real pipeline workspace with kanban management, project editing, filters, and high-level operational visibility for projects and message-driven demands.
 
 ### Story 11.1: Projects Workspace Shell and Header
 **As an operator,** I want the `Projects` area to open into a real workspace shell so that the domain feels active and ready for pipeline work instead of acting like a placeholder.  
@@ -554,34 +554,37 @@ This document outlines the epics and user stories derived from the Product Requi
 - Projects page includes a real workspace header and shell.
 - View toggles and primary CTA are visible.
 - Filters and KPI areas have defined placement.
+- The shell supports the concept of project cards created from message demands.
 - All visible labels are in English.  
 **Estimation:** 3 story points  
 **Priority:** High
 
-### Story 11.2: Kanban Board Columns and Deal Cards
-**As an operator,** I want to see opportunities organized by stage in a kanban board so that I can understand the pipeline at a glance.  
+### Story 11.2: Kanban Board Columns and Project Cards
+**As an operator,** I want to see project cards organized by stage in a kanban board so that I can understand the pipeline at a glance.  
 **Acceptance Criteria:**
 - Default Projects view renders a kanban board.
 - Initial stages include Lead, Qualification, Proposal, Negotiation, Closed.
-- Cards surface title, value, owner, channel, priority, tags, due date, and progress.
+- Cards surface title, work type, owner, channel, priority, tags, due date, and progress.
+- Cards can visually indicate when they originated from a conversation demand.
 - Card hierarchy supports fast scanning.  
 **Estimation:** 5 story points  
 **Priority:** High
 
-### Story 11.3: Deal Create/Edit and Stage Movement
-**As an operator,** I want to create, edit, and move deals between stages so that the pipeline is operational rather than static.  
+### Story 11.3: Project Create/Edit and Stage Movement
+**As an operator,** I want to create, edit, and move projects between stages so that the pipeline is operational rather than static.  
 **Acceptance Criteria:**
-- New deal flow exists from the Projects workspace.
-- Existing deal can be opened and edited.
-- Deals can move between stages.
+- New project flow exists from the Projects workspace.
+- Existing project can be opened and edited.
+- Projects can move between stages.
+- A marked message demand can become a project card in the pipeline.
 - Stage movement gives clear visual feedback.  
 **Estimation:** 5 story points  
 **Priority:** High
 
 ### Story 11.4: Pipeline Filters, KPIs, and Secondary Views
-**As an operator or manager,** I want to filter the pipeline and see high-level project metrics so that I can quickly focus on the right deals.  
+**As an operator or manager,** I want to filter the pipeline and see high-level project metrics so that I can quickly focus on the right projects and demands.  
 **Acceptance Criteria:**
-- Filters exist for search, owner, priority, and channel.
+- Filters exist for search, owner, priority, channel, and origin type when relevant.
 - KPI strip surfaces pipeline totals and health.
 - Secondary views such as List and Timeline are available if included in scope.
 - Layout remains aligned with the new Omnichat visual system.  

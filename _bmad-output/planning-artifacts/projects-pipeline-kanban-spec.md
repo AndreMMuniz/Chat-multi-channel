@@ -8,9 +8,9 @@
 
 ## Objective
 
-Turn the `Projects` top-level navigation area into a real operational pipeline workspace for opportunity tracking, stage movement, and commercial follow-up.
+Turn the `Projects` top-level navigation area into a real operational pipeline workspace for project tracking, stage movement, and demand follow-up.
 
-The target experience is not a generic kanban board. It should feel like a sales and relationship pipeline that sits naturally beside `Messages`, `Catalog`, and `Tasks`.
+The target experience is not a generic kanban board. It should feel like an operational project pipeline that sits naturally beside `Messages`, `Catalog`, and `Tasks`.
 
 ---
 
@@ -18,13 +18,20 @@ The target experience is not a generic kanban board. It should feel like a sales
 
 The new `Projects` domain should support:
 
-- deal and opportunity tracking
+- project card tracking across a shared pipeline
+- message-driven demand intake from `Messages`
 - stage-based pipeline management
-- visibility into responsible agent, priority, channel, tags, due date, and monetary value
+- visibility into responsible agent, priority, channel, tags, due date, and status
 - quick scanning of pipeline health
-- future expansion toward CRM workflows
+- future expansion toward CRM and operational workflows
 
 This epic should establish the **UI and interaction foundation** first. It does not need full CRM automation yet.
+
+Important business rule:
+
+- cards in this workspace represent `Projects`
+- a conversation message containing a demand can be marked and turned into a project card
+- in the first operational model, this message-originated project card may behave like a task or demand item inside the projects pipeline
 
 ---
 
@@ -35,9 +42,9 @@ The reference mock shows the right overall direction:
 - indigo-forward visual system aligned with Epic 10
 - side-by-side column scanning with strong card hierarchy
 - lightweight KPI strip above the board
-- filters that help operators narrow deals quickly
+- filters that help operators narrow project cards quickly
 - alternative `List` and `Timeline` views as secondary access patterns
-- deal detail/edit modal instead of routing the user away from the workspace
+- project detail/edit modal instead of routing the user away from the workspace
 
 Important translation to app reality:
 
@@ -55,7 +62,7 @@ Important translation to app reality:
 
 - page header
 - view toggle
-- primary CTA for creating a new deal
+- primary CTA for creating a new project
 - filters row
 - KPI summary strip
 - board/list/timeline content area
@@ -76,9 +83,9 @@ If delivery needs to be phased, `Kanban` must ship first and the others can foll
 
 The visual model implied by the mock includes:
 
-- project/deal title
+- project title
 - ticket or identifier
-- monetary value
+- demand type or work type
 - assigned owner / agent
 - source channel
 - priority
@@ -87,6 +94,7 @@ The visual model implied by the mock includes:
 - progress
 - stage / column
 - notes or short description
+- linked conversation when the card originated from `Messages`
 
 This epic should treat these as **pipeline card fields**, even if backend persistence begins with mocked or local state.
 
@@ -117,10 +125,11 @@ These should be treated as configurable in the future, but they can be fixed for
 
 ### Cards
 
-- card hierarchy should emphasize title and value first
+- card hierarchy should emphasize title and current status first
 - priority, channel, and tags should help scanning without overpowering the card
 - due date and overdue state should be visible
 - avatar/owner should be readable but compact
+- cards created from conversations should expose their origin clearly
 
 ### Filters
 
@@ -135,14 +144,15 @@ Clear-all behavior should be built in.
 
 ### Modal
 
-Creating or editing a deal should happen in a modal or sheet, not via full page navigation.
+Creating or editing a project should happen in a modal or sheet, not via full page navigation.
 
 The modal should support:
 
-- create new deal
-- edit existing deal
+- create new project
+- edit existing project
 - move stage if necessary
 - delete or archive later if the story includes it
+- show or preserve conversation origin when applicable
 
 ---
 
@@ -155,7 +165,8 @@ The modal should support:
 - Kanban board
 - card movement
 - filters
-- deal modal
+- project modal
+- support for project cards created from conversation demands
 - English language normalization in this domain
 - alignment with the indigo visual system
 
@@ -170,7 +181,7 @@ The modal should support:
 - CRM automation
 - backend workflow rules
 - custom stage administration
-- cross-module automation with Tasks
+- full cross-module automation with Tasks
 - reports beyond the pipeline workspace
 
 ---
@@ -192,6 +203,7 @@ Recommended breakdown:
 Epic 11 is successful when:
 
 - `Projects` is no longer a placeholder
-- the user can visually manage opportunities in a kanban pipeline
+- the user can visually manage project cards in a kanban pipeline
+- the user can understand that a message demand may become a project card to be worked through the pipeline
 - the workspace feels coherent with the post-Epic-10 navigation and visual system
 - the structure is ready to evolve into a fuller CRM or delivery pipeline later

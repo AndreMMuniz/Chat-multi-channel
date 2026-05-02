@@ -10,7 +10,7 @@
 
 ## User Story
 
-**As an operator or manager,** I want to filter the pipeline and see high-level project metrics so that I can quickly focus on the right deals.
+**As an operator or manager,** I want to filter the pipeline and see high-level project metrics so that I can quickly focus on the right projects and demands.
 
 ---
 
@@ -23,6 +23,7 @@ Complete the supporting operational layer of the Projects workspace:
   - owner
   - priority
   - channel
+  - origin type when relevant
 - KPI strip
 - `List` and `Timeline` secondary views if feasible in this epic
 
@@ -30,9 +31,10 @@ Complete the supporting operational layer of the Projects workspace:
 
 ## Acceptance Criteria
 
-- [ ] The workspace includes functional filters for core deal dimensions
+- [ ] The workspace includes functional filters for core project dimensions
 - [ ] Clear-all behavior is available
 - [ ] A KPI summary strip surfaces basic pipeline totals and health
+- [ ] The workspace can distinguish conversation-originated demand cards from manually created projects when that data exists
 - [ ] `List` and/or `Timeline` views are available if included in scope
 - [ ] Secondary views remain visually consistent with the kanban workspace
 - [ ] The workspace leaves room for future integration with `Tasks` and CRM features
@@ -43,3 +45,4 @@ Complete the supporting operational layer of the Projects workspace:
 
 - If time is limited, prioritize filters and KPI strip before the secondary views.
 - Keep the first KPI layer compact and decision-oriented.
+- Origin-aware filtering should not make the first release feel like a separate `Tasks` module.
