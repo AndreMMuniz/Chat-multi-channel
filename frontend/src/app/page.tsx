@@ -7,7 +7,8 @@ import { twMerge } from 'tailwind-merge';
 import { ChevronLeft } from 'lucide-react';
 import type { IconType } from 'react-icons';
 import { FaWhatsapp, FaCommentDots } from 'react-icons/fa';
-import { FaTelegram, FaEnvelope, FaGlobe } from 'react-icons/fa6';
+import { FaTelegram, FaGlobe } from 'react-icons/fa6';
+import { MdOutlineEmail } from 'react-icons/md';
 import { TbSparkles } from 'react-icons/tb';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useConversations } from '@/hooks/useConversations';
@@ -75,25 +76,25 @@ const CHANNEL_META: Record<ChannelType, {
   TELEGRAM: {
     label: 'Telegram',
     badgeClass: 'bg-sky-50 text-sky-700 border-sky-100',
-    iconClass: 'text-sky-600',
+    iconClass: 'text-[#0088CC]',
     icon: FaTelegram,
   },
   WHATSAPP: {
     label: 'WhatsApp',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    iconClass: 'text-emerald-600',
+    iconClass: 'text-[#25D366]',
     icon: FaWhatsapp,
   },
   EMAIL: {
     label: 'Email',
-    badgeClass: 'bg-orange-50 text-orange-700 border-orange-100',
-    iconClass: 'text-orange-500',
-    icon: FaEnvelope,
+    badgeClass: 'bg-red-50 text-red-700 border-red-100',
+    iconClass: 'text-[#EA4335]',
+    icon: MdOutlineEmail,
   },
   SMS: {
     label: 'SMS',
-    badgeClass: 'bg-violet-50 text-violet-700 border-violet-100',
-    iconClass: 'text-violet-600',
+    badgeClass: 'bg-amber-50 text-amber-700 border-amber-100',
+    iconClass: 'text-[#F59E0B]',
     icon: FaCommentDots,
   },
   WEB: {
@@ -151,7 +152,7 @@ function ChannelBadge({ channel, compact = false }: { channel: ChannelType; comp
         meta.badgeClass
       )}
     >
-      <Icon className={compact ? 'text-[11px]' : 'text-[12px]'} />
+      <Icon className={cn(compact ? 'text-[11px]' : 'text-[12px]', meta.iconClass)} />
       <span>{meta.label}</span>
     </span>
   );
