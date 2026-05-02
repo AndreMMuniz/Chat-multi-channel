@@ -6,6 +6,7 @@ langchain-openai
 sqlalchemy
 psycopg2-binary
 pydantic
+pydantic-settings
 python-dotenv
 httpx
 websockets
@@ -17,3 +18,5 @@ supabase
 alembic
 email-validator
 slowapi
+cryptography
+redis

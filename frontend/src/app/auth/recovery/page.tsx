@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { authApi } from "@/lib/api/index";
 
 interface PasswordRule {
   label: string;
@@ -91,22 +90,10 @@ export default function RecoveryPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API}/auth/set-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ new_password: password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail || "Failed to set password. The link may have expired.");
-        return;
-      }
+      await authApi.setPassword(token, password);
       setState("success");
-    } catch {
-      setError("Connection error. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connection error. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -159,7 +146,7 @@ export default function RecoveryPage() {
               <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-red-500 text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>link_off</span>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Link inválido ou expirado</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Invalid or expired link</h2>
               <p className="text-sm text-slate-500 mb-6">
                 This recovery link is invalid or has already been used. Ask an administrator to send a new one.
               </p>

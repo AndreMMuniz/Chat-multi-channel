@@ -1,22 +1,31 @@
+import os
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from typing import Dict, Any
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, text
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.models import Conversation, Message, ConversationStatus, ChannelType
+from app.core.limiter import limiter
+from app.models.models import Conversation, Message, ConversationStatus, ChannelType, AISuggestion, User
+from app.schemas.common import create_response
 
 router = APIRouter()
 
 
 @router.get("/stats")
-def get_dashboard_stats(
+@limiter.limit("60/minute")
+async def get_dashboard_stats(
+    request: Request,
+    days: int = Query(7, ge=1, le=90),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
-):
+) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    period_start = now - timedelta(days=days)
+    prev_period_start = period_start - timedelta(days=days)
 
     # ── Conversations overview ─────────────────────────────────────────────
     total = db.query(func.count(Conversation.id)).scalar() or 0
@@ -42,6 +51,21 @@ def get_dashboard_stats(
     # ── Resolution rate ────────────────────────────────────────────────────
     resolution_rate = round((closed_count / total * 100) if total > 0 else 0, 1)
 
+    # ── Avg resolution time (hours) — closed conversations in selected period
+    closed_in_period = db.query(Conversation).filter(
+        Conversation.status == ConversationStatus.CLOSED,
+        Conversation.updated_at >= period_start,
+    ).all()
+    if closed_in_period:
+        total_hours = sum(
+            (c.updated_at - c.created_at).total_seconds() / 3600
+            for c in closed_in_period
+            if c.updated_at and c.created_at and c.updated_at > c.created_at
+        )
+        avg_resolution_hours = round(total_hours / len(closed_in_period), 1)
+    else:
+        avg_resolution_hours = None
+
     # ── Channel breakdown ──────────────────────────────────────────────────
     channels = {
         (row[0].name if hasattr(row[0], "name") else str(row[0])).upper(): row[1]
@@ -50,40 +74,163 @@ def get_dashboard_stats(
         ).group_by(Conversation.channel).all()
     }
 
-    # ── Last 7 days trend ──────────────────────────────────────────────────
-    daily_conversations = []
-    for i in range(6, -1, -1):
-        day_start = (now - timedelta(days=i)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        day_end = day_start + timedelta(days=1)
-        count = db.query(func.count(Conversation.id)).filter(
-            Conversation.created_at >= day_start,
-            Conversation.created_at < day_end,
-        ).scalar() or 0
-        daily_conversations.append({
-            "date": day_start.strftime("%a"),
-            "full_date": day_start.strftime("%b %d"),
-            "count": count,
-        })
+    # ── Current period totals (for comparison) ────────────────────────────
+    current_period_convs = db.query(func.count(Conversation.id)).filter(
+        Conversation.created_at >= period_start
+    ).scalar() or 0
+    prev_period_convs = db.query(func.count(Conversation.id)).filter(
+        Conversation.created_at >= prev_period_start,
+        Conversation.created_at < period_start,
+    ).scalar() or 0
 
-    # ── Messages last 7 days ───────────────────────────────────────────────
-    daily_messages = []
-    for i in range(6, -1, -1):
-        day_start = (now - timedelta(days=i)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        day_end = day_start + timedelta(days=1)
-        count = db.query(func.count(Message.id)).filter(
-            Message.created_at >= day_start,
-            Message.created_at < day_end,
-        ).scalar() or 0
-        daily_messages.append({
-            "date": day_start.strftime("%a"),
-            "count": count,
-        })
+    current_period_msgs = db.query(func.count(Message.id)).filter(
+        Message.created_at >= period_start
+    ).scalar() or 0
+    prev_period_msgs = db.query(func.count(Message.id)).filter(
+        Message.created_at >= prev_period_start,
+        Message.created_at < period_start,
+    ).scalar() or 0
 
-    return {
+    # ── Daily trend builder ────────────────────────────────────────────────
+    def build_daily(model, date_field, offset_days: int):
+        rows = []
+        for i in range(days - 1, -1, -1):
+            day_start = (now - timedelta(days=i + offset_days)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            day_end = day_start + timedelta(days=1)
+            count = db.query(func.count(model.id)).filter(
+                date_field >= day_start,
+                date_field < day_end,
+            ).scalar() or 0
+            label = day_start.strftime("%d/%m") if days > 7 else day_start.strftime("%a")
+            rows.append({"date": label, "full_date": day_start.strftime("%b %d"), "count": count})
+        return rows
+
+    daily_conversations      = build_daily(Conversation, Conversation.created_at, 0)
+    prev_daily_conversations = build_daily(Conversation, Conversation.created_at, days)
+    daily_messages           = build_daily(Message,       Message.created_at,       0)
+    prev_daily_messages      = build_daily(Message,       Message.created_at,       days)
+
+    # ── SLA & Queue Health (Epic 3) ────────────────────────────────────────────
+    sla_threshold_min = int(os.getenv("SLA_THRESHOLD_MINUTES", "60"))
+    sla_cutoff = now - timedelta(minutes=sla_threshold_min)
+
+    # Conversations at SLA risk: OPEN + unread + last_message_date before cutoff
+    sla_at_risk = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.OPEN,
+        Conversation.is_unread == True,
+        Conversation.last_message_date <= sla_cutoff,
+    ).scalar() or 0
+
+    # First-response SLA compliance: % of CLOSED conversations in period that had first_response_at
+    closed_with_response = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.CLOSED,
+        Conversation.created_at >= period_start,
+        Conversation.first_response_at.isnot(None),
+    ).scalar() or 0
+    total_closed_period = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.CLOSED,
+        Conversation.created_at >= period_start,
+    ).scalar() or 0
+    sla_compliance_pct = round(
+        (closed_with_response / total_closed_period * 100) if total_closed_period > 0 else 0, 1
+    )
+
+    # Avg first-response time (minutes) for conversations in the period
+    resp_rows = db.query(Conversation).filter(
+        Conversation.first_response_at.isnot(None),
+        Conversation.created_at >= period_start,
+    ).all()
+    if resp_rows:
+        avg_first_response_min = round(
+            sum(
+                (c.first_response_at - c.created_at).total_seconds() / 60
+                for c in resp_rows
+                if c.first_response_at and c.created_at and c.first_response_at > c.created_at
+            ) / len(resp_rows), 1
+        )
+    else:
+        avg_first_response_min = None
+
+    # Queue health: open conversations by channel
+    queue_by_channel = {
+        (row[0].name if hasattr(row[0], "name") else str(row[0])).upper(): row[1]
+        for row in db.query(Conversation.channel, func.count(Conversation.id))
+        .filter(Conversation.status == ConversationStatus.OPEN)
+        .group_by(Conversation.channel)
+        .all()
+    }
+
+    # Unassigned open conversations
+    unassigned_open = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.OPEN,
+        Conversation.assigned_user_id.is_(None),
+    ).scalar() or 0
+
+    # ── Story 6.4: P50 / P90 resolution times ────────────────────────────────
+    # percentile_cont is a PostgreSQL ordered-set aggregate — use raw SQL
+    percentile_rows = db.execute(text("""
+        SELECT
+            percentile_cont(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600
+            ) AS p50_hours,
+            percentile_cont(0.9) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600
+            ) AS p90_hours
+        FROM conversations
+        WHERE status = 'CLOSED'
+          AND updated_at >= :since
+          AND created_at IS NOT NULL
+          AND updated_at > created_at
+    """), {"since": period_start}).fetchone()
+
+    p50_hours = round(float(percentile_rows[0]), 2) if percentile_rows and percentile_rows[0] else None
+    p90_hours = round(float(percentile_rows[1]), 2) if percentile_rows and percentile_rows[1] else None
+
+    # ── Story 6.5: Per-agent performance ─────────────────────────────────────
+    agent_rows = db.execute(text("""
+        SELECT
+            u.id,
+            u.full_name,
+            COUNT(c.id) AS conversations_handled,
+            AVG(EXTRACT(EPOCH FROM (c.first_response_at - c.created_at)) / 60) AS avg_first_response_min,
+            SUM(CASE WHEN c.status = 'CLOSED' THEN 1 ELSE 0 END) AS resolved
+        FROM users u
+        LEFT JOIN conversations c ON c.assigned_user_id = u.id
+            AND c.created_at >= :since
+        WHERE u.is_active = true AND u.is_approved = true
+        GROUP BY u.id, u.full_name
+        HAVING COUNT(c.id) > 0
+        ORDER BY conversations_handled DESC
+        LIMIT 10
+    """), {"since": period_start}).fetchall()
+
+    agent_stats = [
+        {
+            "id": str(row[0]),
+            "full_name": row[1],
+            "conversations_handled": int(row[2]),
+            "avg_first_response_min": round(float(row[3]), 1) if row[3] else None,
+            "resolved": int(row[4]),
+            "resolution_rate": round(int(row[4]) / int(row[2]) * 100, 1) if int(row[2]) > 0 else 0,
+        }
+        for row in agent_rows
+    ]
+
+    # ── Story 6.5: AI suggestion usage ───────────────────────────────────────
+    ai_suggestions_generated = db.query(func.count(AISuggestion.id)).scalar() or 0
+
+    # Conversations that have at least one AI suggestion
+    convs_with_ai = db.query(
+        func.count(func.distinct(AISuggestion.conversation_id))
+    ).scalar() or 0
+
+    ai_adoption_pct = round(
+        (convs_with_ai / total * 100) if total > 0 else 0, 1
+    )
+
+    return create_response({
         "total_conversations": total,
         "open_conversations": open_count,
         "closed_conversations": closed_count,
@@ -91,7 +238,29 @@ def get_dashboard_stats(
         "unread_conversations": unread_count,
         "messages_today": messages_today,
         "resolution_rate": resolution_rate,
+        "avg_resolution_hours": avg_resolution_hours,
         "channels": channels,
         "daily_conversations": daily_conversations,
+        "prev_daily_conversations": prev_daily_conversations,
         "daily_messages": daily_messages,
-    }
+        "prev_daily_messages": prev_daily_messages,
+        "period_days": days,
+        "current_period_conversations": current_period_convs,
+        "prev_period_conversations": prev_period_convs,
+        "current_period_messages": current_period_msgs,
+        "prev_period_messages": prev_period_msgs,
+        # SLA & Queue (Epic 3)
+        "sla_at_risk": sla_at_risk,
+        "sla_threshold_minutes": sla_threshold_min,
+        "sla_compliance_pct": sla_compliance_pct,
+        "avg_first_response_minutes": avg_first_response_min,
+        "queue_by_channel": queue_by_channel,
+        "unassigned_open": unassigned_open,
+        # Analytics (Epic 6)
+        "p50_resolution_hours": p50_hours,
+        "p90_resolution_hours": p90_hours,
+        "agent_stats": agent_stats,
+        "ai_suggestions_generated": ai_suggestions_generated,
+        "convs_with_ai": convs_with_ai,
+        "ai_adoption_pct": ai_adoption_pct,
+    })

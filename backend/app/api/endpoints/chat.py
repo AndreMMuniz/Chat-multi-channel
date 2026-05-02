@@ -1,119 +1,317 @@
-from typing import List
+import uuid as _uuid
+from typing import List, Dict, Any, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.models import Conversation, Message
-from app.schemas.chat import ConversationResponse, ConversationUpdate, MessageResponse
-from app.core.websocket import manager
+from app.schemas.chat import ConversationResponse, ConversationUpdate, MessageResponse, AISuggestionResponse
+from app.schemas.common import create_response, create_paginated_response, create_error_response
+from app.core.websocket import manager  # still used by WebSocket endpoint
 
 router = APIRouter()
 
-# --- WebSockets ---
+# --- WebSocket ---
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    """
+    Real-time WebSocket endpoint.
+
+    Client sends JSON frames:
+      {"type": "subscribe",   "conversation_id": "<uuid>"}
+      {"type": "unsubscribe", "conversation_id": "<uuid>"}
+      {"type": "ack",         "conversation_id": "<uuid>", "sequence": 123}
+      {"type": "ping"}
+
+    Server sends SequencedEvent JSON (see websocket.py).
+    """
+    client_id = str(_uuid.uuid4())
+    await manager.connect(websocket, client_id)
     try:
         while True:
-            # We can receive pings or commands from frontend if needed
-            data = await websocket.receive_text()
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+
+            if msg_type == "identify":
+                # Operator sends their identity once after connecting
+                manager.identify(
+                    client_id,
+                    user_id=data.get("user_id", ""),
+                    display_name=data.get("display_name", ""),
+                )
+
+            elif msg_type == "subscribe":
+                conv_id = data.get("conversation_id", "")
+                manager.subscribe(client_id, conv_id)
+                await manager.send_personal(client_id, "subscribed", {"conversation_id": conv_id})
+
+            elif msg_type == "unsubscribe":
+                conv_id = data.get("conversation_id", "")
+                manager.unsubscribe(client_id, conv_id)
+
+            elif msg_type == "ack":
+                conv_id = data.get("conversation_id", "")
+                sequence = data.get("sequence", 0)
+                manager.acknowledge(client_id, conv_id, sequence)
+
+            elif msg_type == "ping":
+                await manager.send_personal(client_id, "pong", {})
+
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(client_id)
+    except Exception:
+        manager.disconnect(client_id)
 
 # --- REST Endpoints ---
-@router.get("/conversations", response_model=List[ConversationResponse])
-def get_conversations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """List all conversations (used by the frontend dashboard)."""
-    conversations = db.query(Conversation).order_by(Conversation.last_message_date.desc().nulls_last()).offset(skip).limit(limit).all()
-    return conversations
+@router.get("/conversations")
+@limiter.limit("60/minute")
+async def get_conversations(
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = None,
+    assigned_user_id: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List conversations with optional filters. Eager-loads contact and assigned_user."""
+    from sqlalchemy.orm import joinedload
+    from app.models.models import Contact, User
 
-@router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
-def get_conversation_messages(conversation_id: UUID, db: Session = Depends(get_db)):
+    q = (
+        db.query(Conversation)
+        .options(
+            joinedload(Conversation.contact),
+            joinedload(Conversation.assigned_user),
+        )
+    )
+    if status:
+        from app.models.models import ConversationStatus as CS
+        try:
+            q = q.filter(Conversation.status == CS[status.upper()])
+        except KeyError:
+            pass
+    if assigned_user_id:
+        q = q.filter(Conversation.assigned_user_id == assigned_user_id)
+
+    total = q.count()
+    conversations = q.order_by(Conversation.last_message_date.desc().nulls_last()).offset(skip).limit(limit).all()
+    return create_paginated_response(
+        data=[ConversationResponse.model_validate(c) for c in conversations],
+        total=total,
+        page=(skip // limit) + 1,
+        page_size=limit,
+    )
+
+@router.get("/conversations/{conversation_id}/messages")
+@limiter.limit("60/minute")
+async def get_conversation_messages(request: Request, conversation_id: UUID, skip: int = 0, limit: int = 50, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Get all messages for a specific conversation."""
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    messages = db.query(Message).filter(Message.conversation_id == conversation_id).order_by(Message.created_at.asc()).all()
-    return messages
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND",
+            message="Conversation not found",
+            status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
-@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
-async def update_conversation(conversation_id: UUID, update_data: ConversationUpdate, db: Session = Depends(get_db)):
+    messages = db.query(Message).filter(Message.conversation_id == conversation_id).order_by(Message.conversation_sequence.asc()).offset(skip).limit(limit).all()
+    total = db.query(Message).filter(Message.conversation_id == conversation_id).count()
+    return create_paginated_response(
+        data=[MessageResponse.model_validate(m) for m in messages],
+        total=total,
+        page=(skip // limit) + 1,
+        page_size=limit
+    )
+
+from app.schemas.chat import MessageCreate
+from app.services.conversation_service import ConversationService, get_conversation_service
+from app.services.message_service import MessageService, get_message_service
+
+@router.patch("/conversations/{conversation_id}")
+@limiter.limit("60/minute")
+async def update_conversation(
+    request: Request,
+    conversation_id: UUID,
+    update_data: ConversationUpdate,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """Update conversation status, tag, or read state."""
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    update_dict = update_data.model_dump(exclude_unset=True)
-    for key, value in update_dict.items():
-        setattr(conversation, key, value)
-        
-    db.commit()
-    db.refresh(conversation)
-    
-    # Broadcast the change via WebSocket
-    await manager.broadcast_json({
-        "type": "conversation_updated",
-        "data": {
-            "id": str(conversation.id),
-            "status": conversation.status.value if conversation.status else None,
-            "tag": conversation.tag.value if conversation.tag else None,
-            "is_unread": conversation.is_unread
-        }
-    })
-    
-    return conversation
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND",
+            message="Conversation not found",
+            status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
 
-from app.schemas.chat import MessageCreate
-from app.models.models import ChannelType, Contact
-from app.services.telegram_service import telegram_service
+    svc = ConversationService(db)
+    conversation = await svc.update_and_broadcast(
+        conversation, update_data.model_dump(exclude_unset=True)
+    )
+    return create_response(ConversationResponse.model_validate(conversation))
 
-@router.post("/conversations/{conversation_id}/messages", response_model=MessageResponse)
-async def send_message(conversation_id: UUID, message_data: MessageCreate, db: Session = Depends(get_db)):
+
+@router.post("/conversations/{conversation_id}/messages")
+@limiter.limit("60/minute")
+async def send_message(
+    request: Request,
+    conversation_id: UUID,
+    message_data: MessageCreate,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """Send a message from the dashboard to a conversation."""
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-        
-    # Save message in DB
-    new_message = Message(
-        conversation_id=conversation.id,
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND",
+            message="Conversation not found",
+            status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    svc = MessageService(db)
+    new_message = await svc.send_from_dashboard(
+        conversation=conversation,
         content=message_data.content,
-        inbound=False,
         owner_id=message_data.owner_id,
-        message_type=message_data.message_type,
+        message_type=message_data.message_type.value if hasattr(message_data.message_type, "value") else str(message_data.message_type),
         image=message_data.image,
-        file=message_data.file
+        file=message_data.file,
+        idempotency_key=message_data.idempotency_key,
     )
-    db.add(new_message)
-    
-    # Update conversation status
-    conversation.last_message = message_data.content
-    conversation.is_unread = False
-    
+
+    return create_response(MessageResponse.model_validate(new_message))
+
+
+# ── Conversation Assignment (Story 3.5) ──────────────────────────────────────
+
+@router.patch("/conversations/{conversation_id}/assign")
+@limiter.limit("60/minute")
+async def assign_conversation(
+    request: Request,
+    conversation_id: UUID,
+    body: Dict[str, Any],
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Assign or unassign a conversation to an agent. Pass {assigned_user_id: uuid|null}."""
+    from app.models.models import User
+    from app.services.audit_service import log_action
+
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND", message="Conversation not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    new_uid = body.get("assigned_user_id")
+
+    if new_uid:
+        user = db.query(User).filter(User.id == new_uid).first()
+        if not user:
+            error_response, status = create_error_response(
+                code="USER_NOT_FOUND", message="User not found", status_code=404
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+        conversation.assigned_user_id = user.id
+    else:
+        conversation.assigned_user_id = None
+
     db.commit()
-    db.refresh(new_message)
-    
-    # Send to external channel
-    contact = db.query(Contact).filter(Contact.id == conversation.contact_id).first()
-    print(f"Sending to channel: {conversation.channel}")
-    # Robust enum comparison
-    channel_name = conversation.channel.name if hasattr(conversation.channel, "name") else str(conversation.channel).upper()
-    if "TELEGRAM" in channel_name:
-        print(f"Sending via Telegram to {contact.channel_identifier}")
-        await telegram_service.send_message(contact.channel_identifier, message_data.content)
-    # else handle WHATSAPP, EMAIL, etc.
-    
-    # Broadcast to WebSocket to update other connected dashboard clients
-    await manager.broadcast_json({
-        "type": "new_message",
-        "data": {
-            "id": str(new_message.id),
-            "conversation_id": str(conversation.id),
-            "content": new_message.content,
-            "inbound": False,
-            "created_at": new_message.created_at.isoformat() if new_message.created_at else None
-        }
-    })
-    
-    return new_message
+    db.refresh(conversation)
+
+    await manager.broadcast_to_conversation(
+        conversation_id=str(conversation_id),
+        event_type="conversation_updated",
+        data={"conversation_id": str(conversation_id), "assigned_user_id": str(new_uid) if new_uid else None},
+    )
+
+    return create_response(ConversationResponse.model_validate(conversation))
+
+
+# ── Message Retry (Story 4.3) ─────────────────────────────────────────────────
+
+@router.post("/conversations/{conversation_id}/messages/{message_id}/retry")
+@limiter.limit("20/minute")
+async def retry_message(
+    request: Request,
+    conversation_id: UUID,
+    message_id: UUID,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Retry a failed outbound message (max 3 attempts)."""
+    from app.models.models import Message, DeliveryStatus
+
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND", message="Conversation not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    message = db.query(Message).filter(
+        Message.id == message_id,
+        Message.conversation_id == conversation_id,
+    ).first()
+    if not message:
+        error_response, status = create_error_response(
+            code="MESSAGE_NOT_FOUND", message="Message not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    if message.delivery_status != DeliveryStatus.FAILED:
+        error_response, status = create_error_response(
+            code="NOT_FAILED", message="Message is not in failed state", status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    from app.services.message_service import MessageService
+    try:
+        updated = await MessageService(db).retry_message(message, conversation)
+        return create_response(MessageResponse.model_validate(updated))
+    except ValueError as e:
+        error_response, status = create_error_response(
+            code="RETRY_LIMIT", message=str(e), status_code=400
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+
+# ── AI Suggestions ────────────────────────────────────────────────────────────
+
+@router.get("/conversations/{conversation_id}/suggestions")
+@limiter.limit("60/minute")
+async def get_suggestions(
+    request: Request,
+    conversation_id: UUID,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return cached AI suggestions for a conversation (no LLM call)."""
+    from app.services.ai_service import AIService
+    svc = AIService(db)
+    suggestions = svc.get_cached(conversation_id)
+    return create_response({"suggestions": suggestions, "conversation_id": str(conversation_id)})
+
+
+@router.post("/conversations/{conversation_id}/suggestions/generate")
+@limiter.limit("30/minute")
+async def generate_suggestions(
+    request: Request,
+    conversation_id: UUID,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Generate fresh AI reply suggestions using LLM. Replaces cached suggestions."""
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND",
+            message="Conversation not found",
+            status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    from app.services.ai_service import AIService
+    suggestions = await AIService(db).generate(conversation_id)
+    return create_response({"suggestions": suggestions, "conversation_id": str(conversation_id)})

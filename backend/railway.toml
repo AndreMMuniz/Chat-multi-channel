@@ -1,4 +1,20 @@
+[build]
+builder = "DOCKERFILE"
+
 [deploy]
-startCommand = "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT"
+preDeployCommand = "alembic upgrade head"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
+restartPolicy = "always"
+
+# Required environment variables (set in Railway dashboard):
+# DATABASE_URL             — Supabase Postgres connection string (pooler recommended)
+# SUPABASE_URL             — https://xxx.supabase.co
+# SUPABASE_ANON_KEY        — Supabase anon key
+# SUPABASE_SERVICE_ROLE_KEY— Supabase service role key
+# TELEGRAM_BOT_TOKEN       — From @BotFather
+# OPENROUTER_API_KEY       — sk-or-v1-... (or OPENAI_API_KEY for direct OpenAI)
+# ENVIRONMENT              — production
+# FRONTEND_URL             — https://omnichat.munizandre.com
+# WEBHOOK_BASE_URL         — https://your-backend.railway.app  (auto-registers Telegram webhook)
+# ALLOWED_ORIGINS          — https://omnichat.munizandre.com

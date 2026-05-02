@@ -1,15 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getStoredUser, clearAuth, apiFetch } from "@/lib/api";
-
-interface StoredUser {
-  full_name: string;
-  avatar?: string;
-  user_type?: { can_manage_users: boolean };
-}
+import { useAuth } from "@/hooks/useAuth";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: "dashboard",             title: "Dashboard"  },
@@ -17,30 +10,28 @@ const NAV_ITEMS = [
 ];
 
 const ADMIN_ITEMS = [
-  { href: "/admin/users",       icon: "group",    title: "Users"      },
-  { href: "/admin/user-types",  icon: "badge",    title: "User Types" },
-  { href: "/admin/settings",    icon: "settings", title: "Settings"   },
+  { href: "/admin/users",          icon: "group",          title: "Users",          perm: "can_manage_users"     },
+  { href: "/admin/user-types",     icon: "badge",          title: "User Types",     perm: "can_create_user_types" },
+  { href: "/admin/quick-replies",  icon: "quick_phrases",  title: "Quick Replies",  perm: "can_manage_users"     },
+  { href: "/admin/audit",          icon: "policy",         title: "Audit Log",      perm: "can_view_audit_logs"  },
+  { href: "/admin/settings",       icon: "settings",       title: "Settings",       perm: "can_change_settings"  },
 ];
 
 export default function SideNavBar() {
   const pathname  = usePathname();
-  const router    = useRouter();
-  const [user, setUser] = useState<StoredUser | null>(null);
-
-  useEffect(() => {
-    setUser(getStoredUser<StoredUser>());
-  }, []);
+  const router = useRouter();
+  const { user, logout } = useAuth();
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   const handleLogout = async () => {
-    await apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
-    clearAuth();
+    await logout();
     router.replace("/login");
   };
 
   const canManageUsers = user?.user_type?.can_manage_users ?? false;
+  const hasPerm = (perm: string) => !!(user?.user_type?.[perm as keyof typeof user.user_type]);
 
   return (
     <nav className="h-full w-[64px] shrink-0 bg-white border-r border-[#E9ECEF] flex flex-col items-center py-4">
@@ -86,7 +77,7 @@ export default function SideNavBar() {
         {canManageUsers && (
           <>
             <div className="w-8 my-1 border-t border-[#E9ECEF]" />
-            {ADMIN_ITEMS.map(({ href, icon, title }) => {
+            {ADMIN_ITEMS.filter(item => hasPerm(item.perm)).map(({ href, icon, title }) => {
               const active = isActive(href);
               return (
                 <Link

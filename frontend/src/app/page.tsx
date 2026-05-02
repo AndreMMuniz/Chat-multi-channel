@@ -1,443 +1,284 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { ChevronLeft } from 'lucide-react';
+import { TbSparkles } from 'react-icons/tb';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
-import { apiFetch, getStoredUser, getToken } from '@/lib/api';
+import { useConversations } from '@/hooks/useConversations';
+import { useMessages } from '@/hooks/useMessages';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useAISuggestions } from '@/hooks/useAISuggestions';
+import { useQuickReplySearch } from '@/hooks/useQuickReplies';
+import { conversationsApi, usersApi } from '@/lib/api/index';
+import type { SequencedEvent } from '@/types/api';
+import type { Conversation, Message } from '@/types/chat';
 import AudioMessage from '@/components/AudioMessage';
+import { useState as useLocalState, useEffect as useLocalEffect } from 'react';
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;   // 5 MB
-const MAX_AUDIO_SIZE = 10 * 1024 * 1024;  // 10 MB
-const MAX_FILE_SIZE  = 20 * 1024 * 1024;  // 20 MB
+// ── Assignment Panel (Story 3.5) ──────────────────────────────────────────────
 
-async function compressImage(file: File, maxDim = 1920, quality = 0.82): Promise<File> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      let { width, height } = img;
-      if (width > maxDim || height > maxDim) {
-        if (width >= height) { height = Math.round((height * maxDim) / width); width = maxDim; }
-        else { width = Math.round((width * maxDim) / height); height = maxDim; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) { resolve(file); return; }
-          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
-        },
-        'image/jpeg',
-        quality
-      );
-    };
-    img.onerror = () => resolve(file);
-    img.src = objectUrl;
-  });
+function AssignmentPanel({ conversation, onAssign }: {
+  conversation: Conversation;
+  onAssign: (userId: string | null) => Promise<void>;
+}) {
+  const [agents, setAgents] = useLocalState<{ id: string; full_name: string }[]>([]);
+  const [saving, setSaving] = useLocalState(false);
+
+  useLocalEffect(() => {
+    usersApi.listUsers(100).then(r => setAgents(r.data ?? [])).catch(() => {});
+  }, []);
+
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSaving(true);
+    await onAssign(e.target.value || null).catch(() => {});
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={conversation.assigned_user_id ?? ''}
+        onChange={handleChange}
+        disabled={saving}
+        className="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:border-[#7C4DFF] outline-none cursor-pointer text-slate-700 disabled:opacity-50"
+      >
+        <option value="">— Unassigned —</option>
+        {agents.map(a => (
+          <option key={a.id} value={a.id}>{a.full_name}</option>
+        ))}
+      </select>
+      {saving && <span className="material-symbols-outlined text-[16px] text-slate-400 animate-spin">progress_activity</span>}
+    </div>
+  );
 }
+
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Types
+const SLA_THRESHOLD_MINUTES = 60;
 
-interface Message {
-  id: string;
-  conversation_id: string;
-  content: string;
-  inbound: boolean;
-  message_type: 'text' | 'image' | 'file' | 'audio';
-  created_at: string;
-  image?: string;
-  file?: string;
+function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { label: string; color: string; slaBreached: boolean } | null {
+  if (!isUnread || !lastMessageDate) return null;
+  const diffMs = Date.now() - new Date(lastMessageDate).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 15) return null;
+  const slaBreached = diffMin >= SLA_THRESHOLD_MINUTES;
+  if (diffMin < 60) return { label: `${diffMin}m ago`, color: 'text-yellow-600', slaBreached };
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return { label: `${diffH}h ago`, color: diffH >= 2 ? 'text-red-500' : 'text-orange-500', slaBreached };
+  return { label: `${Math.floor(diffH / 24)}d ago`, color: 'text-red-600', slaBreached: true };
 }
-
-interface Contact {
-  id: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  avatar?: string;
-  channel_identifier?: string;
-}
-
-interface Conversation {
-  id: string;
-  contact_id: string;
-  channel: string;
-  status: string;
-  tag?: string;
-  is_unread: boolean;
-  last_message?: string;
-  last_message_date?: string;
-  created_at: string;
-  updated_at: string;
-  contact: Contact;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/api/v1/chat/ws';
 
 export default function ChatPage() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  // Multimedia State
+  const [searchQuery, setSearchQuery] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  
-  const ws = useRef<WebSocket | null>(null);
+  const [slaAlert, setSlaAlert] = useState<{ count: number; threshold: number } | null>(null);
+  const [deliveryAlert, setDeliveryAlert] = useState<{ channel: string; count: number } | null>(null);
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  const [aiSheetOpen, setAiSheetOpen] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch Conversations
-  const fetchConversations = async () => {
-    try {
-      const res = await apiFetch(`/chat/conversations`);
-      if (res.ok) {
-        const data = await res.json();
-        setConversations(data);
-      }
-    } catch (err) {
-      console.error("Error fetching conversations:", err);
-    }
-  };
-
-  // Fetch Messages for a conversation
-  const fetchMessages = async (conversationId: string) => {
-    try {
-      const res = await apiFetch(`/chat/conversations/${conversationId}/messages`);
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data);
-        scrollToBottom();
-      }
-    } catch (err) {
-      console.error("Error fetching messages:", err);
-    }
-  };
-
-  useEffect(() => {
-    console.log('Page loaded, token:', getToken());
-    fetchConversations();
-
-    // WebSocket Connection
-    let isMounted = true;
-    const connectWs = () => {
-      if (ws.current) ws.current.close();
-      ws.current = new WebSocket(WS_URL);
-      ws.current.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          if (parsed.type === "new_message") {
-            const newMsg = parsed.data as Message;
-            
-            // Update conversations list (optimistic sort to top)
-            setConversations(prev => {
-              const updated = [...prev];
-              const idx = updated.findIndex(c => c.id === newMsg.conversation_id);
-              if (idx > -1) {
-                updated[idx].last_message = newMsg.content;
-                updated[idx].last_message_date = newMsg.created_at;
-                updated[idx].is_unread = newMsg.inbound;
-                // Move to top
-                const [conv] = updated.splice(idx, 1);
-                updated.unshift(conv);
-              } else {
-                // If we don't have the conversation, fetch it all again
-                fetchConversations();
-              }
-              return updated;
-            });
-
-            // If the message belongs to the active conversation, append it
-            setActiveConversation(active => {
-              if (active && active.id === newMsg.conversation_id) {
-                setMessages(prev => {
-                  if (prev.some(m => m.id === newMsg.id)) return prev;
-                  return [...prev, newMsg];
-                });
-                scrollToBottom();
-              }
-              return active;
-            });
-          } else if (parsed.type === "conversation_updated") {
-            // Update status/tag in list
-            fetchConversations();
-          }
-        } catch (err) {
-          console.error("Error parsing WS message", err);
-        }
-      };
-    };
-
-    connectWs();
-
-    return () => {
-      isMounted = false;
-      if (ws.current) {
-        ws.current.close();
-        ws.current = null;
-      }
-    };
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }, []);
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+  // ── Domain hooks ──────────────────────────────────────────────────────────
+  const {
+    conversations,
+    activeConversation,
+    activeConversationRef,
+    fetchConversations,
+    selectConversation,
+    updateConversation,
+    notifCounts,
+    activeViewers,
+    onNewMessage,
+    onConversationNotification,
+    onPresenceUpdate,
+    onConversationUpdated,
+  } = useConversations();
 
-  const handleSelectConversation = async (conv: Conversation) => {
-    setActiveConversation(conv);
-    cancelAttachment();
-    await fetchMessages(conv.id);
-    
-    // Mark as read
-    if (conv.is_unread) {
-      try {
-        await apiFetch(`/chat/conversations/${conv.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ is_unread: false })
-        });
-        // Update local state
-        setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, is_unread: false } : c));
-      } catch (err) {
-        console.error("Failed to mark as read", err);
+  // Story 3.3 — sort by SLA risk: breached first, then by wait time desc
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const wtA = waitingTime(a.last_message_date, a.is_unread);
+    const wtB = waitingTime(b.last_message_date, b.is_unread);
+    if (wtA?.slaBreached && !wtB?.slaBreached) return -1;
+    if (!wtA?.slaBreached && wtB?.slaBreached) return 1;
+    const tA = a.last_message_date ? new Date(a.last_message_date).getTime() : 0;
+    const tB = b.last_message_date ? new Date(b.last_message_date).getTime() : 0;
+    return tA - tB; // oldest unread first within same risk tier
+  });
+
+  const filteredConversations = searchQuery.trim()
+    ? sortedConversations.filter(c => {
+        const q = searchQuery.toLowerCase();
+        return (
+          c.contact.name?.toLowerCase().includes(q) ||
+          c.contact.channel_identifier?.toLowerCase().includes(q)
+        );
+      })
+    : sortedConversations;
+
+  const {
+    messages,
+    sendStatus,
+    sending,
+    fetchMessages,
+    sendText,
+    sendFile,
+    sendAudio,
+    retryMessage,
+    appendMessage,
+  } = useMessages(scrollToBottom);
+
+  const {
+    suggestions,
+    source: aiSource,
+    generatedAt: aiGeneratedAt,
+    generating: aiGenerating,
+    loading: aiLoading,
+    fetchCached: fetchAICached,
+    generate: generateAI,
+    clear: clearAI,
+  } = useAISuggestions();
+
+  const { matches: qrMatches, open: qrOpen, search: qrSearch, close: qrClose } = useQuickReplySearch();
+
+  // ── WebSocket event dispatcher ─────────────────────────────────────────────
+  const handleWsEvent = useCallback((event: SequencedEvent) => {
+    if (event.type === 'new_message') {
+      const msg = event.data as unknown as Message;
+      onNewMessage(msg, fetchConversations);
+      if (activeConversationRef.current?.id === msg.conversation_id) {
+        appendMessage(msg);
       }
+    } else if (event.type === 'conversation_notification') {
+      onConversationNotification(event.conversation_id);
+    } else if (event.type === 'presence_update') {
+      const { conversation_id, viewers } = event.data as { conversation_id: string; viewers: string[] };
+      onPresenceUpdate(conversation_id, viewers);
+    } else if (event.type === 'conversation_updated') {
+      onConversationUpdated();
+    } else if (event.type === 'sla_risk_alert') {
+      const d = event.data as { count: number; threshold_minutes: number };
+      setSlaAlert({ count: d.count, threshold: d.threshold_minutes });
+    } else if (event.type === 'delivery_failure_alert') {
+      const d = event.data as { channel: string; failure_count: number };
+      setDeliveryAlert({ channel: d.channel, count: d.failure_count });
     }
-  };
+  }, [onNewMessage, onConversationNotification, onPresenceUpdate, onConversationUpdated, fetchConversations, appendMessage, activeConversationRef]);
 
-  // --- Multimedia Handlers ---
+  const { subscribe, unsubscribe, connectionState } = useWebSocket(handleWsEvent);
 
-  const handleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
+  useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Reset mobile view to list when active conversation is cleared externally (e.g. WebSocket event)
+  useEffect(() => {
+    if (!activeConversation) setMobileView('list');
+  }, [activeConversation]);
 
-    const isImage = file.type.startsWith('image/');
-    const limit = isImage ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
-    if (file.size > limit) {
-      alert(`File too large. Maximum size is ${isImage ? '5' : '20'} MB.`);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
+  // ── Conversation selection ────────────────────────────────────────────────
+  const handleSelectConversation = useCallback(async (conv: Conversation) => {
+    if (activeConversationRef.current) unsubscribe(activeConversationRef.current.id);
+    cancelAttachment();
+    clearAI();
+    await selectConversation(conv);
+    subscribe(conv.id);
+    await fetchMessages(conv.id);
+    fetchAICached(conv.id);
+    setMobileView('chat');
+  }, [selectConversation, fetchMessages, subscribe, unsubscribe, activeConversationRef, fetchAICached, clearAI]);
 
-    setSelectedFile(file);
-    if (isImage) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-    } else {
-      setPreviewUrl(null);
+  const handleMobileBack = useCallback(() => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
     }
     setShowEmojiPicker(false);
-  };
+    setMobileView('list');
+  }, [isRecording]);
 
+  // ── Attachment helpers ────────────────────────────────────────────────────
   const cancelAttachment = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const onEmojiClick = (emojiData: { emoji: string }) => {
-    setInput(prev => prev + emojiData.emoji);
-    // setShowEmojiPicker(false); // Keep open for multiple emojis?
+  const handleFileSelect = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile(file);
+    setPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+    setShowEmojiPicker(false);
   };
 
+  const onEmojiClick = (emojiData: { emoji: string }) =>
+    setInput(prev => prev + emojiData.emoji);
+
+  // ── Recording ─────────────────────────────────────────────────────────────
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      const rec = new MediaRecorder(stream);
+      mediaRecorderRef.current = rec;
       audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      rec.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      rec.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/mpeg' });
+        if (activeConversation) await sendAudio(activeConversation.id, blob);
+        stream.getTracks().forEach(t => t.stop());
       };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mpeg' });
-        await uploadAndSendAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
+      rec.start();
       setIsRecording(true);
       setRecordingDuration(0);
-      timerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-      alert("Microphone access denied or not available.");
+      timerRef.current = setInterval(() => setRecordingDuration(p => p + 1), 1000);
+    } catch {
+      alert('Microphone access denied or not available.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+    if (timerRef.current) clearInterval(timerRef.current);
   };
 
-  const uploadAndSendAudio = async (blob: Blob) => {
-    if (!activeConversation) return;
-
-    if (blob.size > MAX_AUDIO_SIZE) {
-      alert('Audio recording too large. Maximum size is 10 MB.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', blob, 'recording.mp3');
-
-      const uploadRes = await fetch(`${API_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-        // No Content-Type header - browser will set it with boundary
-      });
-
-      if (!uploadRes.ok) throw new Error("Failed to upload audio");
-      const { url } = await uploadRes.json();
-
-      await sendMessageInternal({
-        content: "Audio message",
-        message_type: 'audio',
-        file: url
-      });
-    } catch (err) {
-      console.error("Error sending audio:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── Send ──────────────────────────────────────────────────────────────────
   const handleSendMessage = async () => {
-    if ((!input.trim() && !selectedFile) || !activeConversation) return;
-    
-    let content = input;
-    let type: 'text' | 'image' | 'file' = 'text';
-    let fileUrl = '';
-    let imageUrl = '';
-
-    setLoading(true);
-    try {
-      if (selectedFile) {
-        const fileToUpload = selectedFile.type.startsWith('image/')
-          ? await compressImage(selectedFile)
-          : selectedFile;
-
-        const formData = new FormData();
-        formData.append('file', fileToUpload);
-
-        const uploadRes = await fetch(`${API_URL.replace('/api/v1', '')}/api/v1/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadRes.ok) throw new Error("Failed to upload file");
-        const { url } = await uploadRes.json();
-
-        if (selectedFile.type.startsWith('image/')) {
-          type = 'image';
-          imageUrl = url;
-          if (!content) content = "Image";
-        } else {
-          type = 'file';
-          fileUrl = url;
-          if (!content) content = `File: ${selectedFile.name}`;
-        }
-      }
-
-      await sendMessageInternal({
-        content,
-        message_type: type,
-        image: imageUrl,
-        file: fileUrl
-      });
-
-      setInput('');
+    if (!activeConversation || (!input.trim() && !selectedFile)) return;
+    if (selectedFile) {
+      await sendFile(activeConversation.id, selectedFile);
       cancelAttachment();
-    } catch (err) {
-      console.error("Error sending message:", err);
-    } finally {
-      setLoading(false);
+    } else {
+      await sendText(activeConversation.id, input.trim());
+      setInput('');
     }
   };
 
-  const sendMessageInternal = async (payload: any) => {
-    if (!activeConversation) return;
-
-    const user = getStoredUser<{id: string}>();
-    
-    // Optimistic UI Update
-    const tempId = `temp-${Date.now()}`;
-    const optimisticMessage: Message = {
-      id: tempId,
-      conversation_id: activeConversation.id,
-      content: payload.content,
-      inbound: false,
-      message_type: payload.message_type,
-      created_at: new Date().toISOString(),
-      image: payload.image,
-      file: payload.file
-    };
-
-    setMessages(prev => [...prev, optimisticMessage]);
-    scrollToBottom();
-    
-    try {
-      const res = await apiFetch(`/chat/conversations/${activeConversation.id}/messages`, {
-        method: 'POST',
-        body: JSON.stringify({
-          conversation_id: activeConversation.id,
-          owner_id: user?.id,
-          inbound: false,
-          ...payload
-        })
-      });
-      
-      if (!res.ok) throw new Error('Failed to send message');
-      const realMessage = await res.json();
-      
-      setMessages(prev => {
-        if (prev.some(m => m.id === realMessage.id)) {
-          return prev.filter(m => m.id !== tempId);
-        }
-        return prev.map(m => m.id === tempId ? realMessage : m);
-      });
-    } catch (err) {
-      console.error("Error in sendMessageInternal:", err);
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-    }
-  };
-
+  const loading = sending;
   const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -447,28 +288,87 @@ export default function ChatPage() {
         <span className="text-[18px] font-semibold text-slate-900">Inbox</span>
       </header>
 
+      {/* Connection state banner — P0-2 */}
+      {connectionState !== 'connected' && (
+        <div className={cn(
+          "shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium",
+          connectionState === 'reconnecting' ? "bg-yellow-50 text-yellow-700 border-b border-yellow-200" : "bg-red-50 text-red-700 border-b border-red-200"
+        )}>
+          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+          {connectionState === 'connecting' ? 'Connecting to server…' : 'Connection lost — reconnecting…'}
+        </div>
+      )}
+
+      {/* SLA Risk Alert banner — Story 4.5 */}
+      {slaAlert && (
+        <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-amber-50 text-amber-800 border-b border-amber-200">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[14px]">schedule</span>
+            <span><strong>{slaAlert.count}</strong> conversation{slaAlert.count !== 1 ? 's' : ''} unanswered for more than {slaAlert.threshold} min</span>
+          </div>
+          <button onClick={() => setSlaAlert(null)} className="ml-2 text-amber-600 hover:text-amber-900">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      )}
+
+      {/* Delivery Failure Alert banner — Story 4.4 */}
+      {deliveryAlert && (
+        <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-red-50 text-red-800 border-b border-red-200">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[14px]">error</span>
+            <span><strong>{deliveryAlert.count}</strong> delivery failures on <strong className="uppercase">{deliveryAlert.channel}</strong> in the last few minutes</span>
+          </div>
+          <button onClick={() => setDeliveryAlert(null)} className="ml-2 text-red-600 hover:text-red-900">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Workspace (3-Column Layout) */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left Column: Conversation List (Fixed 320px) */}
-        <aside className="w-[320px] h-full flex flex-col bg-surface-container-lowest border-r border-outline-variant shrink-0">
+      <main className="flex-1 flex overflow-hidden relative">
+        {/* Left Column: Conversation List */}
+        <aside
+          data-testid="conversation-list"
+          className={cn(
+            "h-full flex flex-col bg-surface-container-lowest border-r border-outline-variant",
+            // Desktop: fixed 320px in flex flow
+            "md:static md:w-[320px] md:shrink-0 md:translate-x-0",
+            // Mobile: absolute overlay, full width, slide transition
+            "absolute inset-y-0 left-0 right-0 w-full z-10",
+            "transition-transform duration-300 ease-in-out",
+            mobileView === 'chat' ? "-translate-x-full md:translate-x-0" : "translate-x-0"
+          )}
+        >
           <div className="p-md border-surface-variant">
             <div className="relative flex items-center w-full h-10 rounded-DEFAULT bg-[#F1F3F5] text-on-surface-variant focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-container transition-all">
               <span className="material-symbols-outlined ml-sm text-outline">search</span>
-              <input className="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm outline-none" placeholder="Search conversations..." type="text" />
+              <input
+                className="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm outline-none"
+                placeholder="Search conversations..."
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
           
           {/* List */}
           <div className="flex-1 overflow-y-auto p-sm space-y-sm">
-            {conversations.length === 0 && <div className="p-4 text-center text-sm text-gray-500">No conversations yet</div>}
-            {conversations.map((conv) => (
-              <div 
-                key={conv.id} 
+            {filteredConversations.length === 0 && (
+              <div className="p-4 text-center text-sm text-gray-500">
+                {searchQuery ? 'No results found' : 'No conversations yet'}
+              </div>
+            )}
+            {filteredConversations.map((conv) => (
+              <div
+                key={conv.id}
+                data-testid="conversation-item"
                 onClick={() => handleSelectConversation(conv)}
                 className={cn(
                   "relative p-sm rounded-lg border cursor-pointer flex gap-sm items-start transition-colors",
-                  activeConversation?.id === conv.id 
-                    ? "border-outline-variant bg-surface-container" 
+                  activeConversation?.id === conv.id
+                    ? "border-outline-variant bg-surface-container"
                     : "border-transparent hover:bg-surface-container-high"
                 )}
               >
@@ -483,8 +383,14 @@ export default function ChatPage() {
                       {(conv.contact.name || 'U')[0]}
                     </div>
                   )}
+                  {/* Channel icon badge */}
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-sm border border-outline-variant">
+                    <span className="material-symbols-outlined text-[10px] text-slate-500" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      {conv.channel === 'TELEGRAM' ? 'send' : conv.channel === 'WHATSAPP' ? 'chat_bubble' : conv.channel === 'EMAIL' ? 'mail' : conv.channel === 'SMS' ? 'sms' : 'language'}
+                    </span>
+                  </div>
                   {conv.is_unread && (
-                    <div className={cn("absolute bottom-0 right-0 w-3 h-3 border-2 border-surface-container-lowest rounded-full bg-green-500")}></div>
+                    <div className="absolute -top-0.5 -left-0.5 w-3 h-3 border-2 border-surface-container-lowest rounded-full bg-green-500"></div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -495,16 +401,37 @@ export default function ChatPage() {
                     )}>
                       {conv.contact.name || conv.contact.channel_identifier}
                     </span>
-                    <span className="font-body-sm text-body-sm text-on-surface-variant">
-                      {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Notification badge — P0-3 */}
+                      {notifCounts[conv.id] > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#7C4DFF] text-white text-[10px] font-bold">
+                          {notifCounts[conv.id] > 99 ? '99+' : notifCounts[conv.id]}
+                        </span>
+                      )}
+                      <span className="font-body-sm text-body-sm text-on-surface-variant">
+                        {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
                   </div>
-                  <p className={cn(
-                    "font-body-sm text-body-sm truncate",
-                    conv.is_unread ? "font-medium text-on-surface" : "text-outline"
-                  )}>
-                    {conv.last_message || 'No messages'}
-                  </p>
+                  <div className="flex items-center justify-between gap-1">
+                    <p className={cn(
+                      "font-body-sm text-body-sm truncate flex-1",
+                      conv.is_unread ? "font-medium text-on-surface" : "text-outline"
+                    )}>
+                      {conv.last_message || 'No messages'}
+                    </p>
+                    {/* SLA risk indicator — Stories 3.2/3.3 */}
+                    {(() => {
+                      const wt = waitingTime(conv.last_message_date, conv.is_unread);
+                      if (!wt) return null;
+                      return (
+                        <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-semibold shrink-0", wt.color)}>
+                          {wt.slaBreached && <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>}
+                          {wt.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
             ))}
@@ -512,12 +439,32 @@ export default function ChatPage() {
         </aside>
 
         {/* Center Column: Active Chat Window */}
-        <section className="flex-1 flex flex-col bg-surface-container-low relative min-w-0">
+        <section
+          data-testid="chat-area"
+          className={cn(
+            "flex flex-col bg-surface-container-low min-w-0",
+            // Desktop: flex-1 in flow
+            "md:static md:flex-1 md:translate-x-0",
+            // Mobile: absolute overlay, full width, slide transition
+            "absolute inset-y-0 left-0 right-0 w-full",
+            "transition-transform duration-300 ease-in-out",
+            mobileView === 'list' ? "translate-x-full md:translate-x-0" : "translate-x-0"
+          )}
+        >
           {activeConversation ? (
             <>
               {/* Chat Header */}
               <div className="h-[72px] px-md py-sm border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-md">
+                  {/* Back button — mobile only */}
+                  <button
+                    data-testid="back-button"
+                    onClick={handleMobileBack}
+                    className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
+                    aria-label="Back to conversations"
+                  >
+                    <ChevronLeft size={22} />
+                  </button>
                   <div className="relative">
                     {activeConversation.contact.avatar ? (
                       <img alt={activeConversation.contact.name} className="w-12 h-12 rounded-full object-cover" src={activeConversation.contact.avatar} />
@@ -530,10 +477,45 @@ export default function ChatPage() {
                   <div>
                     <h2 className="font-h2 text-h2 text-on-surface">{activeConversation.contact.name || activeConversation.contact.channel_identifier}</h2>
                     <div className="flex items-center gap-xs text-on-surface-variant font-body-sm text-body-sm">
-                      <span className="material-symbols-outlined text-[16px]">{activeConversation.channel === 'TELEGRAM' ? 'send' : 'chat'}</span>
+                      <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {activeConversation.channel === 'TELEGRAM' ? 'send' : activeConversation.channel === 'WHATSAPP' ? 'chat_bubble' : activeConversation.channel === 'EMAIL' ? 'mail' : activeConversation.channel === 'SMS' ? 'sms' : 'language'}
+                      </span>
                       <span className="capitalize">{activeConversation.channel.toLowerCase()}</span>
+                      {/* Presence indicator — P0-1 */}
+                      {activeViewers.length > 0 && (
+                        <span className="ml-2 flex items-center gap-1 text-amber-600 font-medium">
+                          <span className="material-symbols-outlined text-[14px]">visibility</span>
+                          {activeViewers.length === 1
+                            ? `${activeViewers[0]} is viewing`
+                            : `${activeViewers.slice(0, 2).join(', ')} are viewing`}
+                        </span>
+                      )}
                     </div>
                   </div>
+                </div>
+                {/* Header actions: status selector + mark unread */}
+                <div className="flex items-center gap-sm">
+                  <select
+                    value={activeConversation.status}
+                    onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
+                    className={cn(
+                      "text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-container",
+                      activeConversation.status === 'OPEN' && "bg-orange-50 text-orange-700 border-orange-200",
+                      activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700 border-yellow-200",
+                      activeConversation.status === 'CLOSED' && "bg-slate-100 text-slate-500 border-slate-200"
+                    )}
+                  >
+                    <option value="OPEN">Open</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                  <button
+                    title="Mark as unread"
+                    onClick={() => updateConversation(activeConversation.id, { is_unread: true })}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">mark_email_unread</span>
+                  </button>
                 </div>
               </div>
               
@@ -553,9 +535,10 @@ export default function ChatPage() {
                       
                       <div className={cn(
                         "p-md rounded-xl text-body-md shadow-sm",
-                        !msg.inbound 
+                        !msg.inbound
                           ? "bg-primary-fixed rounded-tr-sm text-on-primary-fixed"
-                          : "bg-surface-container-lowest border border-outline-variant rounded-tl-sm text-on-surface"
+                          : "bg-surface-container-lowest border border-outline-variant rounded-tl-sm text-on-surface",
+                        sendStatus[msg.id] === 'failed' && "opacity-60 border-red-300"
                       )}>
                         <p>{msg.content}</p>
                         {msg.image && <img src={msg.image} alt="Attachment" className="mt-2 rounded-lg max-w-xs cursor-zoom-in" />}
@@ -569,6 +552,32 @@ export default function ChatPage() {
                             <span className="material-symbols-outlined text-[16px] ml-auto opacity-50">download</span>
                           </a>
                         )}
+                        {/* Send failure indicator + retry — Stories 4.2 + 4.3 */}
+                        {(sendStatus[msg.id] === 'failed' || msg.delivery_status === 'failed') && (
+                          <div className="mt-1.5 flex items-center gap-2 text-red-500 text-xs">
+                            <span className="material-symbols-outlined text-[14px]">error</span>
+                            <span title={msg.delivery_error || 'Erro desconhecido'}>
+                              Falha no envio
+                              {msg.delivery_error && <span className="ml-1 opacity-60 font-mono">({msg.delivery_error.split(':').pop()})</span>}
+                            </span>
+                            {(msg.retry_count ?? 0) < 3 && (
+                              <button
+                                onClick={() => retryMessage(msg.conversation_id, msg.id)}
+                                className="underline hover:text-red-700 transition-colors"
+                              >
+                                Tentar novamente {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
+                              </button>
+                            )}
+                            {(msg.retry_count ?? 0) >= 3 && (
+                              <span className="opacity-60">Limite de tentativas atingido</span>
+                            )}
+                          </div>
+                        )}
+                        {sendStatus[msg.id] === 'sending' && (
+                          <div className="mt-1 flex justify-end">
+                            <span className="material-symbols-outlined text-[12px] opacity-50 animate-spin">progress_activity</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -577,7 +586,11 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="p-md bg-surface-container-lowest border-t border-outline-variant relative">
+              <div
+                className="p-md bg-surface-container-lowest border-t border-outline-variant relative"
+                style={{ paddingBottom: 'max(var(--spacing-md, 12px), env(safe-area-inset-bottom))' }}
+                onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) qrClose(); }}
+              >
                 {/* Emoji Picker */}
                 {showEmojiPicker && (
                   <div className="absolute bottom-full mb-2 left-md z-50 shadow-2xl rounded-2xl overflow-hidden border border-outline-variant">
@@ -628,18 +641,43 @@ export default function ChatPage() {
                           <span className="material-symbols-outlined text-[22px]">attach_file</span>
                         </button>
                       </div>
-                      <textarea 
-                        className="flex-1 bg-transparent border-none text-body-md text-on-surface focus:ring-0 outline-none resize-none py-sm pl-sm min-h-[40px] max-h-[120px] overflow-y-auto" 
-                        placeholder="Type a message..." 
+                      {/* Quick Reply autocomplete dropdown */}
+                      {qrOpen && (
+                        <div className="absolute bottom-full left-0 right-0 mb-2 mx-3 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50">
+                          {qrMatches.map(qr => (
+                            <button
+                              key={qr.id}
+                              className="w-full px-4 py-2.5 flex items-start gap-3 hover:bg-slate-50 text-left border-b border-slate-100 last:border-0 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setInput(qr.content);
+                                qrClose();
+                              }}
+                            >
+                              <span className="text-xs font-mono text-[#7C4DFF] bg-purple-50 px-2 py-0.5 rounded-md shrink-0 mt-0.5">{qr.shortcut}</span>
+                              <span className="text-sm text-slate-700 truncate">{qr.content}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <textarea
+                        data-testid="message-input"
+                        className="flex-1 bg-transparent border-none text-body-md text-on-surface focus:ring-0 outline-none resize-none py-sm pl-sm min-h-[40px] max-h-[120px] overflow-y-auto"
+                        placeholder="Type a message or / for quick replies…"
                         rows={1}
                         value={input}
                         onFocus={() => setShowEmojiPicker(false)}
                         onChange={(e) => {
-                          setInput(e.target.value);
+                          const val = e.target.value;
+                          setInput(val);
+                          qrSearch(val);
                           e.target.style.height = 'auto';
                           e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                         }}
-                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSendMessage())}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') { qrClose(); return; }
+                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); qrClose(); handleSendMessage(); }
+                        }}
                       />
                     </>
                   )}
@@ -647,6 +685,30 @@ export default function ChatPage() {
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                   
                   <div className="flex items-center gap-1.5 ml-xs">
+                    {/* Sparkles button — mobile only, triggers AI suggestions Sheet */}
+                    <button
+                      data-testid="ai-sparkles-button"
+                      type="button"
+                      onClick={() => {
+                        if (activeConversation && suggestions.length === 0 && !aiGenerating && !aiLoading) {
+                          generateAI(activeConversation.id);
+                        }
+                        setAiSheetOpen(true);
+                      }}
+                      disabled={aiGenerating || aiLoading}
+                      className={cn(
+                        "md:hidden w-9 h-9 flex items-center justify-center rounded-lg transition-all",
+                        aiGenerating || aiLoading
+                          ? "text-[#7C3AED] opacity-100"
+                          : "text-[#7C3AED] opacity-40 hover:opacity-100"
+                      )}
+                      aria-label="Get AI suggestion"
+                    >
+                      {aiGenerating || aiLoading
+                        ? <span className="w-4 h-4 border-2 border-[#7C3AED]/30 border-t-[#7C3AED] rounded-full animate-spin" />
+                        : <TbSparkles size={18} />
+                      }
+                    </button>
                     {!input.trim() && !selectedFile && !isRecording ? (
                       <button onClick={startRecording} className="w-10 h-10 rounded-lg text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors">
                         <span className="material-symbols-outlined text-[22px]">mic</span>
@@ -673,6 +735,64 @@ export default function ChatPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Mobile AI Suggestions Sheet — bottom drawer, md:hidden */}
+              {aiSheetOpen && (
+                <div className="fixed inset-0 z-50 md:hidden">
+                  {/* Backdrop */}
+                  <div
+                    className="absolute inset-0 bg-black/40 transition-opacity"
+                    onClick={() => setAiSheetOpen(false)}
+                  />
+                  {/* Sheet panel */}
+                  <div
+                    data-testid="ai-suggestions-sheet"
+                    className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl overflow-y-auto"
+                    style={{ maxHeight: '50vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
+                  >
+                    {/* Handle bar */}
+                    <div className="flex justify-center pt-3 pb-1">
+                      <div className="w-10 h-1 rounded-full bg-slate-200" />
+                    </div>
+                    <div className="px-4 pb-4">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 py-3 border-b border-slate-100 mb-3">
+                        <TbSparkles size={16} className="text-[#7C3AED]" />
+                        <span className="text-sm font-semibold text-[#7C3AED]">AI Suggestions</span>
+                        <button
+                          onClick={() => setAiSheetOpen(false)}
+                          className="ml-auto w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                      </div>
+                      {/* Suggestions list */}
+                      <div className="space-y-2">
+                        {(aiGenerating || aiLoading) && (
+                          <div className="flex flex-col gap-2">
+                            {[1, 2, 3].map(i => (
+                              <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+                            ))}
+                          </div>
+                        )}
+                        {!aiGenerating && !aiLoading && suggestions.length === 0 && (
+                          <p className="text-sm text-slate-400 text-center py-4">No suggestions available</p>
+                        )}
+                        {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            data-testid="ai-suggestion-item"
+                            onClick={() => { setInput(s); setAiSheetOpen(false); }}
+                            className="w-full text-left px-4 py-3 rounded-xl bg-[#7C3AED]/5 border border-[#7C3AED]/20 text-sm text-slate-700 hover:bg-[#7C3AED]/10 transition-colors"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-slate-400">
@@ -684,30 +804,180 @@ export default function ChatPage() {
           )}
         </section>
 
-        {/* Right Column: Context & Details */}
-        <aside className="w-[300px] h-full flex flex-col bg-surface-container-lowest border-l border-outline-variant shrink-0 overflow-y-auto">
+        {/* Right Column: Context & Details — hidden on mobile */}
+        <aside className="hidden md:flex w-[300px] h-full flex-col bg-surface-container-lowest border-l border-outline-variant shrink-0 overflow-y-auto">
           {activeConversation ? (
-            <div className="p-lg flex flex-col gap-md">
-              <h3 className="font-body-sm text-body-sm font-semibold text-on-surface uppercase tracking-wider">Contact Details</h3>
-              <div className="flex flex-col gap-sm font-body-sm text-body-sm">
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Name</span>
-                  <span className="text-on-surface font-medium ml-2">{activeConversation.contact.name || '-'}</span>
+            <div className="flex flex-col gap-0">
+              {/* Contact Details */}
+              <div className="p-5 border-b border-outline-variant">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Details</h3>
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Name</span>
+                    <span className="text-slate-900 font-medium ml-2">{activeConversation.contact.name || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Identifier</span>
+                    <span className="text-slate-900 font-medium truncate ml-2" title={activeConversation.contact.channel_identifier}>{activeConversation.contact.channel_identifier}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Channel</span>
+                    <span className="text-slate-900 font-medium capitalize">{activeConversation.channel.toLowerCase()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Tag</span>
+                    <span className="text-slate-900 font-medium capitalize">{activeConversation.tag?.toLowerCase() || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Status</span>
+                    <span className={cn(
+                      "text-xs font-semibold px-2 py-0.5 rounded-full",
+                      activeConversation.status === 'OPEN' && "bg-orange-50 text-orange-700",
+                      activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700",
+                      activeConversation.status === 'CLOSED' && "bg-slate-100 text-slate-500",
+                    )}>
+                      {activeConversation.status}
+                    </span>
+                  </div>
+                  {/* SLA first-response time */}
+                  {activeConversation.first_response_at && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">First Response</span>
+                      <span className="text-xs text-slate-600">
+                        {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Identifier</span>
-                  <span className="text-on-surface font-medium truncate ml-2" title={activeConversation.contact.channel_identifier}>{activeConversation.contact.channel_identifier}</span>
+              </div>
+
+              {/* Assigned Agent (Story 3.5) */}
+              <div className="p-5 border-b border-outline-variant">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Assigned Agent</h3>
+                <AssignmentPanel
+                  conversation={activeConversation}
+                  onAssign={async (userId) => {
+                    await conversationsApi.assignConversation(activeConversation.id, userId);
+                    fetchConversations();
+                  }}
+                />
+              </div>
+
+              {/* Cross-channel history — P1-2 */}
+              {(() => {
+                const otherConvs = conversations.filter(
+                  c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
+                );
+                if (otherConvs.length === 0) return null;
+                const CHANNEL_ICON: Record<string, string> = {
+                  TELEGRAM: 'send', WHATSAPP: 'chat_bubble', EMAIL: 'mail', SMS: 'sms', WEB: 'language',
+                };
+                return (
+                  <div className="p-5 border-b border-outline-variant">
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                      Other conversations ({otherConvs.length})
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {otherConvs.map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => handleSelectConversation(c)}
+                          className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 text-left transition-colors w-full"
+                        >
+                          <span className="material-symbols-outlined text-[16px] text-slate-400" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {CHANNEL_ICON[c.channel] || 'chat'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-slate-700 truncate capitalize">{c.channel.toLowerCase()}</p>
+                            <p className="text-[11px] text-slate-400 truncate">{c.last_message || 'No messages'}</p>
+                          </div>
+                          <span className={cn(
+                            "text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0",
+                            c.status === 'OPEN' && "bg-orange-50 text-orange-600",
+                            c.status === 'PENDING' && "bg-yellow-50 text-yellow-600",
+                            c.status === 'CLOSED' && "bg-slate-100 text-slate-400",
+                          )}>
+                            {c.status}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* AI Suggestions — P2-1 */}
+              <div className="p-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px] text-[#7C4DFF]" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                    AI Suggestions
+                  </h3>
+                  <button
+                    onClick={() => generateAI(activeConversation.id)}
+                    disabled={aiGenerating}
+                    className="flex items-center gap-1 text-xs text-[#7C4DFF] hover:text-[#632ce5] disabled:opacity-50 transition-colors"
+                  >
+                    <span className={cn("material-symbols-outlined text-[14px]", aiGenerating && "animate-spin")}>
+                      {aiGenerating ? "progress_activity" : "refresh"}
+                    </span>
+                    {aiGenerating ? "Generating..." : "Generate"}
+                  </button>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-on-surface-variant">Status</span>
-                  <span className="text-on-surface font-medium capitalize">{activeConversation.status.toLowerCase()}</span>
-                </div>
+
+                {/* Source + timestamp badge */}
+                {aiSource && aiGeneratedAt && (
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                      "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                      aiSource === "generated"
+                        ? "bg-purple-50 text-[#7C4DFF]"
+                        : "bg-slate-100 text-slate-500"
+                    )}>
+                      <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {aiSource === "generated" ? "auto_awesome" : "cached"}
+                      </span>
+                      {aiSource === "generated" ? "Generated now" : "Cached from last session"}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {aiGeneratedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                )}
+
+                {suggestions.length === 0 && !aiGenerating && !aiLoading && (
+                  <button
+                    onClick={() => generateAI(activeConversation.id)}
+                    className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-sm text-slate-400 hover:border-[#7C4DFF] hover:text-[#7C4DFF] transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                    Generate AI suggestions
+                  </button>
+                )}
+
+                {(aiGenerating || aiLoading) && (
+                  <div className="flex flex-col gap-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                )}
+
+                {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInput(s)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl bg-purple-50 border border-purple-100 text-sm text-slate-700 hover:bg-purple-100 hover:border-[#7C4DFF] transition-all leading-snug"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
-             <div className="p-lg flex flex-col gap-md opacity-50">
-                <h3 className="font-body-sm text-body-sm font-semibold text-on-surface uppercase tracking-wider">Contact Details</h3>
-                <p className="text-sm">No contact selected.</p>
+             <div className="p-5 opacity-50">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Contact Details</h3>
+                <p className="text-sm text-slate-400">No contact selected.</p>
              </div>
           )}
         </aside>

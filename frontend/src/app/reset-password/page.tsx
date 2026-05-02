@@ -3,8 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { authApi } from "@/lib/api/index";
 
 function ResetPasswordPageInner() {
   const [password, setPassword] = useState("");
@@ -61,24 +60,13 @@ function ResetPasswordPageInner() {
     }
     setError("");
     setLoading(true);
+    if (!token) { setError("Missing recovery token."); setLoading(false); return; }
     try {
-      const res = await fetch(`${API}/auth/set-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ new_password: password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail || "Failed to reset password");
-        return;
-      }
+      await authApi.setPassword(token, password);
       setSuccess(true);
       setTimeout(() => router.push("/login"), 3000);
-    } catch {
-      setError("Connection error. Check if the server is running.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connection error.");
     } finally {
       setLoading(false);
     }

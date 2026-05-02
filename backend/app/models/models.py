@@ -5,6 +5,7 @@ from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.core.encryption import EncryptedString
 
 # Enums
 class ChannelType(enum.Enum):
@@ -21,8 +22,17 @@ class ConversationStatus(enum.Enum):
 
 class ConversationTag(enum.Enum):
     SUPPORT = "support"
+    BILLING = "billing"
+    FEEDBACK = "feedback"
     SALES = "sales"
     GENERAL = "general"
+    SPAM = "spam"
+
+class DeliveryStatus(enum.Enum):
+    PENDING   = "pending"    # not yet dispatched to channel
+    SENT      = "sent"       # accepted by channel API
+    DELIVERED = "delivered"  # confirmed delivery (where supported)
+    FAILED    = "failed"     # channel rejected or unreachable
 
 class MessageType(enum.Enum):
     TEXT = "text"
@@ -144,6 +154,9 @@ class Conversation(Base):
     last_message = Column(Text, nullable=True)
     last_message_date = Column(DateTime(timezone=True), nullable=True)
 
+    # SLA tracking (Story 3.6)
+    first_response_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -167,6 +180,19 @@ class Message(Base):
 
     image = Column(String, nullable=True) # URL to image
     file = Column(String, nullable=True) # URL to file
+
+    # Sequencing & deduplication for ordered WebSocket delivery
+    conversation_sequence = Column(Integer, nullable=False, default=0)
+    idempotency_key = Column(String(255), nullable=True, unique=True)
+
+    # Delivery tracking (Story 4.1)
+    delivery_status = Column(
+        Enum(DeliveryStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=True,
+    )  # null = inbound (no delivery)
+    delivery_error  = Column(Text, nullable=True)                           # last error reason
+    retry_count     = Column(Integer, nullable=False, default=0)
+    last_retry_at   = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -213,8 +239,8 @@ class GeneralSettings(Base):
     # WhatsApp (Meta Cloud API)
     whatsapp_phone_id = Column(String, nullable=True)
     whatsapp_account_id = Column(String, nullable=True)
-    whatsapp_access_token = Column(String, nullable=True)
-    whatsapp_webhook_token = Column(String, nullable=True)
+    whatsapp_access_token = Column(EncryptedString, nullable=True)
+    whatsapp_webhook_token = Column(EncryptedString, nullable=True)
 
     # Email (IMAP/SMTP)
     email_imap_host = Column(String, nullable=True)
@@ -222,11 +248,14 @@ class GeneralSettings(Base):
     email_smtp_host = Column(String, nullable=True)
     email_smtp_port = Column(Integer, nullable=True, default=587)
     email_address = Column(String, nullable=True)
-    email_password = Column(String, nullable=True)
+    email_password = Column(EncryptedString, nullable=True)
+
+    # Telegram
+    telegram_bot_token = Column(EncryptedString, nullable=True)
 
     # SMS (Twilio)
     twilio_account_sid = Column(String, nullable=True)
-    twilio_auth_token = Column(String, nullable=True)
+    twilio_auth_token = Column(EncryptedString, nullable=True)
     twilio_phone_number = Column(String, nullable=True)
 
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -1,36 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { apiFetch } from "@/lib/api";
+import { settingsApi } from "@/lib/api/index";
+import type { Settings } from "@/types/settings";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Settings {
-  app_name: string;
-  app_email: string;
-  app_logo: string;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
-  ai_model: string;
-  ai_provider: string;
-  // WhatsApp
-  whatsapp_phone_id: string;
-  whatsapp_account_id: string;
-  whatsapp_access_token: string;
-  whatsapp_webhook_token: string;
-  // Email
-  email_imap_host: string;
-  email_imap_port: string;
-  email_smtp_host: string;
-  email_smtp_port: string;
-  email_address: string;
-  email_password: string;
-  // SMS
-  twilio_account_sid: string;
-  twilio_auth_token: string;
-  twilio_phone_number: string;
-}
 
 type TabId = "general" | "visual" | "ai" | "api";
 
@@ -120,20 +94,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [telegramTestResult, setTelegramTestResult] = useState<{ ok: boolean; username?: string; error?: string } | null>(null);
+  const [testingTelegram, setTestingTelegram] = useState(false);
 
   useEffect(() => {
-    apiFetch("/admin/settings")
-      .then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(`${r.status}: ${body.detail || r.statusText}`);
-        }
-        return r.json();
-      })
+    settingsApi.getSettings()
       .then(data => setSettings({
         app_name: "", app_email: "", app_logo: "",
         primary_color: "#0F172A", secondary_color: "#3B82F6", accent_color: "#10B981",
         ai_model: "gpt-4o-mini", ai_provider: "openrouter",
+        telegram_bot_token: "",
         whatsapp_phone_id: "", whatsapp_account_id: "", whatsapp_access_token: "", whatsapp_webhook_token: "",
         email_imap_host: "", email_imap_port: "993", email_smtp_host: "", email_smtp_port: "587",
         email_address: "", email_password: "",
@@ -153,18 +123,16 @@ export default function SettingsPage() {
     if (!settings) return;
     setSaving(true); setError(""); setSuccess(false);
     try {
-      const res = await apiFetch("/admin/settings", {
-        method: "PATCH",
-        body: JSON.stringify({
-          ...settings,
-          email_imap_port: settings.email_imap_port ? Number(settings.email_imap_port) : null,
-          email_smtp_port: settings.email_smtp_port ? Number(settings.email_smtp_port) : null,
-        }),
+      await settingsApi.updateSettings({
+        ...settings,
+        email_imap_port: settings.email_imap_port ? String(Number(settings.email_imap_port)) : "",
+        email_smtp_port: settings.email_smtp_port ? String(Number(settings.email_smtp_port)) : "",
       });
-      if (res.ok) { setSuccess(true); setTimeout(() => setSuccess(false), 3000); }
-      else { const d = await res.json(); setError(d.detail || "Failed to save."); }
-    } catch { setError("Connection error."); }
-    finally { setSaving(false); }
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save.");
+    } finally { setSaving(false); }
   };
 
   if (loading) {
@@ -193,7 +161,28 @@ export default function SettingsPage() {
     );
   }
 
+  const handleTelegramTest = async () => {
+    if (!settings?.telegram_bot_token) return;
+    setTestingTelegram(true);
+    setTelegramTestResult(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/telegram/test-connection`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ token: settings.telegram_bot_token }),
+      });
+      const json = await res.json();
+      setTelegramTestResult(json.data ?? json);
+    } catch {
+      setTelegramTestResult({ ok: false, error: "Connection failed" });
+    } finally {
+      setTestingTelegram(false);
+    }
+  };
+
   const s = settings;
+  const telegramConfigured = !!s.telegram_bot_token;
   const whatsappConfigured = !!(s.whatsapp_phone_id && s.whatsapp_access_token);
   const emailConfigured    = !!(s.email_address && s.email_password);
   const smsConfigured      = !!(s.twilio_account_sid && s.twilio_auth_token);
@@ -205,16 +194,21 @@ export default function SettingsPage() {
         <h1 className="text-[18px] font-semibold text-slate-900">Platform Configuration</h1>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
-        {/* ── Left Tab Navigation ─────────────────────────────────────────── */}
-        <nav className="w-56 bg-white border-r border-[#E9ECEF] flex flex-col py-4 shrink-0 gap-1 px-2">
+        {/* ── Tab Navigation — vertical on desktop, horizontal scroll on mobile ── */}
+        <nav className="
+          bg-white border-b md:border-b-0 md:border-r border-[#E9ECEF] shrink-0
+          flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible
+          py-2 md:py-4 px-2 gap-1 md:w-56
+          [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
+        ">
           {TABS.map(tab => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left w-full ${
+              className={`flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all shrink-0 md:w-full md:text-left ${
                 activeTab === tab.id
                   ? "bg-[#7C4DFF]/10 text-[#7C4DFF] font-semibold"
                   : "text-slate-600 hover:bg-slate-100"
@@ -226,7 +220,7 @@ export default function SettingsPage() {
               >
                 {tab.icon}
               </span>
-              {tab.label}
+              <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           ))}
         </nav>
@@ -339,8 +333,64 @@ export default function SettingsPage() {
                     Configure the credentials for each channel. Values are stored securely in the database.
                   </p>
 
+                  {/* Telegram */}
+                  <ApiGroup icon="send" label="Telegram" color="bg-sky-50 text-sky-800 border-b border-sky-100" configured={telegramConfigured}>
+                    <div className="md:col-span-2">
+                      <Field label="Bot Token" hint="Get from @BotFather: /newbot or /token">
+                        <PasswordInput
+                          value={s.telegram_bot_token}
+                          onChange={set("telegram_bot_token")}
+                          placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                        />
+                      </Field>
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleTelegramTest}
+                        disabled={!s.telegram_bot_token || testingTelegram}
+                        className="h-9 px-4 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-medium hover:bg-sky-100 disabled:opacity-50 transition-colors flex items-center gap-2"
+                      >
+                        {testingTelegram ? (
+                          <span className="w-3.5 h-3.5 border-2 border-sky-400/30 border-t-sky-600 rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]">wifi_tethering</span>
+                        )}
+                        Test Connection
+                      </button>
+                      {telegramTestResult && (
+                        <span className={`text-sm font-medium flex items-center gap-1.5 ${telegramTestResult.ok ? "text-emerald-600" : "text-red-500"}`}>
+                          <span className="material-symbols-outlined text-[16px]">
+                            {telegramTestResult.ok ? "check_circle" : "error"}
+                          </span>
+                          {telegramTestResult.ok
+                            ? `Connected as @${telegramTestResult.username}`
+                            : telegramTestResult.error}
+                        </span>
+                      )}
+                    </div>
+                  </ApiGroup>
+
                   {/* WhatsApp */}
                   <ApiGroup icon="chat" label="WhatsApp — Meta Cloud API" color="bg-green-50 text-green-800 border-b border-green-100" configured={whatsappConfigured}>
+                    {/* Webhook URL — readonly, for Meta Dashboard setup */}
+                    <Field label="Webhook URL" hint="Copy this URL into your Meta App → Webhooks">
+                      <div className="flex items-center gap-2">
+                        <input
+                          readOnly
+                          value={`${process.env.NEXT_PUBLIC_API_URL ?? 'https://your-backend.railway.app'}/api/v1/whatsapp/webhook`}
+                          className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600 font-mono select-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/whatsapp/webhook`)}
+                          className="shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+                          title="Copy to clipboard"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                        </button>
+                      </div>
+                    </Field>
                     <Field label="Phone Number ID">
                       <TextInput value={s.whatsapp_phone_id} onChange={set("whatsapp_phone_id")} placeholder="123456789012345" />
                     </Field>

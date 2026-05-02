@@ -1,0 +1,182 @@
+# generated: 2026-04-30
+# last_updated: 2026-04-30
+# project: Chat-multi-channel
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-04-30
+last_updated: 2026-05-02  # epic 9 done — mobile responsiveness complete
+project: Chat-multi-channel
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+
+  # ── Epic 1: User Authentication and Access Management ───────────────────────
+  # FR1-FR9 | Self-signup, RBAC, role management, auth, password recovery
+  # Implemented: login, signup, admin approval, user types/permissions, HttpOnly cookies
+  epic-1: done
+
+  1-1-visitor-account-creation: done
+  1-2-admin-account-approval: done
+  1-3-role-assignment: done
+  1-4-user-account-management: done
+  1-5-custom-role-creation: done
+  1-6-role-permission-updates: done
+  1-7-permission-enforcement: done
+  1-8-user-authentication: done
+  1-9-password-recovery: done
+
+  epic-1-retrospective: done
+
+  # ── Epic 2: Multi-Channel Conversation Management ───────────────────────────
+  # FR10-FR18 | Unified inbox, threads, send/receive, status, read/unread
+  # Implemented: 3-column inbox UI, WebSocket real-time, message sequencing,
+  #              AI suggestions, quick replies, audio/file/emoji, cross-channel history
+  epic-2: done
+
+  2-1-unified-inbox-view: done
+  2-2-conversation-thread-opening: done
+  2-3-outbound-message-sending: done
+  2-4-inbound-message-ingestion: done
+  2-5-conversation-status-updates: done
+  2-6-read-unread-management: done
+  2-7-conversation-summaries: done
+  2-8-concurrent-conversation-handling: done
+
+  epic-2-retrospective: done
+
+  # ── Epic 3: SLA and Queue Oversight ─────────────────────────────────────────
+  # FR19-FR24 | Operational indicators, SLA risk, prioritization, reassignment, compliance
+  # Implemented: first_response_at, SLA dashboard cards, inbox SLA sort + badge,
+  #              AssignmentPanel, /assign endpoint, queue_by_channel dashboard
+  epic-3: done
+
+  3-1-operational-indicators-view: done
+  3-2-sla-risk-surfacing: done
+  3-3-conversation-prioritization: done
+  3-4-channel-workload-monitoring: done
+  3-5-conversation-reassignment: done
+  3-6-sla-compliance-tracking: done
+
+  epic-3-retrospective: done
+
+  # ── Epic 4: Message Delivery and Reliability ────────────────────────────────
+  # FR25-FR29 | Delivery failure detection, status, retry, manager alerts, SLA alerts
+  # Implemented: DeliveryStatus enum, ChannelDeliveryError, retry endpoint (max 3),
+  #              DeliveryAlertService (threshold + WS broadcast), SLA check loop
+  epic-4: done
+
+  4-1-delivery-failure-detection: done
+  4-2-failure-status-exposure: done
+  4-3-message-retry-flow: done
+  4-4-failure-alerts-for-managers: done
+  4-5-sla-risk-alerts: done
+
+  epic-4-retrospective: done
+
+  # ── Epic 5: Governance, Audit, and Configuration ────────────────────────────
+  # FR30-FR37 | Channel config, credential storage, audit logging, audit viewer
+  # Implemented: settings page (WhatsApp/Email/SMS/Telegram/AI/Branding),
+  #              audit_service log_action, audit log viewer page + nav link,
+  #              config change auditing with secret masking
+  epic-5: done
+
+  5-1-telegram-configuration: done
+  5-2-whatsapp-configuration: done
+  5-3-email-configuration: done
+  5-4-secure-credential-storage: done
+  5-5-audit-log-recording: done
+  5-6-audit-log-viewing: done
+  5-7-role-change-auditing: done
+  5-8-configuration-change-auditing: done
+
+  epic-5-retrospective: done
+
+  # ── Epic 6: Analytics and Operational Visibility ────────────────────────────
+  # FR38-FR42 | Volume dashboard, trends, channel distribution, resolution indicators, adoption
+  # Implemented: 8 KPI cards, bar charts + period comparison, SLA cards, channel donut,
+  #              P50/P90 resolution percentiles, agent performance table, AI adoption KPIs
+  epic-6: done
+
+  6-1-conversation-volume-dashboard: done
+  6-2-operational-trends-view: done
+  6-3-channel-distribution-metrics: done
+  6-4-resolution-indicators: done
+  6-5-adoption-tracking: done
+
+  epic-6-retrospective: optional
+
+  # ── Epic 7: Admin and Platform Operations ───────────────────────────────────
+  # FR43-FR46 | User management, platform settings, single-tenant, ~100 concurrent users
+  # Implemented: bulk actions (enable/disable/delete), DB pool_size=20/max_overflow=30,
+  #              enriched /health endpoint, single-tenant by design
+  epic-7: done
+
+  7-1-user-profile-management: done
+  7-2-platform-settings-management: done
+  7-3-single-tenant-operation-support: done
+  7-4-concurrent-user-support: done
+
+  epic-7-retrospective: optional
+
+  # ── Epic 8: Production Hardening ────────────────────────────────────────────
+  # Post-retro action items — security, reliability, observability, test coverage
+  # Source: Retrospective 2026-04-29 (10 action items, 4 critical / 4 important / 2 nice-to-have)
+  epic-8: in-progress
+
+  8-1-staging-migration-validation: done           # CRITICAL — 5 pts
+  8-2-environment-variables-documentation: done   # CRITICAL — 3 pts
+  8-3-aes-256-credential-encryption: done   # CRITICAL — 8 pts
+  8-4-redis-streams-queue-migration: done           # CRITICAL — 8 pts
+  8-5-pytest-suite-for-critical-services: done            # Important — 13 pts
+  8-6-playwright-e2e-tests: done                         # Important — 8 pts
+  8-7-granular-rate-limiting: done                       # Important — 5 pts
+  8-8-api-key-startup-validation: done                   # Important — 2 pts
+  8-9-messageservice-refactoring: review            # Nice-to-have — 5 pts
+  8-10-telegram-bot-configuration-ui: done          # Nice-to-have — 5 pts
+
+  epic-8-retrospective: optional
+
+  # ── Epic 9: Mobile Responsiveness ───────────────────────────────────────────
+  # WhatsApp-style navigation, AI sparkles input, admin panel adaptation
+  # Source: Party mode roundtable 2026-05-02 — defined by Sally, Winston, Amelia, John
+  epic-9: done
+
+  9-1-mobile-whatsapp-layout: done                    # High — 5 pts
+  9-2-mobile-ai-sparkles-input: done                  # High — 3 pts
+  9-3-mobile-admin-responsiveness: done               # Medium — 3 pts
+  9-4-mobile-playwright-tests: done                   # High — 3 pts
+
+  epic-9-retrospective: optional
