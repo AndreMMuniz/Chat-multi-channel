@@ -621,7 +621,7 @@ export default function ChatPage() {
                   </div>
                   <div className="mb-1.5 flex items-center gap-1.5">
                     <ChannelBadge channel={conv.channel} compact />
-                    <TagBadge tag={conv.tag || undefined} />
+                    <TagBadge tag={conv.tag ?? undefined} />
                   </div>
                   <div className="flex items-center justify-between gap-1">
                     <p className={cn(
