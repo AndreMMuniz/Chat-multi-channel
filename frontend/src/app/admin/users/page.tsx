@@ -1,12 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
+import UsersAreaShell from "@/components/admin/UsersAreaShell";
 import { usersApi, userTypesApi } from "@/lib/api/index";
 import Modal from "@/components/shared/Modal";
 import type { User, UserType, CreateUserRequest, UpdateUserRequest } from "@/types/auth";
 
-interface CreateForm extends CreateUserRequest {}
+type CreateForm = CreateUserRequest;
 
 interface EditForm extends UpdateUserRequest {
   full_name: string;
@@ -61,7 +63,12 @@ export default function UsersPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
 
   const toggleSelect = (id: string) =>
-    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const toggleSelectAll = () =>
     setSelected(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(u => u.id)));
@@ -96,12 +103,6 @@ export default function UsersPage() {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (userTypes.length > 0 && !createForm.user_type_id) {
-      setCreateForm((f) => ({ ...f, user_type_id: userTypes[0].id }));
-    }
-  }, [userTypes, createForm.user_type_id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -195,7 +196,7 @@ export default function UsersPage() {
   );
 
   return (
-    <>
+    <UsersAreaShell>
       {/* Header */}
       <div className="min-h-16 flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-[#E9ECEF] bg-white shrink-0">
         <div className="flex items-center gap-3 md:gap-6 flex-wrap">
@@ -328,7 +329,7 @@ export default function UsersPage() {
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             {u.avatar ? (
-                              <img src={u.avatar} alt={u.full_name} className="w-9 h-9 rounded-full object-cover" />
+                              <Image src={u.avatar} alt={u.full_name} className="w-9 h-9 rounded-full object-cover" width={36} height={36} />
                             ) : (
                               <div className="w-9 h-9 rounded-full bg-purple-100 text-[#632ce5] flex items-center justify-center text-xs font-bold shrink-0">
                                 {u.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
@@ -536,6 +537,6 @@ export default function UsersPage() {
         </Modal>
       )}
       </AnimatePresence>
-    </>
+    </UsersAreaShell>
   );
 }

@@ -78,12 +78,12 @@ export function useConversations(): UseConversationsReturn {
 
   const updateConversation = useCallback(async (id: string, data: UpdateConversationRequest) => {
     try {
-      await conversationsApi.updateConversation(id, data);
+      const updatedConversation = await conversationsApi.updateConversation(id, data);
       setConversations(prev =>
-        prev.map(c => (c.id === id ? { ...c, ...data } : c))
+        prev.map(c => (c.id === id ? { ...c, ...updatedConversation } : c))
       );
       if (activeConversationRef.current?.id === id) {
-        setActive({ ...activeConversationRef.current, ...data });
+        setActive({ ...activeConversationRef.current, ...updatedConversation });
       }
     } catch (err) {
       console.error("updateConversation:", err);

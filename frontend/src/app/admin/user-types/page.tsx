@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
+import UsersAreaShell from "@/components/admin/UsersAreaShell";
 import { userTypesApi } from "@/lib/api/index";
 import Modal from "@/components/shared/Modal";
 import type { UserType, PermKey, BaseRole } from "@/types/auth";
@@ -86,7 +87,11 @@ export default function UserTypesPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    queueMicrotask(() => {
+      void load();
+    });
+  }, [load]);
 
   const openCreate = () => {
     setEditingType(null);
@@ -139,7 +144,7 @@ export default function UserTypesPage() {
     ALL_PERM_KEYS.filter((k) => !!(t as unknown as Record<string, unknown>)[k]).length;
 
   return (
-    <>
+    <UsersAreaShell>
       {/* Header */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-[#E9ECEF] bg-white shrink-0">
         <h1 className="text-[18px] font-semibold text-slate-900">User Types</h1>
@@ -325,7 +330,7 @@ export default function UserTypesPage() {
               <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-red-500 text-[24px]">delete</span>
               </div>
-              <h3 className="text-center font-semibold text-slate-900 mb-2">Delete "{deleteConfirm.name}"?</h3>
+              <h3 className="text-center font-semibold text-slate-900 mb-2">Delete &quot;{deleteConfirm.name}&quot;?</h3>
               <p className="text-center text-sm text-slate-500 mb-6">This action cannot be undone. Users with this role will need to be reassigned.</p>
               <div className="flex gap-2.5">
                 <button onClick={() => setDeleteConfirm(null)} className="flex-1 h-10 rounded-lg border border-[#E9ECEF] text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
@@ -335,6 +340,6 @@ export default function UserTypesPage() {
           </Modal>
         )}
       </AnimatePresence>
-    </>
+    </UsersAreaShell>
   );
 }

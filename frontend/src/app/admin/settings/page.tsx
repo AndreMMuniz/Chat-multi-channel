@@ -1,21 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import ConfigAreaShell from "@/components/admin/ConfigAreaShell";
 import { settingsApi } from "@/lib/api/index";
 import type { Settings } from "@/types/settings";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type TabId = "general" | "visual" | "ai" | "api";
-
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "general",  label: "General",          icon: "tune"       },
-  { id: "visual",   label: "Visual Identity",   icon: "palette"    },
-  { id: "ai",       label: "AI Configuration",  icon: "smart_toy"  },
-  { id: "api",      label: "API Settings",      icon: "api"        },
-];
-
-// ─── Small reusable pieces ────────────────────────────────────────────────────
+type TabId = "general" | "visual" | "channels" | "ai" | "api";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -28,7 +18,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 const inputCls =
-  "w-full h-11 px-4 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#7C4DFF] focus:ring-4 focus:ring-[#7C4DFF]/10 transition-all outline-none text-slate-900 text-sm";
+  "w-full h-11 px-4 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-slate-900 text-sm";
 
 function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputCls} />;
@@ -41,7 +31,7 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
       <input {...props} type={show ? "text" : "password"} className={inputCls + " pr-11"} />
       <button
         type="button"
-        onClick={() => setShow(v => !v)}
+        onClick={() => setShow((v) => !v)}
         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
       >
         <span className="material-symbols-outlined text-[20px]">{show ? "visibility_off" : "visibility"}</span>
@@ -52,11 +42,11 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 function SectionCard({ title, badge, children }: { title: string; badge?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E9ECEF] shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#E9ECEF] bg-slate-50/50 flex items-center gap-3">
-        <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">{title}</h2>
+    <div className="overflow-hidden rounded-2xl border border-[#E9ECEF] bg-white shadow-sm">
+      <div className="flex items-center gap-3 border-b border-[#E9ECEF] bg-slate-50/50 px-6 py-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">{title}</h2>
         {badge && (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide">
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
             {badge}
           </span>
         )}
@@ -67,25 +57,37 @@ function SectionCard({ title, badge, children }: { title: string; badge?: string
 }
 
 function ApiGroup({
-  icon, label, color, configured, children,
+  icon,
+  label,
+  color,
+  configured,
+  children,
 }: {
-  icon: string; label: string; color: string; configured: boolean; children: React.ReactNode;
+  icon: string;
+  label: string;
+  color: string;
+  configured: boolean;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="border border-[#E9ECEF] rounded-2xl overflow-hidden">
-      <div className={`px-5 py-3 flex items-center gap-3 ${color}`}>
-        <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
-        <span className="font-semibold text-sm">{label}</span>
-        <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${configured ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+    <div className="overflow-hidden rounded-2xl border border-[#E9ECEF]">
+      <div className={`flex items-center gap-3 px-5 py-3 ${color}`}>
+        <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+          {icon}
+        </span>
+        <span className="text-sm font-semibold">{label}</span>
+        <span
+          className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+            configured ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+          }`}
+        >
           {configured ? "Configured" : "Not configured"}
         </span>
       </div>
-      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5 bg-white">{children}</div>
+      <div className="grid grid-cols-1 gap-5 bg-white p-5 md:grid-cols-2">{children}</div>
     </div>
   );
 }
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("general");
@@ -98,30 +100,50 @@ export default function SettingsPage() {
   const [testingTelegram, setTestingTelegram] = useState(false);
 
   useEffect(() => {
-    settingsApi.getSettings()
-      .then(data => setSettings({
-        app_name: "", app_email: "", app_logo: "",
-        primary_color: "#0F172A", secondary_color: "#3B82F6", accent_color: "#10B981",
-        ai_model: "gpt-4o-mini", ai_provider: "openrouter",
-        telegram_bot_token: "",
-        whatsapp_phone_id: "", whatsapp_account_id: "", whatsapp_access_token: "", whatsapp_webhook_token: "",
-        email_imap_host: "", email_imap_port: "993", email_smtp_host: "", email_smtp_port: "587",
-        email_address: "", email_password: "",
-        twilio_account_sid: "", twilio_auth_token: "", twilio_phone_number: "",
-        ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v ?? ""])),
-      }))
+    settingsApi
+      .getSettings()
+      .then((data) =>
+        setSettings({
+          app_name: "",
+          app_email: "",
+          app_logo: "",
+          primary_color: "#0F172A",
+          secondary_color: "#3B82F6",
+          accent_color: "#10B981",
+          ai_model: "gpt-4o-mini",
+          ai_provider: "openrouter",
+          telegram_bot_token: "",
+          whatsapp_phone_id: "",
+          whatsapp_account_id: "",
+          whatsapp_access_token: "",
+          whatsapp_webhook_token: "",
+          email_imap_host: "",
+          email_imap_port: "993",
+          email_smtp_host: "",
+          email_smtp_port: "587",
+          email_address: "",
+          email_password: "",
+          twilio_account_sid: "",
+          twilio_auth_token: "",
+          twilio_phone_number: "",
+          ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v ?? ""])),
+        }),
+      )
       .catch((err: Error) => setError(err.message || "Failed to load settings."))
       .finally(() => setLoading(false));
   }, []);
 
-  const set = (key: keyof Settings) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setSettings(s => s ? { ...s, [key]: e.target.value } : null);
+  const set = (key: keyof Settings) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setSettings((s) => (s ? { ...s, [key]: e.target.value } : null));
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settings) return;
-    setSaving(true); setError(""); setSuccess(false);
+
+    setSaving(true);
+    setError("");
+    setSuccess(false);
+
     try {
       await settingsApi.updateSettings({
         ...settings,
@@ -132,39 +154,17 @@ export default function SettingsPage() {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined text-4xl text-[#7C4DFF] animate-spin">progress_activity</span>
-          <p className="text-slate-500 font-medium">Loading settings...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!settings) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <span className="material-symbols-outlined text-4xl text-red-400">error</span>
-          <p className="text-slate-700 font-medium">Failed to load settings</p>
-          <p className="text-sm text-slate-500">{error || "Could not connect to the backend."}</p>
-          <button onClick={() => window.location.reload()} className="mt-2 px-5 py-2 rounded-xl bg-[#7C4DFF] text-white text-sm font-medium hover:bg-[#632ce5] transition-colors">
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const handleTelegramTest = async () => {
     if (!settings?.telegram_bot_token) return;
+
     setTestingTelegram(true);
     setTelegramTestResult(null);
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/telegram/test-connection`, {
         method: "POST",
@@ -181,73 +181,70 @@ export default function SettingsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <span className="material-symbols-outlined animate-spin text-4xl text-indigo-600">progress_activity</span>
+          <p className="font-medium text-slate-500">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <span className="material-symbols-outlined text-4xl text-red-400">error</span>
+          <p className="font-medium text-slate-700">Failed to load settings</p>
+          <p className="text-sm text-slate-500">{error || "Could not connect to the backend."}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const s = settings;
   const telegramConfigured = !!s.telegram_bot_token;
   const whatsappConfigured = !!(s.whatsapp_phone_id && s.whatsapp_access_token);
-  const emailConfigured    = !!(s.email_address && s.email_password);
-  const smsConfigured      = !!(s.twilio_account_sid && s.twilio_auth_token);
+  const emailConfigured = !!(s.email_address && s.email_password);
+  const smsConfigured = !!(s.twilio_account_sid && s.twilio_auth_token);
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://your-backend.railway.app";
+  const whatsappWebhookUrl = `${backendUrl}/api/v1/whatsapp/webhook`;
+  const anyChannelConfigured = telegramConfigured || whatsappConfigured || emailConfigured || smsConfigured;
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
-      {/* Header */}
-      <header className="h-16 flex items-center px-6 border-b border-[#E9ECEF] bg-white shrink-0">
-        <h1 className="text-[18px] font-semibold text-slate-900">Platform Configuration</h1>
-      </header>
+    <ConfigAreaShell activeSection={activeTab} onSectionChange={(section) => setActiveTab(section as TabId)}>
+      <div className="flex flex-1 flex-col overflow-hidden bg-slate-50">
+        <header className="h-16 shrink-0 border-b border-[#E9ECEF] bg-white px-6 flex items-center">
+          <h1 className="text-[18px] font-semibold text-slate-900">Platform Configuration</h1>
+        </header>
 
-      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-
-        {/* ── Tab Navigation — vertical on desktop, horizontal scroll on mobile ── */}
-        <nav className="
-          bg-white border-b md:border-b-0 md:border-r border-[#E9ECEF] shrink-0
-          flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible
-          py-2 md:py-4 px-2 gap-1 md:w-56
-          [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
-        ">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all shrink-0 md:w-full md:text-left ${
-                activeTab === tab.id
-                  ? "bg-[#7C4DFF]/10 text-[#7C4DFF] font-semibold"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              <span
-                className="material-symbols-outlined text-[20px]"
-                style={activeTab === tab.id ? { fontVariationSettings: "'FILL' 1" } : {}}
-              >
-                {tab.icon}
-              </span>
-              <span className="whitespace-nowrap">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        {/* ── Content Area ─────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
           <form onSubmit={handleSave}>
-            <div className="max-w-3xl mx-auto p-6 space-y-6">
-
-              {/* Alerts */}
+            <div className="mx-auto max-w-3xl space-y-6 p-6">
               {error && (
-                <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center gap-3">
+                <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
                   <span className="material-symbols-outlined">error</span>
                   <p className="text-sm font-medium">{error}</p>
                 </div>
               )}
               {success && (
-                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center gap-3">
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
                   <span className="material-symbols-outlined">check_circle</span>
                   <p className="text-sm font-medium">Settings saved successfully!</p>
                 </div>
               )}
 
-              {/* ── General Tab ───────────────────────────────────────────── */}
               {activeTab === "general" && (
                 <SectionCard title="General Information">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <Field label="Application Name">
                       <TextInput value={s.app_name} onChange={set("app_name")} placeholder="Omnichat" />
                     </Field>
@@ -258,33 +255,34 @@ export default function SettingsPage() {
                 </SectionCard>
               )}
 
-              {/* ── Visual Identity Tab ───────────────────────────────────── */}
               {activeTab === "visual" && (
                 <SectionCard title="Visual Identity">
                   <div className="space-y-8">
-                    {/* Logo */}
-                    <div className="flex flex-col md:flex-row gap-6 items-start">
-                      <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                    <div className="flex flex-col items-start gap-6 md:flex-row">
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
                         {s.app_logo ? (
-                          <img src={s.app_logo} alt="Logo" className="w-full h-full object-contain p-2" />
+                          <img src={s.app_logo} alt="Logo" className="h-full w-full object-contain p-2" />
                         ) : (
-                          <span className="material-symbols-outlined text-slate-400 text-3xl">image</span>
+                          <span className="material-symbols-outlined text-3xl text-slate-400">image</span>
                         )}
                       </div>
                       <div className="flex-1">
-                        <Field label="Logo URL" hint="Recommended: 256×256px PNG or SVG">
+                        <Field label="Logo URL" hint="Recommended: 256x256px PNG or SVG">
                           <TextInput value={s.app_logo} onChange={set("app_logo")} placeholder="https://example.com/logo.png" />
                         </Field>
                       </div>
                     </div>
 
-                    {/* Colors */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {(["primary_color", "secondary_color", "accent_color"] as const).map(key => (
-                        <Field key={key} label={key.replace("_color", "").replace("_", " ").replace(/^\w/, c => c.toUpperCase()) + " Color"}>
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                      {(["primary_color", "secondary_color", "accent_color"] as const).map((key) => (
+                        <Field key={key} label={key.replace("_color", "").replace("_", " ").replace(/^\w/, (c) => c.toUpperCase()) + " Color"}>
                           <div className="flex gap-2">
-                            <input type="color" value={s[key]} onChange={set(key)}
-                              className="w-11 h-11 rounded-xl bg-white border border-slate-200 p-1 cursor-pointer" />
+                            <input
+                              type="color"
+                              value={s[key]}
+                              onChange={set(key)}
+                              className="h-11 w-11 cursor-pointer rounded-xl border border-slate-200 bg-white p-1"
+                            />
                             <TextInput value={s[key]} onChange={set(key)} className={inputCls + " font-mono"} />
                           </div>
                         </Field>
@@ -294,54 +292,16 @@ export default function SettingsPage() {
                 </SectionCard>
               )}
 
-              {/* ── AI Configuration Tab ──────────────────────────────────── */}
-              {activeTab === "ai" && (
-                <SectionCard title="AI Configuration">
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Field label="Model Provider">
-                        <select value={s.ai_provider} onChange={set("ai_provider")} className={inputCls + " cursor-pointer"}>
-                          <option value="openai">OpenAI</option>
-                          <option value="anthropic">Anthropic</option>
-                          <option value="google">Google Gemini</option>
-                          <option value="openrouter">OpenRouter (Recommended)</option>
-                          <option value="groq">Groq</option>
-                        </select>
-                      </Field>
-                      <Field label="Global AI Model">
-                        <select value={s.ai_model} onChange={set("ai_model")} className={inputCls + " cursor-pointer"}>
-                          <option value="gpt-4o">GPT-4o</option>
-                          <option value="gpt-4o-mini">GPT-4o mini</option>
-                          <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
-                          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
-                          <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                        </select>
-                      </Field>
-                    </div>
-                    <p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
-                      <span className="font-bold text-slate-700">Note:</span> This model will be used by all agents across the platform unless overridden individually.
-                    </p>
-                  </div>
-                </SectionCard>
-              )}
-
-              {/* ── API Settings Tab ──────────────────────────────────────── */}
-              {activeTab === "api" && (
+              {activeTab === "channels" && (
                 <div className="space-y-5">
                   <p className="text-sm text-slate-500">
-                    Configure the credentials for each channel. Values are stored securely in the database.
+                    Configure each communication channel as a first-class section of the platform.
                   </p>
 
-                  {/* Telegram */}
-                  <ApiGroup icon="send" label="Telegram" color="bg-sky-50 text-sky-800 border-b border-sky-100" configured={telegramConfigured}>
+                  <ApiGroup icon="send" label="Telegram" color="border-b border-sky-100 bg-sky-50 text-sky-800" configured={telegramConfigured}>
                     <div className="md:col-span-2">
                       <Field label="Bot Token" hint="Get from @BotFather: /newbot or /token">
-                        <PasswordInput
-                          value={s.telegram_bot_token}
-                          onChange={set("telegram_bot_token")}
-                          placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                        />
+                        <PasswordInput value={s.telegram_bot_token} onChange={set("telegram_bot_token")} placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" />
                       </Field>
                     </div>
                     <div className="md:col-span-2 flex items-center gap-3">
@@ -349,48 +309,30 @@ export default function SettingsPage() {
                         type="button"
                         onClick={handleTelegramTest}
                         disabled={!s.telegram_bot_token || testingTelegram}
-                        className="h-9 px-4 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-medium hover:bg-sky-100 disabled:opacity-50 transition-colors flex items-center gap-2"
+                        className="flex h-9 items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-50"
                       >
                         {testingTelegram ? (
-                          <span className="w-3.5 h-3.5 border-2 border-sky-400/30 border-t-sky-600 rounded-full animate-spin" />
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-400/30 border-t-sky-600" />
                         ) : (
                           <span className="material-symbols-outlined text-[16px]">wifi_tethering</span>
                         )}
                         Test Connection
                       </button>
                       {telegramTestResult && (
-                        <span className={`text-sm font-medium flex items-center gap-1.5 ${telegramTestResult.ok ? "text-emerald-600" : "text-red-500"}`}>
-                          <span className="material-symbols-outlined text-[16px]">
-                            {telegramTestResult.ok ? "check_circle" : "error"}
-                          </span>
-                          {telegramTestResult.ok
-                            ? `Connected as @${telegramTestResult.username}`
-                            : telegramTestResult.error}
+                        <span className={`flex items-center gap-1.5 text-sm font-medium ${telegramTestResult.ok ? "text-emerald-600" : "text-red-500"}`}>
+                          <span className="material-symbols-outlined text-[16px]">{telegramTestResult.ok ? "check_circle" : "error"}</span>
+                          {telegramTestResult.ok ? `Connected as @${telegramTestResult.username}` : telegramTestResult.error}
                         </span>
                       )}
                     </div>
                   </ApiGroup>
 
-                  {/* WhatsApp */}
-                  <ApiGroup icon="chat" label="WhatsApp — Meta Cloud API" color="bg-green-50 text-green-800 border-b border-green-100" configured={whatsappConfigured}>
-                    {/* Webhook URL — readonly, for Meta Dashboard setup */}
-                    <Field label="Webhook URL" hint="Copy this URL into your Meta App → Webhooks">
-                      <div className="flex items-center gap-2">
-                        <input
-                          readOnly
-                          value={`${process.env.NEXT_PUBLIC_API_URL ?? 'https://your-backend.railway.app'}/api/v1/whatsapp/webhook`}
-                          className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600 font-mono select-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/whatsapp/webhook`)}
-                          className="shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-                          title="Copy to clipboard"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                        </button>
-                      </div>
-                    </Field>
+                  <ApiGroup
+                    icon="chat"
+                    label="WhatsApp - Meta Cloud API"
+                    color="border-b border-green-100 bg-green-50 text-green-800"
+                    configured={whatsappConfigured}
+                  >
                     <Field label="Phone Number ID">
                       <TextInput value={s.whatsapp_phone_id} onChange={set("whatsapp_phone_id")} placeholder="123456789012345" />
                     </Field>
@@ -405,8 +347,7 @@ export default function SettingsPage() {
                     </Field>
                   </ApiGroup>
 
-                  {/* Email */}
-                  <ApiGroup icon="mail" label="Email — IMAP / SMTP" color="bg-blue-50 text-blue-800 border-b border-blue-100" configured={emailConfigured}>
+                  <ApiGroup icon="mail" label="Email - IMAP / SMTP" color="border-b border-blue-100 bg-blue-50 text-blue-800" configured={emailConfigured}>
                     <Field label="IMAP Host">
                       <TextInput value={s.email_imap_host} onChange={set("email_imap_host")} placeholder="imap.gmail.com" />
                     </Field>
@@ -427,13 +368,12 @@ export default function SettingsPage() {
                     </Field>
                   </ApiGroup>
 
-                  {/* SMS */}
-                  <ApiGroup icon="sms" label="SMS — Twilio" color="bg-red-50 text-red-800 border-b border-red-100" configured={smsConfigured}>
+                  <ApiGroup icon="sms" label="SMS - Twilio" color="border-b border-red-100 bg-red-50 text-red-800" configured={smsConfigured}>
                     <Field label="Account SID">
                       <TextInput value={s.twilio_account_sid} onChange={set("twilio_account_sid")} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
                     </Field>
                     <Field label="Auth Token">
-                      <PasswordInput value={s.twilio_auth_token} onChange={set("twilio_auth_token")} placeholder="••••••••••••••••••••••••••••••••" />
+                      <PasswordInput value={s.twilio_auth_token} onChange={set("twilio_auth_token")} placeholder="••••••••••••••••" />
                     </Field>
                     <Field label="Twilio Phone Number" hint="E.164 format: +15005550006">
                       <TextInput value={s.twilio_phone_number} onChange={set("twilio_phone_number")} placeholder="+15005550006" />
@@ -442,32 +382,136 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* ── Save Bar ──────────────────────────────────────────────── */}
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#E9ECEF]">
+              {activeTab === "ai" && (
+                <SectionCard title="AI Configuration">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      <Field label="Model Provider">
+                        <select value={s.ai_provider} onChange={set("ai_provider")} className={inputCls + " cursor-pointer"}>
+                          <option value="openai">OpenAI</option>
+                          <option value="anthropic">Anthropic</option>
+                          <option value="google">Google Gemini</option>
+                          <option value="openrouter">OpenRouter (Recommended)</option>
+                          <option value="groq">Groq</option>
+                        </select>
+                      </Field>
+                      <Field label="Global AI Model">
+                        <select value={s.ai_model} onChange={set("ai_model")} className={inputCls + " cursor-pointer"}>
+                          <option value="gpt-4o">GPT-4o</option>
+                          <option value="gpt-4o-mini">GPT-4o mini</option>
+                          <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+                          <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        </select>
+                      </Field>
+                    </div>
+                    <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      <span className="font-bold text-slate-700">Note:</span> This model will be used by all agents across the platform unless overridden individually.
+                    </p>
+                  </div>
+                </SectionCard>
+              )}
+
+              {activeTab === "api" && (
+                <div className="space-y-5">
+                  <p className="text-sm text-slate-500">
+                    Keep shared webhook and integration details in one place. Channel credentials stay under Channels.
+                  </p>
+
+                  <ApiGroup
+                    icon="api"
+                    label="Webhook Endpoints"
+                    color="border-b border-indigo-100 bg-indigo-50 text-indigo-800"
+                    configured={whatsappConfigured}
+                  >
+                    <Field label="Backend Base URL" hint="Used as the base for webhook registration and channel callbacks">
+                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
+                        {backendUrl}
+                      </div>
+                    </Field>
+                    <Field label="WhatsApp Webhook URL" hint="Copy this URL into your Meta App Webhooks configuration">
+                      <div className="flex items-center gap-2">
+                        <input
+                          readOnly
+                          value={whatsappWebhookUrl}
+                          className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 select-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(whatsappWebhookUrl)}
+                          className="shrink-0 rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                          title="Copy to clipboard"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                        </button>
+                      </div>
+                    </Field>
+                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 md:col-span-2">
+                      Keep channel secrets inside Channels and treat this section as operational reference for deployments and third-party setup.
+                    </div>
+                  </ApiGroup>
+
+                  <ApiGroup
+                    icon="shield_lock"
+                    label="Integration Status"
+                    color="border-b border-slate-200 bg-slate-100 text-slate-800"
+                    configured={anyChannelConfigured}
+                  >
+                    <Field label="Telegram">
+                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
+                        {telegramConfigured ? "Configured in Channels" : "Not configured"}
+                      </div>
+                    </Field>
+                    <Field label="WhatsApp">
+                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
+                        {whatsappConfigured ? "Configured in Channels" : "Not configured"}
+                      </div>
+                    </Field>
+                    <Field label="Email">
+                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
+                        {emailConfigured ? "Configured in Channels" : "Not configured"}
+                      </div>
+                    </Field>
+                    <Field label="SMS">
+                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
+                        {smsConfigured ? "Configured in Channels" : "Not configured"}
+                      </div>
+                    </Field>
+                  </ApiGroup>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 border-t border-[#E9ECEF] pt-2">
                 <button
                   type="button"
                   onClick={() => setSuccess(false)}
-                  className="h-11 px-6 rounded-xl border border-[#E9ECEF] text-sm font-medium text-slate-600 hover:bg-white hover:shadow-sm transition-all"
+                  className="h-11 rounded-xl border border-[#E9ECEF] px-6 text-sm font-medium text-slate-600 transition-all hover:bg-white hover:shadow-sm"
                 >
                   Discard
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="h-11 px-8 rounded-xl bg-[#7C4DFF] hover:bg-[#632ce5] text-white text-sm font-bold shadow-lg shadow-purple-200 disabled:opacity-60 transition-all flex items-center gap-2"
+                  className="flex h-11 items-center gap-2 rounded-xl bg-indigo-600 px-8 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 disabled:opacity-60"
                 >
                   {saving ? (
-                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Saving...
+                    </>
                   ) : (
-                    <><span className="material-symbols-outlined text-[20px]">save</span>Save Configuration</>
+                    <>
+                      <span className="material-symbols-outlined text-[20px]">save</span>
+                      Save Configuration
+                    </>
                   )}
                 </button>
               </div>
-
             </div>
           </form>
         </div>
       </div>
-    </div>
+    </ConfigAreaShell>
   );
 }

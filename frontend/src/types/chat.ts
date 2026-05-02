@@ -28,7 +28,7 @@ export interface Conversation {
   contact_id: string;
   channel: ChannelType;
   status: ConversationStatus;
-  tag?: ConversationTag;
+  tag?: ConversationTag | null;
   is_unread: boolean;
   last_message?: string;
   last_message_date?: string;
@@ -74,7 +74,7 @@ export interface SendMessageRequest {
 /** PATCH /chat/conversations/{id} request */
 export interface UpdateConversationRequest {
   status?: ConversationStatus;
-  tag?: ConversationTag;
+  tag?: ConversationTag | null;
   is_unread?: boolean;
 }
 

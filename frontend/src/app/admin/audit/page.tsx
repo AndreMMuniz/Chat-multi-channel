@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import UsersAreaShell from "@/components/admin/UsersAreaShell";
 import { auditApi } from "@/lib/api/index";
 import type { AuditLog } from "@/lib/api/audit";
 
@@ -101,7 +102,9 @@ export default function AuditLogPage() {
   }, []);
 
   useEffect(() => {
-    fetchLogs(page, resourceFilter);
+    queueMicrotask(() => {
+      void fetchLogs(page, resourceFilter);
+    });
   }, [page, resourceFilter, fetchLogs]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -120,7 +123,8 @@ export default function AuditLogPage() {
     : logs;
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    <UsersAreaShell>
+      <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
       <header className="h-16 flex items-center justify-between px-6 border-b border-[#E9ECEF] bg-white shrink-0">
         <div className="flex items-center gap-3">
@@ -267,6 +271,7 @@ export default function AuditLogPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </UsersAreaShell>
   );
 }
