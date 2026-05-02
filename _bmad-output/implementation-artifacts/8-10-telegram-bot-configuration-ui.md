@@ -1,6 +1,6 @@
 # Story 8.10: Telegram Bot Configuration UI
 
-**Status:** review
+**Status:** done
 **Epic:** 8 — Production Hardening
 **Story Points:** 5
 **Priority:** Nice-to-have
@@ -328,3 +328,30 @@ const handleTelegramTest = async () => {
 
 ### Completion Notes
 Implemented 2026-05-02. All 175 existing tests pass. TypeScript compiles clean. Pattern follows existing encrypted fields (EncryptedString TypeDecorator). Test-connection endpoint is stateless — does not persist the token. `update_settings` promoted to `async` to support `asyncio.create_task` for best-effort webhook re-registration.
+
+---
+
+## Senior Developer Review (AI)
+
+**Review date:** 2026-05-02
+**Outcome:** Changes Requested
+**Layers:** Blind Hunter + Edge Case Hunter + Acceptance Auditor
+
+### Action Items
+
+#### Decision Needed
+- [x] [Review][Decision] Token cleared — reload behavior undefined: resolved → on clear, reload with `TELEGRAM_BOT_TOKEN` env var fallback [`config_routes.py`]
+
+#### Patches
+- [x] [Review][Patch] `/test-connection` has no authentication — added `Depends(get_current_user)` [`backend/app/api/endpoints/telegram.py`]
+- [x] [Review][Patch] `resp.json()` called outside try/except — confirmed already inside try block; no change needed [`backend/app/api/endpoints/telegram.py`]
+- [x] [Review][Patch] `asyncio.create_task` result not stored — stored in `_webhook_task` [`backend/app/api/endpoints/config_routes.py`]
+
+#### Deferred
+- [x] [Review][Defer] Sensitive fields (`telegram_bot_token`, `whatsapp_access_token`, etc.) returned in `SettingsOut` — pre-existing pattern for all channel credentials — deferred, pre-existing
+- [x] [Review][Defer] `set_webhook` in `telegram_service.py` has no timeout — pre-existing, not introduced by this change — deferred, pre-existing
+- [x] [Review][Defer] Webhook URL not validated as HTTPS — pre-existing, no validation exists for any other webhook URL — deferred, pre-existing
+- [x] [Review][Defer] `model_dump(exclude_unset=True)` called twice in `update_settings` — theoretical inconsistency, deterministic in practice — deferred, pre-existing
+- [x] [Review][Defer] `body: dict` in `test_connection` instead of Pydantic model — style preference, not a bug — deferred, low priority
+- [x] [Review][Defer] `json.data ?? json` response shape fallback — if `data` key is `null`, raw envelope is returned — deferred, low impact
+- [x] [Review][Defer] Token not sanitized before URL interpolation in `test_connection` — Telegram rejects non-conformant tokens; risk is very low — deferred, low priority

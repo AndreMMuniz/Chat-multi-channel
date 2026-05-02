@@ -103,14 +103,16 @@ async def update_settings(
     db.add(s)
     db.commit()
     db.refresh(s)
-    if "telegram_bot_token" in body.model_dump(exclude_unset=True) and s.telegram_bot_token:
+    updates = body.model_dump(exclude_unset=True)
+    if "telegram_bot_token" in updates:
         from app.services.telegram_service import telegram_service
-        telegram_service.reload(s.telegram_bot_token)
         from app.core.config import settings as app_cfg
+        new_token = s.telegram_bot_token or getattr(app_cfg, "TELEGRAM_BOT_TOKEN", "")
+        telegram_service.reload(new_token)
         base_url = getattr(app_cfg, "WEBHOOK_BASE_URL", "").rstrip("/")
-        if base_url:
+        if base_url and new_token:
             import asyncio
-            asyncio.create_task(
+            _webhook_task = asyncio.create_task(
                 telegram_service.set_webhook(f"{base_url}/api/v1/telegram/webhook")
             )
     return s

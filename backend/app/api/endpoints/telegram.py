@@ -3,6 +3,8 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 from app.core.database import get_db
+from app.core.auth import get_current_user
+from app.models.models import User
 from app.services.telegram_service import telegram_service
 from app.schemas.common import create_response, create_error_response
 
@@ -15,7 +17,10 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)) -> D
     return create_response({"status": "ok"})
 
 @router.post("/test-connection")
-async def test_connection(body: dict) -> Dict[str, Any]:
+async def test_connection(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
     """Verify a Telegram bot token by calling getMe. Does NOT persist the token."""
     token = body.get("token", "").strip()
     if not token:
