@@ -136,6 +136,16 @@ export async function mockSendMessage(page: Page, replyContent: string) {
   );
 }
 
+export async function mockAISuggestions(page: Page, suggestions: string[] = ["Thank you for your message!", "I'll look into this right away.", "Could you please provide more details?"]) {
+  await page.route("**/api/v1/chat/conversations/*/ai-suggestion**", (route: Route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ data: suggestions }),
+    });
+  });
+}
+
 /** Catch-all: silently return empty 200 for any unmocked API call. */
 export async function mockApiCatchAll(page: Page) {
   await page.route("**/api/v1/**", (route: Route) => {

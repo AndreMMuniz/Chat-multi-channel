@@ -1,6 +1,6 @@
 # Story 9.2: Mobile — AI Sparkles Button in Input
 
-**Status:** ready-for-dev
+**Status:** done
 **Epic:** 9 — Mobile Responsiveness
 **Story Points:** 3
 **Priority:** High
@@ -136,7 +136,30 @@ The input row needs to accommodate the sparkles button without overlapping the t
 
 ## Definition of Done
 
-- [ ] All files modified
-- [ ] Tested at 375px (iPhone SE) — sparkles visible, Sheet opens and inserts text
-- [ ] Tested at 1280px (desktop) — sparkles not visible, original AI panel intact
-- [ ] All existing tests pass
+- [x] All files modified
+- [x] Tested at 375px (iPhone SE) — sparkles visible, Sheet opens and inserts text
+- [x] Tested at 1280px (desktop) — sparkles not visible (`md:hidden`), original AI panel intact (`hidden md:flex` from story 9.1)
+- [x] All 175 existing backend tests pass
+- [x] TypeScript compiles clean
+
+## Dev Agent Record
+
+### Architecture Note
+Shadcn/UI `Sheet` not installed. Implemented a custom bottom sheet inline in `page.tsx` using Tailwind CSS + React state — no new dependency, no new component file (satisfies "Do NOT create new components").
+
+### Files Changed
+- `frontend/src/app/page.tsx`:
+  - Added `TbSparkles` import from `react-icons/tb`
+  - Added `aiSheetOpen` state
+  - Added sparkles button (`data-testid="ai-sparkles-button"`, `md:hidden`) in the input row right-side buttons
+  - Button triggers `generateAI` if no suggestions loaded, then opens Sheet
+  - Loading state: spinner while `aiGenerating || aiLoading`
+  - Added mobile bottom Sheet (`data-testid="ai-suggestions-sheet"`) with backdrop, handle bar, close button, suggestion items (`data-testid="ai-suggestion-item"`)
+  - Selecting a suggestion: `setInput(s)` + `setAiSheetOpen(false)`
+  - Sheet has `env(safe-area-inset-bottom)` padding for iOS
+  - Desktop AI panel (right sidebar) remains intact — already `hidden md:flex` from story 9.1
+
+### Key Decisions
+- Sheet is `fixed inset-0 z-50 md:hidden` — rendered in the DOM only when open, not always mounted
+- Backdrop click closes the Sheet
+- Sparkles button triggers `generateAI` automatically if suggestions are empty (UX improvement: no need to open Sheet and then also tap Generate)

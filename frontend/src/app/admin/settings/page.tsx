@@ -194,16 +194,21 @@ export default function SettingsPage() {
         <h1 className="text-[18px] font-semibold text-slate-900">Platform Configuration</h1>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
-        {/* ── Left Tab Navigation ─────────────────────────────────────────── */}
-        <nav className="w-56 bg-white border-r border-[#E9ECEF] flex flex-col py-4 shrink-0 gap-1 px-2">
+        {/* ── Tab Navigation — vertical on desktop, horizontal scroll on mobile ── */}
+        <nav className="
+          bg-white border-b md:border-b-0 md:border-r border-[#E9ECEF] shrink-0
+          flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible
+          py-2 md:py-4 px-2 gap-1 md:w-56
+          [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
+        ">
           {TABS.map(tab => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left w-full ${
+              className={`flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all shrink-0 md:w-full md:text-left ${
                 activeTab === tab.id
                   ? "bg-[#7C4DFF]/10 text-[#7C4DFF] font-semibold"
                   : "text-slate-600 hover:bg-slate-100"
@@ -215,7 +220,7 @@ export default function SettingsPage() {
               >
                 {tab.icon}
               </span>
-              {tab.label}
+              <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           ))}
         </nav>

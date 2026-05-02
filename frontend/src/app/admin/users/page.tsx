@@ -197,8 +197,8 @@ export default function UsersPage() {
   return (
     <>
       {/* Header */}
-      <div className="h-16 flex items-center justify-between px-6 border-b border-[#E9ECEF] bg-white shrink-0">
-        <div className="flex items-center gap-6">
+      <div className="min-h-16 flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-[#E9ECEF] bg-white shrink-0">
+        <div className="flex items-center gap-3 md:gap-6 flex-wrap">
           <h1 className="text-[18px] font-semibold text-slate-900">Users</h1>
           <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
             <button
@@ -281,7 +281,7 @@ export default function UsersPage() {
               </div>
             )}
 
-            <div className="bg-white rounded-xl border border-[#E9ECEF] overflow-hidden">
+            <div className="overflow-x-auto rounded-xl border border-[#E9ECEF] bg-white">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[#E9ECEF] bg-slate-50">

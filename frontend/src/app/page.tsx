@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { ChevronLeft } from 'lucide-react';
+import { TbSparkles } from 'react-icons/tb';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useConversations } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
@@ -82,6 +84,8 @@ export default function ChatPage() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [slaAlert, setSlaAlert] = useState<{ count: number; threshold: number } | null>(null);
   const [deliveryAlert, setDeliveryAlert] = useState<{ channel: string; count: number } | null>(null);
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  const [aiSheetOpen, setAiSheetOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -183,6 +187,11 @@ export default function ChatPage() {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
+  // Reset mobile view to list when active conversation is cleared externally (e.g. WebSocket event)
+  useEffect(() => {
+    if (!activeConversation) setMobileView('list');
+  }, [activeConversation]);
+
   // ── Conversation selection ────────────────────────────────────────────────
   const handleSelectConversation = useCallback(async (conv: Conversation) => {
     if (activeConversationRef.current) unsubscribe(activeConversationRef.current.id);
@@ -192,7 +201,18 @@ export default function ChatPage() {
     subscribe(conv.id);
     await fetchMessages(conv.id);
     fetchAICached(conv.id);
+    setMobileView('chat');
   }, [selectConversation, fetchMessages, subscribe, unsubscribe, activeConversationRef, fetchAICached, clearAI]);
+
+  const handleMobileBack = useCallback(() => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    setShowEmojiPicker(false);
+    setMobileView('list');
+  }, [isRecording]);
 
   // ── Attachment helpers ────────────────────────────────────────────────────
   const cancelAttachment = () => {
@@ -306,9 +326,20 @@ export default function ChatPage() {
       )}
 
       {/* Main Workspace (3-Column Layout) */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left Column: Conversation List (Fixed 320px) */}
-        <aside className="w-[320px] h-full flex flex-col bg-surface-container-lowest border-r border-outline-variant shrink-0">
+      <main className="flex-1 flex overflow-hidden relative">
+        {/* Left Column: Conversation List */}
+        <aside
+          data-testid="conversation-list"
+          className={cn(
+            "h-full flex flex-col bg-surface-container-lowest border-r border-outline-variant",
+            // Desktop: fixed 320px in flex flow
+            "md:static md:w-[320px] md:shrink-0 md:translate-x-0",
+            // Mobile: absolute overlay, full width, slide transition
+            "absolute inset-y-0 left-0 right-0 w-full z-10",
+            "transition-transform duration-300 ease-in-out",
+            mobileView === 'chat' ? "-translate-x-full md:translate-x-0" : "translate-x-0"
+          )}
+        >
           <div className="p-md border-surface-variant">
             <div className="relative flex items-center w-full h-10 rounded-DEFAULT bg-[#F1F3F5] text-on-surface-variant focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-container transition-all">
               <span className="material-symbols-outlined ml-sm text-outline">search</span>
@@ -332,6 +363,7 @@ export default function ChatPage() {
             {filteredConversations.map((conv) => (
               <div
                 key={conv.id}
+                data-testid="conversation-item"
                 onClick={() => handleSelectConversation(conv)}
                 className={cn(
                   "relative p-sm rounded-lg border cursor-pointer flex gap-sm items-start transition-colors",
@@ -407,12 +439,32 @@ export default function ChatPage() {
         </aside>
 
         {/* Center Column: Active Chat Window */}
-        <section className="flex-1 flex flex-col bg-surface-container-low relative min-w-0">
+        <section
+          data-testid="chat-area"
+          className={cn(
+            "flex flex-col bg-surface-container-low min-w-0",
+            // Desktop: flex-1 in flow
+            "md:static md:flex-1 md:translate-x-0",
+            // Mobile: absolute overlay, full width, slide transition
+            "absolute inset-y-0 left-0 right-0 w-full",
+            "transition-transform duration-300 ease-in-out",
+            mobileView === 'list' ? "translate-x-full md:translate-x-0" : "translate-x-0"
+          )}
+        >
           {activeConversation ? (
             <>
               {/* Chat Header */}
               <div className="h-[72px] px-md py-sm border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-md">
+                  {/* Back button — mobile only */}
+                  <button
+                    data-testid="back-button"
+                    onClick={handleMobileBack}
+                    className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
+                    aria-label="Back to conversations"
+                  >
+                    <ChevronLeft size={22} />
+                  </button>
                   <div className="relative">
                     {activeConversation.contact.avatar ? (
                       <img alt={activeConversation.contact.name} className="w-12 h-12 rounded-full object-cover" src={activeConversation.contact.avatar} />
@@ -534,7 +586,11 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="p-md bg-surface-container-lowest border-t border-outline-variant relative" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) qrClose(); }}>
+              <div
+                className="p-md bg-surface-container-lowest border-t border-outline-variant relative"
+                style={{ paddingBottom: 'max(var(--spacing-md, 12px), env(safe-area-inset-bottom))' }}
+                onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) qrClose(); }}
+              >
                 {/* Emoji Picker */}
                 {showEmojiPicker && (
                   <div className="absolute bottom-full mb-2 left-md z-50 shadow-2xl rounded-2xl overflow-hidden border border-outline-variant">
@@ -605,6 +661,7 @@ export default function ChatPage() {
                         </div>
                       )}
                       <textarea
+                        data-testid="message-input"
                         className="flex-1 bg-transparent border-none text-body-md text-on-surface focus:ring-0 outline-none resize-none py-sm pl-sm min-h-[40px] max-h-[120px] overflow-y-auto"
                         placeholder="Type a message or / for quick replies…"
                         rows={1}
@@ -628,6 +685,30 @@ export default function ChatPage() {
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                   
                   <div className="flex items-center gap-1.5 ml-xs">
+                    {/* Sparkles button — mobile only, triggers AI suggestions Sheet */}
+                    <button
+                      data-testid="ai-sparkles-button"
+                      type="button"
+                      onClick={() => {
+                        if (activeConversation && suggestions.length === 0 && !aiGenerating && !aiLoading) {
+                          generateAI(activeConversation.id);
+                        }
+                        setAiSheetOpen(true);
+                      }}
+                      disabled={aiGenerating || aiLoading}
+                      className={cn(
+                        "md:hidden w-9 h-9 flex items-center justify-center rounded-lg transition-all",
+                        aiGenerating || aiLoading
+                          ? "text-[#7C3AED] opacity-100"
+                          : "text-[#7C3AED] opacity-40 hover:opacity-100"
+                      )}
+                      aria-label="Get AI suggestion"
+                    >
+                      {aiGenerating || aiLoading
+                        ? <span className="w-4 h-4 border-2 border-[#7C3AED]/30 border-t-[#7C3AED] rounded-full animate-spin" />
+                        : <TbSparkles size={18} />
+                      }
+                    </button>
                     {!input.trim() && !selectedFile && !isRecording ? (
                       <button onClick={startRecording} className="w-10 h-10 rounded-lg text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors">
                         <span className="material-symbols-outlined text-[22px]">mic</span>
@@ -654,6 +735,64 @@ export default function ChatPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Mobile AI Suggestions Sheet — bottom drawer, md:hidden */}
+              {aiSheetOpen && (
+                <div className="fixed inset-0 z-50 md:hidden">
+                  {/* Backdrop */}
+                  <div
+                    className="absolute inset-0 bg-black/40 transition-opacity"
+                    onClick={() => setAiSheetOpen(false)}
+                  />
+                  {/* Sheet panel */}
+                  <div
+                    data-testid="ai-suggestions-sheet"
+                    className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl overflow-y-auto"
+                    style={{ maxHeight: '50vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
+                  >
+                    {/* Handle bar */}
+                    <div className="flex justify-center pt-3 pb-1">
+                      <div className="w-10 h-1 rounded-full bg-slate-200" />
+                    </div>
+                    <div className="px-4 pb-4">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 py-3 border-b border-slate-100 mb-3">
+                        <TbSparkles size={16} className="text-[#7C3AED]" />
+                        <span className="text-sm font-semibold text-[#7C3AED]">AI Suggestions</span>
+                        <button
+                          onClick={() => setAiSheetOpen(false)}
+                          className="ml-auto w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                      </div>
+                      {/* Suggestions list */}
+                      <div className="space-y-2">
+                        {(aiGenerating || aiLoading) && (
+                          <div className="flex flex-col gap-2">
+                            {[1, 2, 3].map(i => (
+                              <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+                            ))}
+                          </div>
+                        )}
+                        {!aiGenerating && !aiLoading && suggestions.length === 0 && (
+                          <p className="text-sm text-slate-400 text-center py-4">No suggestions available</p>
+                        )}
+                        {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            data-testid="ai-suggestion-item"
+                            onClick={() => { setInput(s); setAiSheetOpen(false); }}
+                            className="w-full text-left px-4 py-3 rounded-xl bg-[#7C3AED]/5 border border-[#7C3AED]/20 text-sm text-slate-700 hover:bg-[#7C3AED]/10 transition-colors"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-slate-400">
@@ -665,8 +804,8 @@ export default function ChatPage() {
           )}
         </section>
 
-        {/* Right Column: Context & Details */}
-        <aside className="w-[300px] h-full flex flex-col bg-surface-container-lowest border-l border-outline-variant shrink-0 overflow-y-auto">
+        {/* Right Column: Context & Details — hidden on mobile */}
+        <aside className="hidden md:flex w-[300px] h-full flex-col bg-surface-container-lowest border-l border-outline-variant shrink-0 overflow-y-auto">
           {activeConversation ? (
             <div className="flex flex-col gap-0">
               {/* Contact Details */}

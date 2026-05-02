@@ -186,7 +186,7 @@ export default function AuditLogPage() {
             <p className="text-sm">{search ? "No results match your search." : "No audit records yet."}</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-[#E9ECEF] overflow-hidden shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-[#E9ECEF] shadow-sm bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E9ECEF] bg-slate-50/70">

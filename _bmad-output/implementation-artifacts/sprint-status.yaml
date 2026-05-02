@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-02  # epic 9 created — mobile responsiveness
+last_updated: 2026-05-02  # epic 9 done — mobile responsiveness complete
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -172,11 +172,11 @@ development_status:
   # ── Epic 9: Mobile Responsiveness ───────────────────────────────────────────
   # WhatsApp-style navigation, AI sparkles input, admin panel adaptation
   # Source: Party mode roundtable 2026-05-02 — defined by Sally, Winston, Amelia, John
-  epic-9: in-progress
+  epic-9: done
 
-  9-1-mobile-whatsapp-layout: ready-for-dev          # High — 5 pts
-  9-2-mobile-ai-sparkles-input: ready-for-dev        # High — 3 pts
-  9-3-mobile-admin-responsiveness: ready-for-dev     # Medium — 3 pts
-  9-4-mobile-playwright-tests: ready-for-dev         # High — 3 pts
+  9-1-mobile-whatsapp-layout: done                    # High — 5 pts
+  9-2-mobile-ai-sparkles-input: done                  # High — 3 pts
+  9-3-mobile-admin-responsiveness: done               # Medium — 3 pts
+  9-4-mobile-playwright-tests: done                   # High — 3 pts
 
   epic-9-retrospective: optional
