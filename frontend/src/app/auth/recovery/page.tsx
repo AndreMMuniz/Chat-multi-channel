@@ -146,7 +146,7 @@ export default function RecoveryPage() {
               <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-red-500 text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>link_off</span>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Link inválido ou expirado</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Invalid or expired link</h2>
               <p className="text-sm text-slate-500 mb-6">
                 This recovery link is invalid or has already been used. Ask an administrator to send a new one.
               </p>

@@ -128,11 +128,11 @@ function BarChart({
         <div className="flex items-center gap-4 text-[11px] text-slate-500">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
-            <span>Período atual</span>
+            <span>Current period</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color, opacity: 0.25 }} />
-            <span>Período anterior</span>
+            <span>Previous period</span>
           </div>
         </div>
       )}
@@ -355,27 +355,27 @@ export default function DashboardPage() {
               <KpiCard
                 icon="warning"          label="SLA at Risk"
                 value={stats.sla_at_risk}
-                sub={`>${stats.sla_threshold_minutes}min sem resposta`}
+                sub={`>${stats.sla_threshold_minutes}min unanswered`}
                 iconBg={stats.sla_at_risk > 0 ? "bg-red-50" : "bg-slate-50"}
                 color={stats.sla_at_risk > 0 ? "#EF4444" : "#94A3B8"}
               />
               <KpiCard
                 icon="verified"         label="SLA Compliance"
                 value={`${stats.sla_compliance_pct}%`}
-                sub="conversas fechadas com resposta"
+                sub="closed conversations with response"
                 iconBg={stats.sla_compliance_pct >= 80 ? "bg-green-50" : "bg-yellow-50"}
                 color={stats.sla_compliance_pct >= 80 ? "#10B981" : "#F59E0B"}
               />
               <KpiCard
                 icon="speed"            label="Avg First Response"
                 value={stats.avg_first_response_minutes !== null ? `${stats.avg_first_response_minutes}m` : "—"}
-                sub="tempo até 1ª resposta do agente"
+                sub="time to first agent response"
                 iconBg="bg-indigo-50"   color="#6366F1"
               />
               <KpiCard
                 icon="person_off"       label="Unassigned Open"
                 value={stats.unassigned_open}
-                sub="sem agente atribuído"
+                sub="without assigned agent"
                 iconBg={stats.unassigned_open > 5 ? "bg-orange-50" : "bg-slate-50"}
                 color={stats.unassigned_open > 5 ? "#F97316" : "#94A3B8"}
               />
@@ -525,7 +525,7 @@ export default function DashboardPage() {
                 </div>
                 <BarChart data={stats.daily_conversations} prevData={stats.prev_daily_conversations} color="#7C4DFF" />
                 <div className="mt-1 text-xs text-slate-500">
-                  {stats.current_period_conversations} conversas neste período
+                  {stats.current_period_conversations} conversations in this period
                 </div>
               </div>
 
@@ -537,7 +537,7 @@ export default function DashboardPage() {
                 </div>
                 <BarChart data={stats.daily_messages} prevData={stats.prev_daily_messages} color="#3B82F6" />
                 <div className="mt-1 text-xs text-slate-500">
-                  {stats.current_period_messages} mensagens neste período
+                  {stats.current_period_messages} messages in this period
                 </div>
               </div>
             </div>
@@ -658,7 +658,7 @@ export default function DashboardPage() {
               <KpiCard
                 icon="psychology"     label="AI Adoption Rate"
                 value={`${stats.ai_adoption_pct ?? 0}%`}
-                sub="conversas com pelo menos 1 sugestão"
+                sub="conversations with at least 1 suggestion"
                 iconBg={(stats.ai_adoption_pct ?? 0) >= 50 ? "bg-green-50" : "bg-slate-50"}
                 color={(stats.ai_adoption_pct ?? 0) >= 50 ? "#10B981" : "#94A3B8"}
               />

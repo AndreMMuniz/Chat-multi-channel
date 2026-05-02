@@ -67,10 +67,10 @@ function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { 
   const diffMin = Math.floor(diffMs / 60_000);
   if (diffMin < 15) return null;
   const slaBreached = diffMin >= SLA_THRESHOLD_MINUTES;
-  if (diffMin < 60) return { label: `há ${diffMin}m`, color: 'text-yellow-600', slaBreached };
+  if (diffMin < 60) return { label: `${diffMin}m ago`, color: 'text-yellow-600', slaBreached };
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return { label: `há ${diffH}h`, color: diffH >= 2 ? 'text-red-500' : 'text-orange-500', slaBreached };
-  return { label: `há ${Math.floor(diffH / 24)}d`, color: 'text-red-600', slaBreached: true };
+  if (diffH < 24) return { label: `${diffH}h ago`, color: diffH >= 2 ? 'text-red-500' : 'text-orange-500', slaBreached };
+  return { label: `${Math.floor(diffH / 24)}d ago`, color: 'text-red-600', slaBreached: true };
 }
 
 export default function ChatPage() {
@@ -304,7 +304,7 @@ export default function ChatPage() {
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-amber-50 text-amber-800 border-b border-amber-200">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]">schedule</span>
-            <span><strong>{slaAlert.count}</strong> conversa{slaAlert.count !== 1 ? 's' : ''} sem resposta há mais de {slaAlert.threshold} min</span>
+            <span><strong>{slaAlert.count}</strong> conversation{slaAlert.count !== 1 ? 's' : ''} unanswered for more than {slaAlert.threshold} min</span>
           </div>
           <button onClick={() => setSlaAlert(null)} className="ml-2 text-amber-600 hover:text-amber-900">
             <span className="material-symbols-outlined text-[16px]">close</span>
@@ -317,7 +317,7 @@ export default function ChatPage() {
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-red-50 text-red-800 border-b border-red-200">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]">error</span>
-            <span><strong>{deliveryAlert.count}</strong> falhas de entrega no canal <strong className="uppercase">{deliveryAlert.channel}</strong> nos últimos minutos</span>
+            <span><strong>{deliveryAlert.count}</strong> delivery failures on <strong className="uppercase">{deliveryAlert.channel}</strong> in the last few minutes</span>
           </div>
           <button onClick={() => setDeliveryAlert(null)} className="ml-2 text-red-600 hover:text-red-900">
             <span className="material-symbols-outlined text-[16px]">close</span>
@@ -486,8 +486,8 @@ export default function ChatPage() {
                         <span className="ml-2 flex items-center gap-1 text-amber-600 font-medium">
                           <span className="material-symbols-outlined text-[14px]">visibility</span>
                           {activeViewers.length === 1
-                            ? `${activeViewers[0]} está visualizando`
-                            : `${activeViewers.slice(0, 2).join(', ')} estão visualizando`}
+                            ? `${activeViewers[0]} is viewing`
+                            : `${activeViewers.slice(0, 2).join(', ')} are viewing`}
                         </span>
                       )}
                     </div>
@@ -875,7 +875,7 @@ export default function ChatPage() {
                 return (
                   <div className="p-5 border-b border-outline-variant">
                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                      Outras conversas ({otherConvs.length})
+                      Other conversations ({otherConvs.length})
                     </h3>
                     <div className="flex flex-col gap-2">
                       {otherConvs.map(c => (
@@ -921,7 +921,7 @@ export default function ChatPage() {
                     <span className={cn("material-symbols-outlined text-[14px]", aiGenerating && "animate-spin")}>
                       {aiGenerating ? "progress_activity" : "refresh"}
                     </span>
-                    {aiGenerating ? "Gerando…" : "Gerar"}
+                    {aiGenerating ? "Generating..." : "Generate"}
                   </button>
                 </div>
 
@@ -937,7 +937,7 @@ export default function ChatPage() {
                       <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                         {aiSource === "generated" ? "auto_awesome" : "cached"}
                       </span>
-                      {aiSource === "generated" ? "Gerado agora" : "Cache da última sessão"}
+                      {aiSource === "generated" ? "Generated now" : "Cached from last session"}
                     </span>
                     <span className="text-[10px] text-slate-400">
                       {aiGeneratedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -951,7 +951,7 @@ export default function ChatPage() {
                     className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-sm text-slate-400 hover:border-[#7C4DFF] hover:text-[#7C4DFF] transition-colors flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                    Gerar sugestões com IA
+                    Generate AI suggestions
                   </button>
                 )}
 
