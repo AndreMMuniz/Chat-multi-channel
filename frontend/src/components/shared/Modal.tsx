@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   title: string;
@@ -11,16 +12,27 @@ interface ModalProps {
 }
 
 export default function Modal({ title, onClose, children, maxWidth = "max-w-md" }: ModalProps) {
-  // Prevent scroll when modal is open
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "unset";
     };
   }, []);
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  // Also close on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -30,13 +42,13 @@ export default function Modal({ title, onClose, children, maxWidth = "max-w-md" 
         onClick={onClose}
       />
 
-      {/* Modal Container */}
+      {/* Modal */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-        className={`relative bg-white rounded-2xl shadow-2xl w-full ${maxWidth} min-w-[min(90vw,400px)] flex flex-col max-h-[90vh] overflow-hidden`}
+        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+        transition={{ type: "spring", duration: 0.4, bounce: 0.25 }}
+        className={`relative bg-white rounded-2xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] overflow-hidden`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#E9ECEF] shrink-0">
@@ -50,10 +62,11 @@ export default function Modal({ title, onClose, children, maxWidth = "max-w-md" 
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
+        <div className="overflow-y-auto p-6 flex-1">
           {children}
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-03  # epic 13 closed with project-aware message-to-card routing
+last_updated: 2026-05-03  # epic 13 retrospective completed
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -232,4 +232,4 @@ development_status:
   13-2-create-card-from-message-with-project-routing: done
   13-3-message-tag-delete-and-quick-reply-actions: done
 
-  epic-13-retrospective: optional
+  epic-13-retrospective: done
