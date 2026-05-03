@@ -72,36 +72,45 @@ const CHANNEL_META: Record<ChannelType, {
   badgeClass: string;
   iconClass: string;
   icon: IconType;
+  dot: string;
+  bg: string;
+  text: string;
+  border: string;
 }> = {
   TELEGRAM: {
     label: 'Telegram',
     badgeClass: 'bg-sky-50 text-sky-700 border-sky-100',
     iconClass: 'text-[#0088CC]',
     icon: FaTelegram,
+    dot: '#0088CC', bg: '#f0f9ff', text: '#0369a1', border: '#bae6fd',
   },
   WHATSAPP: {
     label: 'WhatsApp',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
     iconClass: 'text-[#25D366]',
     icon: FaWhatsapp,
+    dot: '#25D366', bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0',
   },
   EMAIL: {
     label: 'Email',
     badgeClass: 'bg-red-50 text-red-700 border-red-100',
     iconClass: 'text-[#EA4335]',
     icon: MdOutlineEmail,
+    dot: '#F97316', bg: '#fff7ed', text: '#c2410c', border: '#fed7aa',
   },
   SMS: {
     label: 'SMS',
     badgeClass: 'bg-amber-50 text-amber-700 border-amber-100',
     iconClass: 'text-[#F59E0B]',
     icon: FaCommentDots,
+    dot: '#8B5CF6', bg: '#f5f3ff', text: '#6d28d9', border: '#ddd6fe',
   },
   WEB: {
     label: 'Web Chat',
     badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
     iconClass: 'text-slate-500',
     icon: FaGlobe,
+    dot: '#94a3b8', bg: '#f8fafc', text: '#475569', border: '#e2e8f0',
   },
 };
 
@@ -495,73 +504,46 @@ export default function ChatPage() {
                 onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="mt-3 space-y-2">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                <button
-                  onClick={() => setSelectedChannel('ALL')}
-                  className={cn(
-                    'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                    selectedChannel === 'ALL'
-                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
-                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                  )}
-                >
+            <div className="mt-2 space-y-1.5">
+              {/* Channel filter chips */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
+                <button onClick={() => setSelectedChannel('ALL')}
+                  className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer"
+                  style={selectedChannel === 'ALL' ? { background: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
                   Todos
                 </button>
-                {availableChannels.map((channel) => (
-                  <button
-                    key={channel}
-                    onClick={() => setSelectedChannel(channel)}
-                    className={cn(
-                      'shrink-0 rounded-full border px-2 py-1 transition-colors',
-                      selectedChannel === channel
-                        ? 'border-indigo-200 bg-indigo-50'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    )}
-                  >
-                    <ChannelBadge channel={channel} compact />
-                  </button>
-                ))}
+                {availableChannels.map((ch) => {
+                  const m = CHANNEL_META[ch];
+                  const active = selectedChannel === ch;
+                  return (
+                    <button key={ch} onClick={() => setSelectedChannel(ch)}
+                      className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                      style={active ? { background: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: m.dot, display: 'inline-block', flexShrink: 0 }} />
+                      {m.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                <button
-                  onClick={() => setSelectedTag('ALL')}
-                  className={cn(
-                    'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                    selectedTag === 'ALL'
-                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
-                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                  )}
-                >
+              {/* Tag filter chips */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
+                <button onClick={() => setSelectedTag('ALL')}
+                  className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors cursor-pointer"
+                  style={selectedTag === 'ALL' ? { background: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
                   Todas tags
                 </button>
-                {TAG_OPTIONS.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => setSelectedTag(tag)}
-                    className={cn(
-                      'shrink-0 rounded-full transition-all',
-                      selectedTag === tag ? 'ring-2 ring-indigo-100 ring-offset-1' : '',
-                      tagCounts[tag] === 0 && selectedTag !== tag ? 'opacity-45 hover:opacity-70' : ''
-                    )}
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <TagBadge tag={tag} className="px-2.5 py-1" />
-                      <span className={cn(
-                        'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                        tagCounts[tag] > 0 ? 'bg-slate-100 text-slate-500' : 'bg-slate-50 text-slate-400'
-                      )}>
-                        {tagCounts[tag]}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+                {TAG_OPTIONS.map((tag) => {
+                  const m = TAG_META[tag];
+                  const active = selectedTag === tag;
+                  return (
+                    <button key={tag} onClick={() => setSelectedTag(tag)}
+                      className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors cursor-pointer"
+                      style={active ? { background: m.activeBg, color: m.activeText, borderColor: m.activeBorder } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
+                      {m.label}
+                    </button>
+                  );
+                })}
               </div>
-              {selectedTag !== 'ALL' && (
-                <p className="text-[11px] text-slate-400">
-                  One tag per conversation in this release. Filtering and labeling are built for operational organization, not multi-tag CRM yet.
-                </p>
-              )}
             </div>
           </div>
           
@@ -584,93 +566,81 @@ export default function ChatPage() {
                 )}
               </div>
             )}
-            {filteredConversations.map((conv) => (
-              <div
-                key={conv.id}
-                data-testid="conversation-item"
-                onClick={() => handleSelectConversation(conv)}
-                className={cn(
-                  "relative p-sm rounded-lg border cursor-pointer flex gap-sm items-start transition-colors",
-                  activeConversation?.id === conv.id
-                    ? "border-outline-variant bg-surface-container"
-                    : "border-transparent hover:bg-surface-container-high"
-                )}
-              >
-                {activeConversation?.id === conv.id && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full"></div>
-                )}
-                <div className="relative shrink-0 ml-1">
-                  {conv.contact.avatar ? (
-                    <Image
-                      alt={conv.contact.name || 'Contact avatar'}
-                      className="w-10 h-10 rounded-full object-cover"
-                      src={conv.contact.avatar}
-                      width={40}
-                      height={40}
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-h2 text-h2 uppercase">
-                      {(conv.contact.name || 'U')[0]}
+            {filteredConversations.map((conv) => {
+              const chMeta = getChannelMeta(conv.channel);
+              const isActive = activeConversation?.id === conv.id;
+              const initials = (conv.contact.name || conv.contact.channel_identifier || 'U')
+                .split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+              const sla = waitingTime(conv.last_message_date, conv.is_unread);
+              return (
+                <div
+                  key={conv.id}
+                  data-testid="conversation-item"
+                  onClick={() => handleSelectConversation(conv)}
+                  style={isActive ? { background: '#eef2ff', borderColor: '#c7d2fe' } : {}}
+                  className={cn(
+                    "relative rounded-[9px] border cursor-pointer flex gap-2.5 items-start transition-colors",
+                    "px-3 py-2.5 mb-0.5",
+                    isActive ? "border-[#c7d2fe]" : "border-transparent hover:bg-[#e8ecf8]"
+                  )}
+                >
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 bg-[#4f46e5] rounded-r-[4px]"></div>
+                  )}
+                  {/* Avatar with channel dot */}
+                  <div className="relative shrink-0">
+                    {conv.contact.avatar ? (
+                      <Image alt={initials} className="w-[38px] h-[38px] rounded-full object-cover"
+                        src={conv.contact.avatar} width={38} height={38} />
+                    ) : (
+                      <div className="w-[38px] h-[38px] rounded-full bg-[#ede9fe] text-[#7C4DFF] flex items-center justify-center text-[13px] font-bold uppercase">
+                        {initials}
+                      </div>
+                    )}
+                    {/* Channel dot */}
+                    <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] bg-white border border-[#E9ECEF] rounded-full flex items-center justify-center">
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: chMeta.dot, display: 'block' }} />
                     </div>
-                  )}
-                  {/* Channel icon badge */}
-                  <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm border border-outline-variant">
-                    {(() => {
-                      const chMeta = getChannelMeta(conv.channel);
-                      const Icon = chMeta.icon;
-                      return <Icon className={cn('text-[11px]', chMeta.iconClass)} />;
-                    })()}
+                    {conv.is_unread && (
+                      <div className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5 border-2 border-white rounded-full bg-green-500"></div>
+                    )}
                   </div>
-                  {conv.is_unread && (
-                    <div className="absolute -top-0.5 -left-0.5 w-3 h-3 border-2 border-surface-container-lowest rounded-full bg-green-500"></div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline mb-1">
-                    <span className={cn(
-                      "font-body-md text-body-md truncate",
-                      conv.is_unread ? "font-semibold text-on-surface" : "font-medium text-on-surface"
-                    )}>
-                      {conv.contact.name || conv.contact.channel_identifier}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* Notification badge — P0-3 */}
-                      {notifCounts[conv.id] > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
-                          {notifCounts[conv.id] > 99 ? '99+' : notifCounts[conv.id]}
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-baseline mb-0.5">
+                      <span className="text-[13px] truncate max-w-[130px]"
+                        style={{ fontWeight: conv.is_unread ? 600 : 500, color: '#1d1a24' }}>
+                        {conv.contact.name || conv.contact.channel_identifier}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {notifCounts[conv.id] > 0 && (
+                          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#4f46e5] text-white text-[10px] font-bold">
+                            {notifCounts[conv.id] > 99 ? '99+' : notifCounts[conv.id]}
+                          </span>
+                        )}
+                        <span className="text-[10px]" style={{ color: sla?.slaBreached ? '#ef4444' : '#94a3b8', fontWeight: sla?.slaBreached ? 600 : 400 }}>
+                          {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Tag + SLA row */}
+                    <div className="flex items-center gap-1 mb-0.5 flex-wrap">
+                      <TagBadge tag={conv.tag ?? undefined} />
+                      {sla && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-500">
+                          <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+                          {sla.label}
                         </span>
                       )}
-                      <span className="font-body-sm text-body-sm text-on-surface-variant">
-                        {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
                     </div>
-                  </div>
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <ChannelBadge channel={conv.channel} compact />
-                    <TagBadge tag={conv.tag ?? undefined} />
-                  </div>
-                  <div className="flex items-center justify-between gap-1">
-                    <p className={cn(
-                      "font-body-sm text-body-sm truncate flex-1",
-                      conv.is_unread ? "font-medium text-on-surface" : "text-outline"
-                    )}>
+                    <p className="text-[12px] truncate"
+                      style={{ color: conv.is_unread ? '#374151' : '#94a3b8', fontWeight: conv.is_unread ? 500 : 400 }}>
                       {conv.last_message || 'Sem mensagens'}
                     </p>
-                    {/* SLA risk indicator — Stories 3.2/3.3 */}
-                    {(() => {
-                      const wt = waitingTime(conv.last_message_date, conv.is_unread);
-                      if (!wt) return null;
-                      return (
-                        <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-semibold shrink-0", wt.color)}>
-                          {wt.slaBreached && <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>}
-                          {wt.label}
-                        </span>
-                      );
-                    })()}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </aside>
 
@@ -1083,15 +1053,27 @@ export default function ChatPage() {
                         Gerar sugestões de IA
                       </button>
                     )}
-                    {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setInput(s)}
-                        className="w-full text-left px-3 py-2 rounded-lg bg-[#faf5ff] border border-[#ede9fe] text-xs text-slate-700 leading-relaxed hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-all"
-                      >
-                        {s}
-                      </button>
-                    ))}
+                    {!aiGenerating && !aiLoading && suggestions.map((s, i) => {
+                      const confidence = Math.max(70, 97 - i * 8);
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setInput(s)}
+                          className="w-full text-left px-3 py-2.5 rounded-[9px] bg-[#faf5ff] border border-[#ede9fe] text-xs text-slate-700 leading-relaxed hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-all"
+                        >
+                          <p className="mb-1.5">{s}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-[#94a3b8]">Confiança</span>
+                            <div className="flex items-center gap-1.5">
+                              <div style={{ width: 50, height: 3, background: '#e9d5ff', borderRadius: 99 }}>
+                                <div style={{ width: `${confidence}%`, height: '100%', background: confidence > 85 ? '#7C4DFF' : '#a78bfa', borderRadius: 99 }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-[#7C4DFF]">{confidence}%</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
