@@ -16,7 +16,7 @@ import { useMessages } from '@/hooks/useMessages';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
-import { conversationsApi, usersApi } from '@/lib/api/index';
+import { conversationsApi, usersApi, quickRepliesApi } from '@/lib/api/index';
 import type { SequencedEvent } from '@/types/api';
 import type { ChannelType, Conversation, ConversationTag, Message } from '@/types/chat';
 import AudioMessage from '@/components/AudioMessage';
@@ -196,6 +196,13 @@ export default function ChatPage() {
   const [deliveryAlert, setDeliveryAlert] = useState<{ channel: string; count: number } | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const [aiSheetOpen, setAiSheetOpen] = useState(false);
+  const [showAIDesktop, setShowAIDesktop] = useState(true);
+  const [rightPanelTab, setRightPanelTab] = useState<'contact' | 'details' | 'history'>('contact');
+  const [allQuickReplies, setAllQuickReplies] = useState<import('@/types/quickReply').QuickReply[]>([]);
+
+  useEffect(() => {
+    quickRepliesApi.listQuickReplies().then(r => setAllQuickReplies(r.data ?? [])).catch(() => {});
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -703,17 +710,19 @@ export default function ChatPage() {
                       <TagBadge tag={activeConversation.tag} />
                       {/* Presence indicator — P0-1 */}
                       {activeViewers.length > 0 && (
-                        <span className="ml-2 flex items-center gap-1 text-amber-600 font-medium">
-                          <span className="material-symbols-outlined text-[14px]">visibility</span>
-                          {activeViewers.length === 1
-                            ? `${activeViewers[0]} is viewing`
-                            : `${activeViewers.slice(0, 2).join(', ')} are viewing`}
+                        <span className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 rounded-full px-2.5 py-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                          <span className="text-[10px] font-semibold text-orange-700">
+                            {activeViewers.length === 1
+                              ? `${activeViewers[0]} is viewing`
+                              : `${activeViewers.length} viewing`}
+                          </span>
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
-                {/* Header actions: status selector + mark unread */}
+                {/* Header actions */}
                 <div className="flex items-center gap-sm">
                   <select
                     value={activeConversation.status}
@@ -729,6 +738,19 @@ export default function ChatPage() {
                     <option value="PENDING">Pending</option>
                     <option value="CLOSED">Closed</option>
                   </select>
+                  {/* AI toggle — desktop */}
+                  <button
+                    title="AI Suggestions"
+                    onClick={() => setShowAIDesktop(v => !v)}
+                    className={cn(
+                      "hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors",
+                      showAIDesktop
+                        ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                        : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    )}
+                  >
+                    <TbSparkles size={17} />
+                  </button>
                   <button
                     title="Mark as unread"
                     onClick={() => updateConversation(activeConversation.id, { is_unread: true })}
@@ -820,6 +842,28 @@ export default function ChatPage() {
                 ))}
                 <div ref={messagesEndRef} />
               </div>
+
+              {/* Quick Reply chip strip — desktop */}
+              {allQuickReplies.length > 0 && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-white border-t border-outline-variant overflow-x-auto [&::-webkit-scrollbar]:hidden">
+                  {allQuickReplies.slice(0, 4).map(qr => (
+                    <button
+                      key={qr.id}
+                      onClick={() => setInput(qr.content)}
+                      className="shrink-0 flex items-center gap-1.5 h-7 px-3 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                    >
+                      <span className="bg-indigo-50 text-indigo-600 border border-indigo-100 rounded px-1 py-0.5 text-[9px] font-bold">{qr.shortcut}</span>
+                      {qr.shortcut.replace('/', '').charAt(0).toUpperCase() + qr.shortcut.replace('/', '').slice(1)}
+                    </button>
+                  ))}
+                  {allQuickReplies.length > 4 && (
+                    <button className="shrink-0 flex items-center gap-1 h-7 px-3 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                      <span className="material-symbols-outlined text-[14px]">more_horiz</span>
+                      More
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Input Area */}
               <div
@@ -972,6 +1016,61 @@ export default function ChatPage() {
                 </div>
               </div>
 
+              {/* AI Panel — desktop, below composer */}
+              {showAIDesktop && (
+                <div className="hidden md:block border-t border-outline-variant bg-white">
+                  <div className="px-4 py-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#7C3AED] to-indigo-600 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[11px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider">AI Suggestions</span>
+                      {(aiGenerating || aiLoading) && (
+                        <span className="w-3 h-3 border-2 border-[#7C3AED]/30 border-t-[#7C3AED] rounded-full animate-spin" />
+                      )}
+                      {aiSource && aiGeneratedAt && (
+                        <span className="text-[10px] text-slate-400">
+                          {aiSource === 'generated' ? 'Generated' : 'Cached'} · {aiGeneratedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => generateAI(activeConversation!.id)}
+                      disabled={aiGenerating || aiLoading}
+                      className="flex items-center gap-1.5 h-6 px-2.5 rounded-lg border border-[#e9d5ff] bg-white text-[11px] font-semibold text-[#7C3AED] hover:bg-[#f5f3ff] disabled:opacity-50 transition-colors"
+                    >
+                      <span className={cn("material-symbols-outlined text-[13px]", (aiGenerating || aiLoading) && "animate-spin")}>
+                        {(aiGenerating || aiLoading) ? "progress_activity" : "refresh"}
+                      </span>
+                      {(aiGenerating || aiLoading) ? 'Generating…' : 'Generate'}
+                    </button>
+                  </div>
+                  <div className="px-3 pb-3 flex flex-col gap-2">
+                    {(aiGenerating || aiLoading) && (
+                      [1,2].map(i => <div key={i} className="h-14 rounded-lg bg-slate-100 animate-pulse" />)
+                    )}
+                    {!aiGenerating && !aiLoading && suggestions.length === 0 && (
+                      <button
+                        onClick={() => generateAI(activeConversation!.id)}
+                        className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-xs text-slate-400 hover:border-[#7C3AED] hover:text-[#7C3AED] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                        Generate AI suggestions
+                      </button>
+                    )}
+                    {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setInput(s)}
+                        className="w-full text-left px-3 py-2 rounded-lg bg-[#faf5ff] border border-[#ede9fe] text-xs text-slate-700 leading-relaxed hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-all"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Mobile AI Suggestions Sheet — bottom drawer, md:hidden */}
               {aiSheetOpen && (
                 <div className="fixed inset-0 z-50 md:hidden">
@@ -1040,193 +1139,174 @@ export default function ChatPage() {
           )}
         </section>
 
-        {/* Right Column: Context & Details — hidden on mobile */}
-        <aside className="hidden md:flex w-[300px] h-full flex-col bg-surface-container-lowest border-l border-outline-variant shrink-0 overflow-y-auto">
+        {/* Right Column — Tabbed panel, hidden on mobile */}
+        <aside className="hidden md:flex w-[280px] h-full flex-col bg-white border-l border-outline-variant shrink-0 overflow-hidden">
           {activeConversation ? (
-            <div className="flex flex-col gap-0">
-              {/* Contact Details */}
-              <div className="p-5 border-b border-outline-variant">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Details</h3>
-                <div className="flex flex-col gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Name</span>
-                    <span className="text-slate-900 font-medium ml-2">{activeConversation.contact.name || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Identifier</span>
-                    <span className="text-slate-900 font-medium truncate ml-2" title={activeConversation.contact.channel_identifier}>{activeConversation.contact.channel_identifier}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Channel</span>
-                    <ChannelBadge channel={activeConversation.channel} compact />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Tag</span>
-                    {activeConversation.tag ? <TagBadge tag={activeConversation.tag} /> : <span className="text-slate-900 font-medium">-</span>}
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Status</span>
-                    <span className={cn(
-                      "text-xs font-semibold px-2 py-0.5 rounded-full",
-                      activeConversation.status === 'OPEN' && "bg-orange-50 text-orange-700",
-                      activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700",
-                      activeConversation.status === 'CLOSED' && "bg-slate-100 text-slate-500",
-                    )}>
-                      {activeConversation.status}
-                    </span>
-                  </div>
-                  {/* SLA first-response time */}
-                  {activeConversation.first_response_at && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500">First Response</span>
-                      <span className="text-xs text-slate-600">
-                        {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Assigned Agent (Story 3.5) */}
-              <div className="p-5 border-b border-outline-variant">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Assigned Agent</h3>
-                <AssignmentPanel
-                  conversation={activeConversation}
-                  onAssign={async (userId) => {
-                    await conversationsApi.assignConversation(activeConversation.id, userId);
-                    fetchConversations();
-                  }}
-                />
-              </div>
-
-              <div className="p-5 border-b border-outline-variant">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Conversation Tag</h3>
-                  {activeConversation.tag ? <TagBadge tag={activeConversation.tag} /> : <span className="text-[11px] font-medium text-slate-400">No tag</span>}
-                </div>
-                <TagSelect
-                  value={activeConversation.tag}
-                  onChange={(tag) => updateConversation(activeConversation.id, { tag })}
-                />
-                <p className="mt-2 text-xs text-slate-400">
-                  One tag per conversation in this release. This keeps filtering and CRM preparation consistent without implying multi-tag support.
-                </p>
-              </div>
-
-              {/* Cross-channel history — P1-2 */}
-              {(() => {
-                const otherConvs = conversations.filter(
-                  c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
-                );
-                if (otherConvs.length === 0) return null;
-                return (
-                  <div className="p-5 border-b border-outline-variant">
-                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                      Other conversations ({otherConvs.length})
-                    </h3>
-                    <div className="flex flex-col gap-2">
-                      {otherConvs.map(c => (
-                        <button
-                          key={c.id}
-                          onClick={() => handleSelectConversation(c)}
-                          className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 text-left transition-colors w-full"
-                        >
-                          <ChannelBadge channel={c.channel} compact />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs font-medium text-slate-700 truncate">{getChannelMeta(c.channel).label}</p>
-                              <TagBadge tag={c.tag} />
-                            </div>
-                            <p className="text-[11px] text-slate-400 truncate">{c.last_message || 'No messages'}</p>
-                          </div>
-                          <span className={cn(
-                            "text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0",
-                            c.status === 'OPEN' && "bg-orange-50 text-orange-600",
-                            c.status === 'PENDING' && "bg-yellow-50 text-yellow-600",
-                            c.status === 'CLOSED' && "bg-slate-100 text-slate-400",
-                          )}>
-                            {c.status}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* AI Suggestions — P2-1 */}
-              <div className="p-5 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[14px] text-indigo-600" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
-                    AI Suggestions
-                  </h3>
+            <>
+              {/* Tab bar */}
+              <div className="flex border-b border-outline-variant shrink-0">
+                {([
+                  ['contact', 'person', 'Contact'],
+                  ['details', 'info', 'Details'],
+                  ['history', 'history', 'History'],
+                ] as const).map(([t, icon, label]) => (
                   <button
-                    onClick={() => generateAI(activeConversation.id)}
-                    disabled={aiGenerating}
-                    className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50 transition-colors"
+                    key={t}
+                    onClick={() => setRightPanelTab(t)}
+                    className={cn(
+                      "flex-1 h-11 flex flex-col items-center justify-center gap-0.5 border-none bg-transparent cursor-pointer transition-all",
+                      rightPanelTab === t
+                        ? "border-b-2 border-[#7C3AED] text-[#7C3AED]"
+                        : "text-slate-400 hover:text-slate-600"
+                    )}
+                    style={{ borderBottom: rightPanelTab === t ? '2px solid #7C3AED' : '2px solid transparent' }}
                   >
-                    <span className={cn("material-symbols-outlined text-[14px]", aiGenerating && "animate-spin")}>
-                      {aiGenerating ? "progress_activity" : "refresh"}
-                    </span>
-                    {aiGenerating ? "Generating..." : "Generate"}
-                  </button>
-                </div>
-
-                {/* Source + timestamp badge */}
-                {aiSource && aiGeneratedAt && (
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn(
-                      "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full",
-                      aiSource === "generated"
-                        ? "bg-indigo-50 text-indigo-600"
-                        : "bg-slate-100 text-slate-500"
-                    )}>
-                      <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                        {aiSource === "generated" ? "auto_awesome" : "cached"}
-                      </span>
-                      {aiSource === "generated" ? "Generated now" : "Cached from last session"}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {aiGeneratedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                )}
-
-                {suggestions.length === 0 && !aiGenerating && !aiLoading && (
-                  <button
-                    onClick={() => generateAI(activeConversation.id)}
-                    className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-sm text-slate-400 hover:border-indigo-500 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                    Generate AI suggestions
-                  </button>
-                )}
-
-                {(aiGenerating || aiLoading) && (
-                  <div className="flex flex-col gap-2">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
-                    ))}
-                  </div>
-                )}
-
-                {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setInput(s)}
-                    className="w-full text-left px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-sm text-slate-700 hover:bg-indigo-100 hover:border-indigo-300 transition-all leading-snug"
-                  >
-                    {s}
+                    <span className="material-symbols-outlined text-[16px]" style={rightPanelTab === t ? { fontVariationSettings: "'FILL' 1" } : {}}>{icon}</span>
+                    <span className="text-[10px] font-semibold">{label}</span>
                   </button>
                 ))}
               </div>
-            </div>
+
+              {/* Tab content */}
+              <div className="flex-1 overflow-y-auto">
+                {/* ── Contact tab ── */}
+                {rightPanelTab === 'contact' && (
+                  <div className="p-4">
+                    <div className="flex flex-col items-center gap-2 pb-4 mb-4 border-b border-outline-variant">
+                      <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-base font-bold">
+                        {(activeConversation.contact.name || activeConversation.contact.channel_identifier || 'U')[0].toUpperCase()}
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-slate-900">{activeConversation.contact.name || '-'}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[220px]">{activeConversation.contact.channel_identifier}</p>
+                      </div>
+                      <ChannelBadge channel={activeConversation.channel} compact />
+                    </div>
+                    <div className="space-y-2.5 text-xs">
+                      {[
+                        { label: 'Name', value: activeConversation.contact.name || '-' },
+                        { label: 'Identifier', value: activeConversation.contact.channel_identifier },
+                        { label: 'Channel', value: getChannelMeta(activeConversation.channel).label },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex justify-between">
+                          <span className="text-slate-500">{label}</span>
+                          <span className="font-medium text-slate-900 text-right max-w-[160px] truncate">{value}</span>
+                        </div>
+                      ))}
+                      {activeConversation.first_response_at && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">First Response</span>
+                          <span className="font-medium text-slate-900">
+                            {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Details tab ── */}
+                {rightPanelTab === 'details' && (
+                  <div className="p-4 space-y-5">
+                    {/* Status */}
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Status</p>
+                      <div className="flex gap-1.5">
+                        {(['OPEN', 'PENDING', 'CLOSED'] as const).map(s => {
+                          const styles = {
+                            OPEN: { active: 'bg-orange-50 text-orange-700 border-orange-200', label: 'Open' },
+                            PENDING: { active: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Pending' },
+                            CLOSED: { active: 'bg-slate-100 text-slate-600 border-slate-300', label: 'Closed' },
+                          };
+                          const isActive = activeConversation.status === s;
+                          return (
+                            <button
+                              key={s}
+                              onClick={() => updateConversation(activeConversation.id, { status: s })}
+                              className={cn(
+                                "flex-1 py-1.5 rounded-lg border text-[11px] font-semibold transition-all",
+                                isActive ? styles[s].active : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                              )}
+                            >
+                              {styles[s].label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Assigned Agent */}
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Agent</p>
+                      <AssignmentPanel
+                        conversation={activeConversation}
+                        onAssign={async (userId) => {
+                          await conversationsApi.assignConversation(activeConversation.id, userId);
+                          fetchConversations();
+                        }}
+                      />
+                    </div>
+
+                    {/* Tag */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Conversation Tag</p>
+                        {activeConversation.tag && <TagBadge tag={activeConversation.tag} />}
+                      </div>
+                      <TagSelect
+                        value={activeConversation.tag}
+                        onChange={(tag) => updateConversation(activeConversation.id, { tag })}
+                      />
+                      <p className="mt-1.5 text-[10px] text-slate-400">One tag per conversation in this release.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── History tab ── */}
+                {rightPanelTab === 'history' && (
+                  <div className="p-4">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Other Conversations</p>
+                    {(() => {
+                      const otherConvs = conversations.filter(
+                        c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
+                      );
+                      if (otherConvs.length === 0) return (
+                        <p className="text-xs text-slate-400 text-center py-6">No previous conversations</p>
+                      );
+                      return (
+                        <div className="flex flex-col divide-y divide-slate-100">
+                          {otherConvs.map(c => (
+                            <button
+                              key={c.id}
+                              onClick={() => handleSelectConversation(c)}
+                              className="flex flex-col gap-1.5 py-3 text-left hover:bg-slate-50 transition-colors px-1 rounded-lg"
+                            >
+                              <div className="flex items-center justify-between">
+                                <ChannelBadge channel={c.channel} compact />
+                                <span className="text-[10px] text-slate-400">
+                                  {c.last_message_date ? new Date(c.last_message_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600 truncate">{c.last_message || 'No messages'}</p>
+                              <span className={cn(
+                                "text-[10px] font-semibold",
+                                c.status === 'CLOSED' ? "text-emerald-600" : "text-slate-400"
+                              )}>
+                                {c.status === 'CLOSED' ? '✓ Resolved' : c.status}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
-             <div className="p-5 opacity-50">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Contact Details</h3>
-                <p className="text-sm text-slate-400">No contact selected.</p>
-             </div>
+            <div className="p-5 opacity-50">
+              <p className="text-sm text-slate-400">No contact selected.</p>
+            </div>
           )}
         </aside>
       </main>

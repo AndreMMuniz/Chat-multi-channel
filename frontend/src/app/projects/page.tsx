@@ -6,6 +6,7 @@ import { FaCommentDots, FaWhatsapp } from "react-icons/fa";
 import { FaGlobe, FaTelegram } from "react-icons/fa6";
 import { MdOutlineEmail, MdSms } from "react-icons/md";
 import Modal from "@/components/shared/Modal";
+import { useAuth } from "@/hooks/useAuth";
 
 type ViewId = "kanban" | "list" | "timeline";
 type StageId = "lead" | "qualification" | "proposal" | "negotiation" | "closed";
@@ -71,14 +72,6 @@ const STAGES: Array<{ id: StageId; label: string; accent: string; surface: strin
   { id: "closed", label: "Closed", accent: "bg-emerald-500", surface: "from-emerald-100 to-emerald-50" },
 ];
 
-const OWNERS: Owner[] = [
-  { id: "o1", name: "Lucas Menezes", initials: "LM", tint: "bg-indigo-100", text: "text-indigo-700" },
-  { id: "o2", name: "Carla Ramos", initials: "CR", tint: "bg-rose-100", text: "text-rose-700" },
-  { id: "o3", name: "Felipe Souza", initials: "FS", tint: "bg-emerald-100", text: "text-emerald-700" },
-  { id: "o4", name: "Mariana Costa", initials: "MC", tint: "bg-amber-100", text: "text-amber-700" },
-  { id: "o5", name: "Bruno Almeida", initials: "BA", tint: "bg-sky-100", text: "text-sky-700" },
-];
-
 const CHANNEL_META: Record<
   ChannelId,
   { label: string; icon: IconType; tint: string; iconClass: string; border: string }
@@ -131,207 +124,7 @@ const ORIGIN_META: Record<OriginId, { label: string; className: string; icon: Ic
   manual: { label: "Manual", className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200", icon: FaGlobe },
 };
 
-const INITIAL_PROJECT_CARDS: ProjectCard[] = [
-  {
-    id: "p1",
-    reference: "PRJ-421",
-    title: "Launch onboarding for TechCorp",
-    contact: "TechCorp Ltd",
-    workType: "Implementation demand",
-    stage: "lead",
-    channel: "WHATSAPP",
-    priority: "high",
-    origin: "message",
-    tags: ["onboarding", "enterprise"],
-    dueDate: "2026-05-05",
-    progress: 18,
-    ownerId: "o1",
-    value: 24000,
-    sourceMessage: "Customer asked for onboarding kickoff and immediate handoff planning.",
-  },
-  {
-    id: "p2",
-    reference: "PRJ-422",
-    title: "Review contract blockers",
-    contact: "Banco Digital Now",
-    workType: "Commercial follow-up",
-    stage: "lead",
-    channel: "EMAIL",
-    priority: "medium",
-    origin: "manual",
-    tags: ["contract", "legal"],
-    dueDate: "2026-05-12",
-    progress: 12,
-    ownerId: "o4",
-    value: 96000,
-  },
-  {
-    id: "p3",
-    reference: "PRJ-423",
-    title: "Escalate API instability complaint",
-    contact: "Clinica Saude+",
-    workType: "Support demand",
-    stage: "lead",
-    channel: "TELEGRAM",
-    priority: "high",
-    origin: "message",
-    tags: ["support", "urgent"],
-    dueDate: "2026-05-03",
-    progress: 6,
-    ownerId: "o2",
-    value: 5200,
-    sourceMessage: "Client reported instability in message delivery and requested a fix today.",
-  },
-  {
-    id: "p4",
-    reference: "PRJ-424",
-    title: "Map retail catalog integration",
-    contact: "Varejo Online",
-    workType: "Integration task",
-    stage: "qualification",
-    channel: "WEB",
-    priority: "medium",
-    origin: "manual",
-    tags: ["catalog", "integration"],
-    dueDate: "2026-05-14",
-    progress: 36,
-    ownerId: "o5",
-    value: 15000,
-  },
-  {
-    id: "p5",
-    reference: "PRJ-425",
-    title: "Prepare omnichannel migration plan",
-    contact: "Fintech Pagar.me",
-    workType: "Project planning",
-    stage: "qualification",
-    channel: "EMAIL",
-    priority: "high",
-    origin: "message",
-    tags: ["migration", "enterprise"],
-    dueDate: "2026-05-06",
-    progress: 44,
-    ownerId: "o3",
-    value: 48000,
-    sourceMessage: "Customer requested a phased migration plan covering email and WhatsApp queues.",
-  },
-  {
-    id: "p6",
-    reference: "PRJ-426",
-    title: "Validate escalation workflow",
-    contact: "EduTech Aprenda+",
-    workType: "QA demand",
-    stage: "qualification",
-    channel: "WHATSAPP",
-    priority: "low",
-    origin: "message",
-    tags: ["workflow", "qa"],
-    dueDate: "2026-05-18",
-    progress: 28,
-    ownerId: "o1",
-    value: 18000,
-    sourceMessage: "Need to validate the new escalation workflow before training the ops team.",
-  },
-  {
-    id: "p7",
-    reference: "PRJ-427",
-    title: "Draft renewal scope proposal",
-    contact: "Rede Vida",
-    workType: "Renewal proposal",
-    stage: "proposal",
-    channel: "SMS",
-    priority: "medium",
-    origin: "manual",
-    tags: ["renewal", "services"],
-    dueDate: "2026-05-08",
-    progress: 58,
-    ownerId: "o2",
-    value: 21000,
-  },
-  {
-    id: "p8",
-    reference: "PRJ-428",
-    title: "Package training sessions",
-    contact: "LogisTech Brasil",
-    workType: "Enablement project",
-    stage: "proposal",
-    channel: "EMAIL",
-    priority: "medium",
-    origin: "message",
-    tags: ["training", "delivery"],
-    dueDate: "2026-05-09",
-    progress: 63,
-    ownerId: "o5",
-    value: 32000,
-    sourceMessage: "Customer wants structured training after rollout approval.",
-  },
-  {
-    id: "p9",
-    reference: "PRJ-429",
-    title: "Negotiate support expansion",
-    contact: "Supermercado Bom Preco",
-    workType: "Expansion opportunity",
-    stage: "negotiation",
-    channel: "WHATSAPP",
-    priority: "high",
-    origin: "manual",
-    tags: ["expansion", "support"],
-    dueDate: "2026-05-07",
-    progress: 74,
-    ownerId: "o4",
-    value: 8500,
-  },
-  {
-    id: "p10",
-    reference: "PRJ-430",
-    title: "Finalize channel rollout",
-    contact: "Farmacias Vida",
-    workType: "Rollout delivery",
-    stage: "negotiation",
-    channel: "TELEGRAM",
-    priority: "medium",
-    origin: "message",
-    tags: ["rollout", "channel"],
-    dueDate: "2026-05-11",
-    progress: 82,
-    ownerId: "o3",
-    value: 12000,
-    sourceMessage: "Client confirmed the rollout but needs a final checklist before go-live.",
-  },
-  {
-    id: "p11",
-    reference: "PRJ-431",
-    title: "Complete onboarding handoff",
-    contact: "Restaurantes GeloBom",
-    workType: "Closed implementation",
-    stage: "closed",
-    channel: "WHATSAPP",
-    priority: "low",
-    origin: "message",
-    tags: ["onboarding", "handoff"],
-    dueDate: "2026-04-30",
-    progress: 100,
-    ownerId: "o1",
-    value: 12000,
-    sourceMessage: "Project delivered and customer confirmed handoff acceptance.",
-  },
-  {
-    id: "p12",
-    reference: "PRJ-432",
-    title: "Resolve webhook backlog",
-    contact: "Marketplace Nexus",
-    workType: "Technical demand",
-    stage: "closed",
-    channel: "WEB",
-    priority: "high",
-    origin: "manual",
-    tags: ["webhook", "infra"],
-    dueDate: "2026-05-01",
-    progress: 100,
-    ownerId: "o5",
-    value: 9000,
-  },
-];
+const INITIAL_PROJECT_CARDS: ProjectCard[] = [];
 
 const TAG_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   upsell:    { bg: "bg-fuchsia-50",  text: "text-fuchsia-700", border: "border-fuchsia-100" },
@@ -387,6 +180,17 @@ function getNextReference(cards: ProjectCard[]) {
   return `PRJ-${next}`;
 }
 
+function getInitials(fullName: string) {
+  return (
+    fullName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "U"
+  );
+}
+
 function toFormState(card: ProjectCard): ProjectFormState {
   return {
     id: card.id,
@@ -407,7 +211,7 @@ function toFormState(card: ProjectCard): ProjectFormState {
   };
 }
 
-function createEmptyForm(cards: ProjectCard[], overrides?: Partial<ProjectFormState>): ProjectFormState {
+function createEmptyForm(cards: ProjectCard[], owners: Owner[], overrides?: Partial<ProjectFormState>): ProjectFormState {
   return {
     id: null,
     reference: getNextReference(cards),
@@ -421,7 +225,7 @@ function createEmptyForm(cards: ProjectCard[], overrides?: Partial<ProjectFormSt
     tagsInput: "",
     dueDate: "2026-05-16",
     progress: 0,
-    ownerId: OWNERS[0].id,
+    ownerId: owners[0]?.id ?? "",
     value: "",
     sourceMessage: "",
     ...overrides,
@@ -509,14 +313,15 @@ function FieldTextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>)
 
 function ProjectCardView({
   card,
+  owner,
   onOpen,
   onDragStart,
 }: {
   card: ProjectCard;
+  owner?: Owner;
   onOpen: (card: ProjectCard) => void;
   onDragStart: (cardId: string, stageId: StageId) => void;
 }) {
-  const owner = OWNERS.find((item) => item.id === card.ownerId);
   const priority = PRIORITY_META[card.priority];
   const origin = ORIGIN_META[card.origin];
   const overdue = isOverdue(card.dueDate) && card.progress < 100;
@@ -601,6 +406,7 @@ function ProjectModal({
   onClose,
   onSave,
   onDelete,
+  owners,
   isEditing,
 }: {
   form: ProjectFormState;
@@ -608,6 +414,7 @@ function ProjectModal({
   onClose: () => void;
   onSave: () => void;
   onDelete?: () => void;
+  owners: Owner[];
   isEditing: boolean;
 }) {
   return (
@@ -660,7 +467,8 @@ function ProjectModal({
           <label className="flex flex-col gap-2">
             <FieldLabel label="Owner" />
             <FieldSelect value={form.ownerId} onChange={(e) => setForm((current) => current ? { ...current, ownerId: e.target.value } : current)}>
-              {OWNERS.map((owner) => (
+              {owners.length === 0 ? <option value="">Unassigned</option> : null}
+              {owners.map((owner) => (
                 <option key={owner.id} value={owner.id}>
                   {owner.name}
                 </option>
@@ -880,6 +688,7 @@ function GanttView({ cards, onCardClick }: { cards: ProjectCard[]; onCardClick: 
 }
 
 export default function ProjectsPage() {
+  const { user } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("kanban");
   const [cards, setCards] = useState<ProjectCard[]>(INITIAL_PROJECT_CARDS);
   const [form, setForm] = useState<ProjectFormState | null>(null);
@@ -890,6 +699,20 @@ export default function ProjectsPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityId | "ALL">("ALL");
   const [channelFilter, setChannelFilter] = useState<ChannelId | "ALL">("ALL");
   const [originFilter, setOriginFilter] = useState<OriginId | "ALL">("ALL");
+
+  const owners = useMemo<Owner[]>(() => {
+    if (!user) return [];
+
+    return [
+      {
+        id: user.id,
+        name: user.full_name,
+        initials: getInitials(user.full_name),
+        tint: "bg-indigo-100",
+        text: "text-indigo-700",
+      },
+    ];
+  }, [user]);
 
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
@@ -936,7 +759,7 @@ export default function ProjectsPage() {
     const activeProjects = filteredCards.filter((card) => card.progress < 100).length;
     const atRisk = filteredCards.filter((card) => isOverdue(card.dueDate) && card.progress < 100).length;
     const conversationOrigin = filteredCards.filter((card) => card.origin === "message").length;
-    const totalOwners = new Set(filteredCards.map((card) => card.ownerId)).size;
+    const totalOwners = new Set(filteredCards.map((card) => card.ownerId).filter(Boolean)).size;
     const pipelineValue = filteredCards.reduce((sum, card) => sum + card.value, 0);
 
     return [
@@ -986,7 +809,7 @@ export default function ProjectsPage() {
   const isEditing = Boolean(form?.id);
 
   const openNewProject = (stage: StageId = "lead") => {
-    setForm(createEmptyForm(cards, { stage }));
+    setForm(createEmptyForm(cards, owners, { stage }));
   };
 
   const openExistingProject = (card: ProjectCard) => {
@@ -1119,7 +942,7 @@ export default function ProjectsPage() {
 
               <FieldSelect value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-11 min-w-[160px] rounded-xl shadow-sm">
                 <option value="ALL">All owners</option>
-                {OWNERS.map((owner) => (
+                {owners.map((owner) => (
                   <option key={owner.id} value={owner.id}>
                     {owner.name}
                   </option>
@@ -1154,16 +977,24 @@ export default function ProjectsPage() {
             </div>
 
             <div className="flex items-center gap-2 xl:ml-auto">
-              {OWNERS.map((owner, index) => (
-                <span
-                  key={owner.id}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold ring-2 ring-white ${owner.tint} ${owner.text} ${index > 0 ? "-ml-1.5" : ""}`}
-                  title={owner.name}
-                >
-                  {owner.initials}
-                </span>
-              ))}
-              <span className="ml-1 text-xs text-slate-500">{OWNERS.length} owners</span>
+              {owners.length > 0 ? (
+                <>
+                  {owners.map((owner, index) => (
+                    <span
+                      key={owner.id}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold ring-2 ring-white ${owner.tint} ${owner.text} ${index > 0 ? "-ml-1.5" : ""}`}
+                      title={owner.name}
+                    >
+                      {owner.initials}
+                    </span>
+                  ))}
+                  <span className="ml-1 text-xs text-slate-500">
+                    {owners.length} {owners.length === 1 ? "owner" : "owners"}
+                  </span>
+                </>
+              ) : (
+                <span className="text-xs text-slate-500">No owners available</span>
+              )}
             </div>
           </div>
 
@@ -1227,14 +1058,18 @@ export default function ProjectsPage() {
                   className="material-symbols-outlined text-[24px]"
                   style={{ fontVariationSettings: "'FILL' 1" }}
                 >
-                  filter_alt
+                  {cards.length === 0 ? "inventory_2" : "filter_alt"}
                 </span>
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-slate-900">No projects match the current filters</h3>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">
+                {cards.length === 0 ? "No project data yet" : "No projects match the current filters"}
+              </h3>
               <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                Try widening the current filters or clear them to bring back the full pipeline workspace.
+                {cards.length === 0
+                  ? "The Projects workspace is now clean and ready to be tested with real data."
+                  : "Try widening the current filters or clear them to bring back the full pipeline workspace."}
               </p>
-              {hasActiveFilters ? (
+              {cards.length > 0 && hasActiveFilters ? (
                 <button
                   type="button"
                   onClick={clearFilters}
@@ -1295,6 +1130,7 @@ export default function ProjectsPage() {
                           <ProjectCardView
                             key={card.id}
                             card={card}
+                            owner={owners.find((item) => item.id === card.ownerId)}
                             onOpen={openExistingProject}
                             onDragStart={handleDragStart}
                           />
@@ -1321,7 +1157,7 @@ export default function ProjectsPage() {
               </div>
               <div className="divide-y divide-slate-200 bg-white">
                 {filteredCards.map((card) => {
-                  const owner = OWNERS.find((item) => item.id === card.ownerId);
+                  const owner = owners.find((item) => item.id === card.ownerId);
                   const stage = STAGES.find((item) => item.id === card.stage);
                   const origin = ORIGIN_META[card.origin];
                   const OriginIcon = origin.icon;
@@ -1375,6 +1211,7 @@ export default function ProjectsPage() {
       {form ? (
         <ProjectModal
           form={form}
+          owners={owners}
           setForm={setForm}
           onClose={() => setForm(null)}
           onSave={handleSave}
