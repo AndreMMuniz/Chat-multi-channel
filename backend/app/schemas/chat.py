@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
@@ -58,6 +58,20 @@ class ConversationUpdate(BaseModel):
     tag: Optional[ConversationTag] = None
     is_unread: Optional[bool] = None
     assigned_user_id: Optional[UUID] = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value):
+        if isinstance(value, str):
+            return value.lower()
+        return value
+
+    @field_validator("tag", mode="before")
+    @classmethod
+    def normalize_tag(cls, value):
+        if isinstance(value, str):
+            return value.lower()
+        return value
 
 class AssignedUserSlim(BaseModel):
     id: UUID

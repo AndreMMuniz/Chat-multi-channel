@@ -8,6 +8,7 @@ from app.models.models import (
     ChannelType,
     Contact,
     Conversation,
+    ConversationTag,
     ConversationStatus,
     DefaultRole,
     Message,
@@ -158,3 +159,36 @@ def test_delete_message_rejects_project_provenance_references(db):
     response = client.delete(f"/api/v1/chat/conversations/{conversation.id}/messages/{message.id}")
     assert response.status_code == 409
     assert response.json()["detail"]["error"]["code"] == "MESSAGE_LINKED_TO_PROJECT"
+
+
+def test_update_conversation_accepts_uppercase_status_and_tag_values(db):
+    user = _seed_user_with_delete_permission(db)
+    contact = Contact(name="Tagged Contact")
+    db.add(contact)
+    db.flush()
+
+    conversation = Conversation(
+        contact_id=contact.id,
+        assigned_user_id=user.id,
+        channel=ChannelType.TELEGRAM,
+        status=ConversationStatus.OPEN,
+        tag=None,
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+
+    client = _make_client(db, user)
+    response = client.patch(
+        f"/api/v1/chat/conversations/{conversation.id}",
+        json={"status": "OPEN", "tag": "SUPPORT"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["status"] == "open"
+    assert payload["tag"] == "support"
+
+    db.refresh(conversation)
+    assert conversation.status == ConversationStatus.OPEN
+    assert conversation.tag == ConversationTag.SUPPORT
