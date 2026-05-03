@@ -597,7 +597,7 @@ export default function ChatPage() {
                   style={isActive ? { background: '#eef2ff', borderColor: '#c7d2fe' } : {}}
                   className={cn(
                     "relative rounded-[9px] border cursor-pointer flex gap-2.5 items-start transition-colors",
-                    "px-3 py-2.5 mb-0.5",
+                    "pl-[13px] pr-2.5 py-2.5 mb-0.5",
                     isActive ? "border-[#c7d2fe]" : "border-transparent hover:bg-[#e8ecf8]"
                   )}
                 >
@@ -645,7 +645,7 @@ export default function ChatPage() {
                     <div className="flex items-center gap-1 mb-0.5 flex-wrap">
                       <TagBadge tag={conv.tag ?? undefined} />
                       {sla && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-500">
+                        <span className="inline-flex items-center gap-[1px] text-[9px] font-bold text-[#ef4444]">
                           <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
                           {sla.label}
                         </span>
@@ -678,8 +678,8 @@ export default function ChatPage() {
           {activeConversation ? (
             <>
               {/* Chat Header */}
-              <div className="h-[72px] px-md py-sm border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-md">
+              <div className="h-16 px-[18px] border-b border-[#E9ECEF] bg-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
                   {/* Back button — mobile only */}
                   <button
                     data-testid="back-button"
@@ -693,10 +693,10 @@ export default function ChatPage() {
                     {activeConversation.contact.avatar ? (
                       <Image
                         alt={activeConversation.contact.name || 'Contact avatar'}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className="w-10 h-10 rounded-full object-cover"
                         src={activeConversation.contact.avatar}
-                        width={48}
-                        height={48}
+                        width={40}
+                        height={40}
                       />
                     ) : (() => {
                       const ac = avatarColor(activeConversation.contact.name || activeConversation.contact.channel_identifier || 'U');
@@ -709,31 +709,40 @@ export default function ChatPage() {
                     })()}
                   </div>
                   <div>
-                    <h2 className="font-h2 text-h2 text-on-surface">{activeConversation.contact.name || activeConversation.contact.channel_identifier}</h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
-                      <ChannelBadge channel={activeConversation.channel} />
+                    <h2 className="text-[15px] font-bold text-[#1d1a24]" style={{ letterSpacing: '-0.2px' }}>{activeConversation.contact.name || activeConversation.contact.channel_identifier}</h2>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <ChannelBadge channel={activeConversation.channel} compact />
                       <TagBadge tag={activeConversation.tag} />
-                      {/* Presence indicator — P0-1 */}
-                      {activeViewers.length > 0 && (
-                        <span className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 rounded-full px-2.5 py-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-                          <span className="text-[10px] font-semibold text-orange-700">
-                            {activeViewers.length === 1
-                              ? `${activeViewers[0]} visualizando`
-                              : `${activeViewers.length} visualizando`}
+                      {(() => {
+                        const wt = waitingTime(activeConversation.last_message_date, activeConversation.is_unread);
+                        if (!wt?.slaBreached) return null;
+                        return (
+                          <span className="inline-flex items-center gap-[3px] text-[10px] font-bold text-[#dc2626]">
+                            <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+                            SLA: {wt.label}
                           </span>
-                        </span>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
                 {/* Header actions */}
-                <div className="flex items-center gap-sm">
+                <div className="flex items-center gap-2">
+                  {/* Presence indicator (right-side, matches prototype) */}
+                  {activeViewers.length > 0 && (
+                    <span className="hidden md:flex items-center gap-[5px] rounded-full"
+                      style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '3px 9px' }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
+                      <span className="text-[11px] font-semibold text-[#c2410c]">
+                        {activeViewers.length === 1 ? `${activeViewers[0]} visualizando` : `${activeViewers.length} visualizando`}
+                      </span>
+                    </span>
+                  )}
                   <select
                     value={activeConversation.status}
                     onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
                     className={cn(
-                      "text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-100",
+                      "h-[30px] px-2.5 rounded-full text-[11px] font-semibold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-100",
                       activeConversation.status === 'OPEN' && "bg-[#fdf4ff] text-[#7C4DFF] border-[#e9d5ff]",
                       activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700 border-yellow-200",
                       activeConversation.status === 'CLOSED' && "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -748,20 +757,20 @@ export default function ChatPage() {
                     title="Sugestões de IA"
                     onClick={() => setShowAIDesktop(v => !v)}
                     className={cn(
-                      "hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors",
+                      "hidden md:flex w-8 h-8 items-center justify-center rounded-lg border transition-colors",
                       showAIDesktop
-                        ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
-                        : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                        ? "bg-[#f5f3ff] text-[#7C4DFF] border-[#e9d5ff]"
+                        : "text-[#94a3b8] border-[#E9ECEF] hover:text-slate-700 hover:bg-slate-50"
                     )}
                   >
-                    <TbSparkles size={17} />
+                    <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: `'FILL' ${showAIDesktop ? 1 : 0}` }}>auto_awesome</span>
                   </button>
                   <button
                     title="Marcar como não lida"
                     onClick={() => updateConversation(activeConversation.id, { is_unread: true })}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E9ECEF] text-[#94a3b8] hover:text-slate-700 hover:bg-slate-50 transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[20px]">mark_email_unread</span>
+                    <span className="material-symbols-outlined text-[16px]">mark_email_unread</span>
                   </button>
                   <button
                     title="Excluir conversa"
@@ -775,32 +784,32 @@ export default function ChatPage() {
                         alert('Falha ao excluir conversa. Verifique suas permissões.');
                       }
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E9ECEF] text-[#94a3b8] hover:text-red-500 hover:bg-red-50 transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
                   </button>
                 </div>
               </div>
               
               {/* Message History */}
-              <div className="flex-1 overflow-y-auto p-lg flex flex-col gap-lg">
+              <div className="flex-1 overflow-y-auto pt-5 px-5 pb-2.5 flex flex-col gap-3.5 bg-[#f8fafc]">
                 {messages.map((msg) => (
-                  <div key={msg.id} className={cn("flex gap-md max-w-[80%]", !msg.inbound ? "self-end flex-row-reverse" : "")}>
-                    <div className={cn("flex flex-col gap-xs", !msg.inbound ? "items-end" : "")}>
-                      <div className={cn("flex items-baseline gap-sm", !msg.inbound ? "flex-row-reverse" : "")}>
-                        <span className="font-body-sm text-body-sm font-medium text-on-surface">
-                          {msg.inbound ? activeConversation.contact.name || 'Usuário' : 'Você'}
+                  <div key={msg.id} className={cn("flex max-w-[72%]", !msg.inbound ? "self-end" : "self-start")}>
+                    <div className={cn("flex flex-col gap-1", !msg.inbound ? "items-end" : "items-start")}>
+                      <div className={cn("flex items-baseline gap-2", !msg.inbound ? "flex-row-reverse" : "")}>
+                        <span className="text-[11px] font-semibold text-[#374151]">
+                          {msg.inbound ? (activeConversation.contact.name || 'Usuário').split(' ')[0] : 'Você'}
                         </span>
-                        <span className="font-label-caps text-label-caps text-on-surface-variant font-normal">
+                        <span className="text-[10px] text-[#94a3b8]">
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      
+
                       <div className={cn(
-                        "px-3.5 py-2.5 text-body-md shadow-sm",
+                        "px-3.5 py-2.5 text-[14px] leading-[1.5] shadow-sm",
                         !msg.inbound
                           ? "bg-[#4f46e5] text-white"
-                          : "bg-white border border-[#E9ECEF] text-on-surface",
+                          : "bg-white border border-[#E9ECEF] text-[#1d1a24]",
                         sendStatus[msg.id] === 'failed' && "opacity-60 border-red-300"
                       )}
                       style={{ borderRadius: msg.inbound ? '4px 14px 14px 14px' : '14px 4px 14px 14px' }}>
@@ -844,13 +853,13 @@ export default function ChatPage() {
                         )}
                       </div>
                       {!msg.inbound && sendStatus[msg.id] !== 'failed' && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className="material-symbols-outlined text-[13px]"
+                        <div className="flex items-center gap-[3px]">
+                          <span className="material-symbols-outlined text-[12px]"
                             style={{ fontVariationSettings: "'FILL' 1", color: msg.delivery_status === 'delivered' ? '#7C4DFF' : '#94a3b8' }}>
                             {msg.delivery_status === 'delivered' ? 'done_all' : 'done'}
                           </span>
-                          <span className="text-[10px] text-slate-400">
-                            {msg.delivery_status === 'delivered' ? 'Entregue' : 'Enviado'}
+                          <span className="text-[10px] text-[#94a3b8]">
+                            {msg.delivery_status === 'delivered' ? 'Lido' : 'Enviado'}
                           </span>
                         </div>
                       )}
@@ -862,19 +871,19 @@ export default function ChatPage() {
 
               {/* Quick Reply chip strip — desktop */}
               {allQuickReplies.length > 0 && (
-                <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-white border-t border-outline-variant overflow-x-auto [&::-webkit-scrollbar]:hidden">
+                <div className="hidden md:flex items-center gap-1.5 pt-1.5 px-3.5 bg-white border-t border-[#E9ECEF] overflow-x-auto [&::-webkit-scrollbar]:hidden">
                   {allQuickReplies.slice(0, 4).map(qr => (
                     <button
                       key={qr.id}
                       onClick={() => setInput(qr.content)}
-                      className="shrink-0 flex items-center gap-1.5 h-7 px-3 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                      className="shrink-0 flex items-center gap-1 h-[26px] px-2.5 rounded-full border border-[#e2e8f0] bg-white text-[11px] font-semibold text-[#575f67] hover:border-[#a5b4fc] hover:bg-[#eef2ff] hover:text-[#4338ca] transition-colors whitespace-nowrap"
                     >
                       <span style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', borderRadius: 4, padding: '0 4px', fontSize: 9, fontWeight: 700 }}>{qr.shortcut}</span>
                       {qr.shortcut.replace('/', '').charAt(0).toUpperCase() + qr.shortcut.replace('/', '').slice(1)}
                     </button>
                   ))}
                   {allQuickReplies.length > 4 && (
-                    <button className="shrink-0 flex items-center gap-1 h-7 px-3 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+                    <button className="shrink-0 flex items-center gap-1 h-[26px] px-2.5 rounded-full border border-[#e2e8f0] bg-white text-[11px] font-semibold text-[#575f67] hover:bg-slate-50 transition-colors">
                       <span className="material-symbols-outlined text-[14px]">more_horiz</span>
                       Mais
                     </button>
@@ -884,8 +893,8 @@ export default function ChatPage() {
 
               {/* Input Area */}
               <div
-                className="p-md bg-surface-container-lowest border-t border-outline-variant relative"
-                style={{ paddingBottom: 'max(var(--spacing-md, 12px), env(safe-area-inset-bottom))' }}
+                className="pt-2.5 px-3.5 pb-3 bg-white relative"
+                style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
                 onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) qrClose(); }}
               >
                 {/* Emoji Picker */}
@@ -921,7 +930,7 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-xs bg-[#F1F3F5] rounded-xl p-xs border border-transparent focus-within:bg-white focus-within:border-indigo-200 focus-within:shadow-sm transition-all min-h-[56px]">
+                <div className="flex items-center gap-1.5 bg-[#f1f5f9] rounded-xl py-[5px] px-1.5 border border-transparent focus-within:bg-white focus-within:border-[#c7d2fe] transition-colors">
                   {isRecording ? (
                     <div className="flex-1 flex items-center gap-3 px-3 py-2 text-indigo-600">
                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -930,12 +939,12 @@ export default function ChatPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center gap-0.5 ml-0.5">
-                        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={cn("w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 transition-colors", showEmojiPicker && "text-indigo-600 bg-indigo-50")}>
-                          <span className="material-symbols-outlined text-[22px]">mood</span>
+                      <div className="flex items-center gap-0.5">
+                        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={cn("w-8 h-8 flex items-center justify-center rounded-[7px] text-[#94a3b8] hover:bg-[#e2e8f0] transition-colors", showEmojiPicker && "text-[#7C4DFF] bg-[#f5f3ff]")}>
+                          <span className="material-symbols-outlined text-[19px]">mood</span>
                         </button>
-                        <button onClick={handleFileSelect} className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 transition-colors">
-                          <span className="material-symbols-outlined text-[22px]">attach_file</span>
+                        <button onClick={handleFileSelect} className="w-8 h-8 flex items-center justify-center rounded-[7px] text-[#94a3b8] hover:bg-[#e2e8f0] transition-colors">
+                          <span className="material-symbols-outlined text-[19px]">attach_file</span>
                         </button>
                       </div>
                       {/* Quick Reply autocomplete dropdown */}
@@ -959,7 +968,7 @@ export default function ChatPage() {
                       )}
                       <textarea
                         data-testid="message-input"
-                        className="flex-1 bg-transparent border-none text-body-md text-on-surface focus:ring-0 outline-none resize-none py-sm pl-sm min-h-[40px] max-h-[120px] overflow-y-auto"
+                        className="flex-1 bg-transparent border-none text-[13px] text-[#1d1a24] focus:ring-0 outline-none resize-none py-1 pl-1 max-h-[120px] overflow-y-auto"
                         placeholder="Digite uma mensagem ou / para respostas rápidas…"
                         rows={1}
                         value={input}
@@ -981,12 +990,12 @@ export default function ChatPage() {
 
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
 
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-0.5 shrink-0">
                     {/* Quick reply shortcut button */}
                     <button
                       onClick={() => { setInput('/'); qrSearch('/'); }}
                       title="Respostas rápidas"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-[#94a3b8] hover:bg-slate-200 hover:text-[#4338ca] transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded-[7px] text-[#94a3b8] hover:bg-[#e2e8f0] hover:text-[#4338ca] transition-colors"
                     >
                       <span className="material-symbols-outlined text-[18px]">quick_phrases</span>
                     </button>
@@ -994,7 +1003,7 @@ export default function ChatPage() {
                     <button
                       title="Sugestões de IA"
                       onClick={() => setShowAIDesktop(v => !v)}
-                      className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors"
+                      className="hidden md:flex w-8 h-8 items-center justify-center rounded-[7px] transition-colors"
                       style={showAIDesktop ? { background: '#f5f3ff', color: '#7C4DFF' } : { color: '#94a3b8' }}
                     >
                       <span className="material-symbols-outlined text-[18px]"
@@ -1011,7 +1020,7 @@ export default function ChatPage() {
                         setAiSheetOpen(true);
                       }}
                       disabled={aiGenerating || aiLoading}
-                      className={cn("md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-all",
+                      className={cn("md:hidden w-8 h-8 flex items-center justify-center rounded-[7px] transition-all",
                         aiGenerating || aiLoading ? "text-[#7C4DFF]" : "text-[#94a3b8] hover:text-[#7C4DFF]")}
                     >
                       {aiGenerating || aiLoading
@@ -1022,15 +1031,15 @@ export default function ChatPage() {
                     {/* Send / mic / stop */}
                     {!input.trim() && !selectedFile && !isRecording ? (
                       <button onClick={startRecording}
-                        className="w-9 h-9 rounded-lg text-[#94a3b8] flex items-center justify-center hover:bg-slate-200 transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">mic</span>
+                        className="w-8 h-8 rounded-[7px] text-[#94a3b8] flex items-center justify-center hover:bg-[#e2e8f0] transition-colors">
+                        <span className="material-symbols-outlined text-[19px]">mic</span>
                       </button>
                     ) : (
                       <button
                         onClick={isRecording ? stopRecording : handleSendMessage}
                         disabled={loading}
                         className={cn(
-                          "w-9 h-9 rounded-[9px] flex items-center justify-center shrink-0 transition-all",
+                          "w-9 h-9 rounded-[9px] flex items-center justify-center shrink-0 transition-all ml-0.5",
                           isRecording ? "bg-red-500 text-white hover:bg-red-600"
                             : input.trim() || selectedFile ? "bg-[#4f46e5] text-white hover:bg-[#4338ca]"
                             : "bg-[#e2e8f0] text-[#94a3b8]",
@@ -1040,7 +1049,7 @@ export default function ChatPage() {
                       >
                         {loading
                           ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          : <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                          : <span className="material-symbols-outlined text-[17px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                               {isRecording ? 'stop' : 'send'}
                             </span>
                         }
@@ -1052,11 +1061,11 @@ export default function ChatPage() {
 
               {/* AI Panel — desktop, below composer */}
               {showAIDesktop && (
-                <div className="hidden md:block border-t border-outline-variant bg-white">
-                  <div className="px-4 py-2.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#7C3AED] to-indigo-600 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[11px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                <div className="hidden md:block border-t border-[#E9ECEF] bg-white">
+                  <div className="pt-2.5 px-3.5 pb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-[5px] bg-gradient-to-br from-[#7C4DFF] to-[#4338ca] flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[12px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
                       </div>
                       <span className="text-[11px] font-bold text-[#7C4DFF] uppercase tracking-wider">Sugestões de IA</span>
                       {(aiGenerating || aiLoading) && (
@@ -1071,7 +1080,7 @@ export default function ChatPage() {
                     <button
                       onClick={() => generateAI(activeConversation!.id)}
                       disabled={aiGenerating || aiLoading}
-                      className="flex items-center gap-1.5 h-6 px-2.5 rounded-lg border border-[#e9d5ff] bg-white text-[11px] font-semibold text-[#7C4DFF] hover:bg-[#f5f3ff] disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 h-[26px] px-2.5 rounded-[7px] border border-[#e9d5ff] bg-white text-[11px] font-semibold text-[#7C4DFF] hover:bg-[#f5f3ff] disabled:opacity-50 transition-colors"
                     >
                       <span className={cn("material-symbols-outlined text-[13px]", (aiGenerating || aiLoading) && "animate-spin")}>
                         {(aiGenerating || aiLoading) ? "progress_activity" : "refresh"}
@@ -1079,9 +1088,9 @@ export default function ChatPage() {
                       {(aiGenerating || aiLoading) ? 'Gerando…' : 'Gerar'}
                     </button>
                   </div>
-                  <div className="px-3 pb-3 flex flex-col gap-2">
+                  <div className="px-2.5 pb-2.5 flex flex-col gap-[5px]">
                     {(aiGenerating || aiLoading) && (
-                      [1,2].map(i => <div key={i} className="h-14 rounded-lg bg-slate-100 animate-pulse" />)
+                      [1,2].map(i => <div key={i} className="h-14 rounded-[9px] bg-slate-100 animate-pulse" />)
                     )}
                     {!aiGenerating && !aiLoading && suggestions.length === 0 && (
                       <button
@@ -1098,9 +1107,9 @@ export default function ChatPage() {
                         <button
                           key={i}
                           onClick={() => setInput(s)}
-                          className="w-full text-left px-3 py-2.5 rounded-[9px] bg-[#faf5ff] border border-[#ede9fe] text-xs text-slate-700 leading-relaxed hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-all"
+                          className="w-full text-left py-[9px] px-[11px] rounded-[9px] bg-[#faf5ff] border border-[#ede9fe] text-[12px] text-[#374151] leading-[1.5] hover:bg-[#ede9fe] hover:border-[#c4b5fd] transition-colors"
                         >
-                          <p className="mb-1.5">{s}</p>
+                          <p className="mb-1">{s}</p>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-[#94a3b8]">Confiança</span>
                             <div className="flex items-center gap-1.5">
@@ -1176,9 +1185,9 @@ export default function ChatPage() {
               )}
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-slate-400">
+            <div className="flex-1 flex items-center justify-center text-[#94a3b8]">
               <div className="text-center">
-                <span className="material-symbols-outlined text-6xl mb-4 opacity-50" style={{ color: '#c7d2fe' }}>chat_bubble_outline</span>
+                <span className="material-symbols-outlined text-[40px]" style={{ color: '#c7d2fe' }}>chat_bubble_outline</span>
                 <p className="text-sm mt-2">Selecione uma conversa</p>
               </div>
             </div>
@@ -1217,42 +1226,45 @@ export default function ChatPage() {
               <div className="flex-1 overflow-y-auto">
                 {/* ── Contact tab ── */}
                 {rightPanelTab === 'contact' && (
-                  <div className="p-4">
-                    <div className="flex flex-col items-center gap-2 pb-4 mb-4 border-b border-outline-variant">
+                  <div className="pt-4 px-4">
+                    <div className="flex flex-col items-center gap-2 pb-4 mb-4 border-b border-[#E9ECEF]">
                       {(() => {
                         const rpName = activeConversation.contact.name || activeConversation.contact.channel_identifier || 'U';
                         const rpColor = avatarColor(rpName);
                         const rpIni = rpName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
                         return (
-                          <div className="w-14 h-14 rounded-full flex items-center justify-center text-[18px] font-bold"
+                          <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-[18px] font-bold"
                             style={{ background: rpColor.bg, color: rpColor.text }}>{rpIni}</div>
                         );
                       })()}
                       <div className="text-center">
-                        <p className="text-sm font-bold text-slate-900">{activeConversation.contact.name || '-'}</p>
-                        <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[220px]">{activeConversation.contact.channel_identifier}</p>
+                        <p className="text-[15px] font-bold text-[#1d1a24]">{activeConversation.contact.name || '-'}</p>
+                        <p className="text-[12px] text-[#7a7487] mt-0.5 truncate max-w-[220px]">{activeConversation.contact.channel_identifier}</p>
                       </div>
-                      <ChannelBadge channel={activeConversation.channel} compact />
+                      <ChannelBadge channel={activeConversation.channel} />
                     </div>
-                    <div className="space-y-2.5 text-xs">
-                      {[
-                        { label: 'Nome', value: activeConversation.contact.name || '-' },
-                        { label: 'Identificador', value: activeConversation.contact.channel_identifier },
-                        { label: 'Canal', value: getChannelMeta(activeConversation.channel).label },
-                      ].map(({ label, value }) => (
-                        <div key={label} className="flex justify-between">
-                          <span className="text-slate-500">{label}</span>
-                          <span className="font-medium text-slate-900 text-right max-w-[160px] truncate">{value}</span>
-                        </div>
-                      ))}
-                      {activeConversation.first_response_at && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Primeira resposta</span>
-                          <span className="font-medium text-slate-900">
-                            {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
-                          </span>
-                        </div>
-                      )}
+                    <div className="mb-3.5">
+                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Detalhes do contato</p>
+                      <div className="space-y-2 text-[12px]">
+                        {[
+                          { label: 'Nome', value: activeConversation.contact.name || '-' },
+                          { label: 'Identificador', value: activeConversation.contact.channel_identifier },
+                          { label: 'Canal', value: getChannelMeta(activeConversation.channel).label },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex justify-between items-center">
+                            <span className="text-[#7a7487]">{label}</span>
+                            <span className="font-medium text-[#1d1a24] text-right max-w-[150px] truncate">{value}</span>
+                          </div>
+                        ))}
+                        {activeConversation.first_response_at && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-[#7a7487]">Primeira resposta</span>
+                            <span className="font-medium text-[#1d1a24]">
+                              {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1276,8 +1288,8 @@ export default function ChatPage() {
                               key={s}
                               onClick={() => updateConversation(activeConversation.id, { status: s })}
                               className={cn(
-                                "flex-1 py-1.5 rounded-lg border text-[11px] font-semibold transition-all",
-                                isActive ? styles[s].active : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                                "flex-1 py-[5px] rounded-[7px] border text-[11px] font-semibold transition-all",
+                                isActive ? styles[s].active : "bg-white text-[#575f67] border-[#e2e8f0] hover:border-slate-300"
                               )}
                             >
                               {styles[s].label}
