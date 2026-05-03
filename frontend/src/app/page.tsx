@@ -651,6 +651,7 @@ export default function ChatPage() {
   const [contextActionHint, setContextActionHint] = useState<ContextActionHintState | null>(null);
   const [projectStages, setProjectStages] = useState<ProjectStage[]>([]);
   const [availableProjects, setAvailableProjects] = useState<ProjectDto[]>([]);
+  const [linkedProjectsByMessageId, setLinkedProjectsByMessageId] = useState<Record<string, ProjectDto[]>>({});
   const [loadingProjectRouting, setLoadingProjectRouting] = useState(false);
   const [submittingProjectCard, setSubmittingProjectCard] = useState(false);
   const [createCardModal, setCreateCardModal] = useState<CreateCardModalState | null>(null);
@@ -844,6 +845,10 @@ export default function ChatPage() {
         tag: routingProject?.tag ?? undefined,
       });
       setCreateCardModal(null);
+      setLinkedProjectsByMessageId((current) => ({
+        ...current,
+        [createCardModal.message.id]: [...(current[createCardModal.message.id] ?? []), createdProject],
+      }));
       setContextActionHint({
         message: routingProject
           ? `Card created using ${routingProject.reference} routing context.`
@@ -927,6 +932,38 @@ export default function ChatPage() {
   } = useAISuggestions();
 
   const { matches: qrMatches, open: qrOpen, search: qrSearch, close: qrClose } = useQuickReplySearch();
+
+  useEffect(() => {
+    if (!activeConversation) return;
+
+    const conversationId = activeConversation.id;
+
+    let cancelled = false;
+
+    async function loadLinkedProjects() {
+      try {
+        const response = await projectsApi.listProjects({ limit: 200, source_type: 'message' });
+        if (cancelled) return;
+
+        const projectMap = response.data
+          .filter((project) => project.conversation_id === conversationId && project.source_message_id)
+          .reduce<Record<string, ProjectDto[]>>((acc, project) => {
+            const messageId = project.source_message_id as string;
+            acc[messageId] = [...(acc[messageId] ?? []), project];
+            return acc;
+          }, {});
+
+        setLinkedProjectsByMessageId(projectMap);
+      } catch {
+        if (!cancelled) setLinkedProjectsByMessageId({});
+      }
+    }
+
+    void loadLinkedProjects();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversation]);
 
   const handleDeleteMessage = useCallback(async () => {
     if (!deleteMessageModal || !activeConversation) return;
@@ -1456,6 +1493,10 @@ export default function ChatPage() {
                   </div>
                 )}
                 {messages.map((msg) => (
+                  (() => {
+                    const linkedProjects = linkedProjectsByMessageId[msg.id] ?? [];
+                    const primaryLinkedProject = linkedProjects[0];
+                    return (
                   <div key={msg.id} className={cn("group/message relative flex max-w-[72%]", !msg.inbound ? "self-end" : "self-start")}>
                     <div className={cn("relative flex flex-col gap-1", !msg.inbound ? "items-end" : "items-start")}>
                       <div className={cn("flex items-baseline gap-2", !msg.inbound ? "flex-row-reverse" : "")}>
@@ -1559,8 +1600,27 @@ export default function ChatPage() {
                           </span>
                         </div>
                       )}
+
+                      {primaryLinkedProject ? (
+                        <div className={cn("flex items-center gap-2", !msg.inbound ? "justify-end" : "justify-start")}>
+                          <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[10px] font-semibold text-indigo-700">
+                            <span className="material-symbols-outlined text-[12px]">add_card</span>
+                            Already a card
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/projects?projectId=${primaryLinkedProject.id}`)}
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-800"
+                          >
+                            <span>Open {primaryLinkedProject.reference}</span>
+                            <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
+                    );
+                  })()
                 ))}
                 <div ref={messagesEndRef} />
               </div>
