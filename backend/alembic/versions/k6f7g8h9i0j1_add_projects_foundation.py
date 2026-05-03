@@ -6,6 +6,7 @@ Create Date: 2026-05-02
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from datetime import datetime, timezone
 
 revision = "k6f7g8h9i0j1"
@@ -14,10 +15,18 @@ branch_labels = None
 depends_on = None
 
 
-project_status_enum = sa.Enum("open", "done", "archived", name="projectstatus")
-project_priority_enum = sa.Enum("low", "medium", "high", name="projectpriority")
-project_source_type_enum = sa.Enum("manual", "message", name="projectsourcetype")
-project_channel_enum = sa.Enum("whatsapp", "telegram", "email", "sms", "web", name="projectchanneltype")
+project_status_enum = postgresql.ENUM("open", "done", "archived", name="projectstatus", create_type=False)
+project_priority_enum = postgresql.ENUM("low", "medium", "high", name="projectpriority", create_type=False)
+project_source_type_enum = postgresql.ENUM("manual", "message", name="projectsourcetype", create_type=False)
+project_channel_enum = postgresql.ENUM(
+    "whatsapp",
+    "telegram",
+    "email",
+    "sms",
+    "web",
+    name="projectchanneltype",
+    create_type=False,
+)
 
 
 def upgrade():
