@@ -9,10 +9,31 @@ import type {
   UpdateConversationRequest,
 } from "@/types/chat";
 
+function normalizeConversation(conversation: Conversation): Conversation {
+  return {
+    ...conversation,
+    channel: conversation.channel?.toUpperCase() as Conversation["channel"],
+    status: conversation.status?.toUpperCase() as Conversation["status"],
+    tag: conversation.tag ? (conversation.tag.toUpperCase() as NonNullable<Conversation["tag"]>) : conversation.tag,
+  };
+}
+
+function toBackendConversationUpdate(data: UpdateConversationRequest) {
+  return {
+    ...data,
+    status: data.status?.toLowerCase(),
+    tag: data.tag?.toLowerCase() ?? data.tag,
+  };
+}
+
 export async function getConversations(
   limit = 100
 ): Promise<ApiResponse<Conversation[]>> {
-  return apiGetList<Conversation>(`/chat/conversations?limit=${limit}`);
+  const response = await apiGetList<Conversation>(`/chat/conversations?limit=${limit}`);
+  return {
+    ...response,
+    data: response.data.map(normalizeConversation),
+  };
 }
 
 export async function getMessages(
@@ -39,22 +60,24 @@ export async function updateConversation(
   conversationId: string,
   data: UpdateConversationRequest
 ): Promise<Conversation> {
-  return apiMutate<UpdateConversationRequest, Conversation>(
+  const updated = await apiMutate<ReturnType<typeof toBackendConversationUpdate>, Conversation>(
     `/chat/conversations/${conversationId}`,
     "PATCH",
-    data
+    toBackendConversationUpdate(data)
   );
+  return normalizeConversation(updated);
 }
 
 export async function assignConversation(
   conversationId: string,
   assignedUserId: string | null
 ): Promise<import("@/types/chat").Conversation> {
-  return apiMutate<{ assigned_user_id: string | null }, import("@/types/chat").Conversation>(
+  const updated = await apiMutate<{ assigned_user_id: string | null }, import("@/types/chat").Conversation>(
     `/chat/conversations/${conversationId}/assign`,
     "PATCH",
     { assigned_user_id: assignedUserId }
   );
+  return normalizeConversation(updated);
 }
 
 export async function deleteConversation(conversationId: string): Promise<void> {
