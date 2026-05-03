@@ -635,6 +635,40 @@ This document outlines the epics and user stories derived from the Product Requi
 **Estimation:** 5 story points  
 **Priority:** High
 
+## Epic 13: Message-to-Project Operational Bridge
+
+Add contextual actions directly to message bubbles so operators can transform conversation content into project work without leaving the `Messages` workspace.
+
+### Story 13.1: Message Bubble Context Actions Shell
+**As an operator,** I want each message bubble to expose contextual actions on hover so that I can act on conversation content without leaving the `Messages` workspace.  
+**Acceptance Criteria:**
+- Hover reveals a subtle `+` trigger on message bubbles.
+- Clicking the trigger opens an anchored contextual menu.
+- Only one message-action menu stays open at a time.
+- The interaction does not shift the current chat layout.  
+**Estimation:** 5 story points  
+**Priority:** High
+
+### Story 13.2: Create Card from Message with Project Routing
+**As an operator,** I want to create a card directly from a message so that customer demands become tracked work with provenance preserved.  
+**Acceptance Criteria:**
+- The flow uses the real message-to-project backend path.
+- Existing-project conversations route the new card to the current project's backlog.
+- New conversations let the operator choose existing project or create a new project.
+- The created card preserves message and conversation provenance.  
+**Estimation:** 8 story points  
+**Priority:** High
+
+### Story 13.3: Message Tag, Delete, and Quick Reply Actions
+**As an operator,** I want contextual actions for tagging, deleting, and converting my own messages into quick replies so that each message bubble becomes an operational control point.  
+**Acceptance Criteria:**
+- `Add Tag` is available from the contextual menu.
+- `Delete` requires explicit confirmation.
+- `Create Quick Reply` appears only for operator-authored messages.
+- Inbound messages never show `Create Quick Reply`.  
+**Estimation:** 5 story points  
+**Priority:** High
+
 ## FR to Epic/Story Mapping
 
 | FR  | Epic | Story |

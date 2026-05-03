@@ -221,3 +221,15 @@ development_status:
   12-4-projects-backend-test-coverage-and-frontend-wiring: done
 
   epic-12-retrospective: optional
+
+  # —— Epic 13: Message-to-Project Operational Bridge ————————————————————————————————
+  # Source: party mode roundtable 2026-05-03
+  # Scope: message bubble contextual actions, create-card from message,
+  #        tag/delete/quick-reply actions, project-aware routing
+  epic-13: in-progress
+
+  13-1-message-bubble-context-actions-shell: done
+  13-2-create-card-from-message-with-project-routing: in-progress
+  13-3-message-tag-delete-and-quick-reply-actions: done
+
+  epic-13-retrospective: optional

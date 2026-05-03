@@ -73,3 +73,13 @@ export async function retryMessage(
     "POST"
   );
 }
+
+export async function deleteMessage(
+  conversationId: string,
+  messageId: string
+): Promise<{ deleted: boolean; id: string }> {
+  return apiMutate<undefined, { deleted: boolean; id: string }>(
+    `/chat/conversations/${conversationId}/messages/${messageId}`,
+    "DELETE"
+  );
+}

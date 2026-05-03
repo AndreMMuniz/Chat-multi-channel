@@ -129,8 +129,9 @@ from app.schemas.chat import MessageCreate
 from app.services.conversation_service import ConversationService, get_conversation_service
 from app.services.message_service import MessageService, get_message_service
 from app.models.models import AISuggestion
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_permission, get_client_ip
 from app.models.models import User
+from app.services.audit_service import log_action
 
 @router.delete("/conversations/{conversation_id}")
 @limiter.limit("30/minute")
@@ -309,6 +310,89 @@ async def retry_message(
             code="RETRY_LIMIT", message=str(e), status_code=400
         )
         raise HTTPException(status_code=status, detail=error_response)
+
+
+@router.delete("/conversations/{conversation_id}/messages/{message_id}")
+@limiter.limit("30/minute")
+async def delete_message(
+    request: Request,
+    conversation_id: UUID,
+    message_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("can_delete_messages")),
+) -> Dict[str, Any]:
+    """Delete a message if it is not referenced by downstream project provenance."""
+    from app.models.models import Project
+
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        error_response, status = create_error_response(
+            code="CONVERSATION_NOT_FOUND", message="Conversation not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    message = db.query(Message).filter(
+        Message.id == message_id,
+        Message.conversation_id == conversation_id,
+    ).first()
+    if not message:
+        error_response, status = create_error_response(
+            code="MESSAGE_NOT_FOUND", message="Message not found", status_code=404
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    linked_project = db.query(Project).filter(Project.source_message_id == message_id).first()
+    if linked_project:
+        error_response, status = create_error_response(
+            code="MESSAGE_LINKED_TO_PROJECT",
+            message="This message cannot be deleted because it is linked to a project card",
+            details={"project_id": str(linked_project.id), "project_reference": linked_project.reference_code},
+            status_code=409,
+        )
+        raise HTTPException(status_code=status, detail=error_response)
+
+    deleted_preview = message.content[:120]
+    db.delete(message)
+    db.flush()
+
+    latest_message = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation_id)
+        .order_by(Message.conversation_sequence.desc())
+        .first()
+    )
+    conversation.last_message = latest_message.content if latest_message else None
+    conversation.last_message_date = latest_message.created_at if latest_message else None
+    conversation.is_unread = latest_message.inbound if latest_message else False
+    db.commit()
+    db.refresh(conversation)
+
+    log_action(
+        db,
+        current_user.id,
+        "delete_message",
+        "message",
+        str(message_id),
+        details={"conversation_id": str(conversation_id), "content_preview": deleted_preview},
+        ip_address=get_client_ip(request),
+    )
+
+    await manager.broadcast_to_conversation(
+        conversation_id=str(conversation_id),
+        event_type="message_deleted",
+        data={"conversation_id": str(conversation_id), "message_id": str(message_id)},
+    )
+    await manager.broadcast_global(
+        "conversation_updated",
+        {
+            "id": str(conversation.id),
+            "status": conversation.status.value if conversation.status else None,
+            "tag": conversation.tag.value if conversation.tag else None,
+            "is_unread": conversation.is_unread,
+        },
+    )
+
+    return create_response({"deleted": True, "id": str(message_id)})
 
 
 # ── AI Suggestions ────────────────────────────────────────────────────────────

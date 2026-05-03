@@ -11,14 +11,16 @@ import { FaTelegram, FaGlobe } from 'react-icons/fa6';
 import { MdOutlineEmail } from 'react-icons/md';
 import { TbSparkles } from 'react-icons/tb';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
+import Modal from '@/components/shared/Modal';
 import { useConversations } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
-import { conversationsApi, usersApi, quickRepliesApi } from '@/lib/api/index';
+import { conversationsApi, usersApi, quickRepliesApi, projectsApi } from '@/lib/api/index';
 import type { SequencedEvent } from '@/types/api';
 import type { ChannelType, Conversation, ConversationTag, Message } from '@/types/chat';
+import type { ProjectDto, ProjectPriority, ProjectStage, ProjectStageKey } from '@/types/project';
 import AudioMessage from '@/components/AudioMessage';
 import { useState as useLocalState, useEffect as useLocalEffect } from 'react';
 
@@ -213,6 +215,411 @@ function TagPills({
   );
 }
 
+type MessageActionId = 'create-card' | 'add-tag' | 'delete' | 'create-quick-reply';
+type CreateCardRouteMode = 'current-conversation-project' | 'existing-project' | 'new-project';
+
+type CreateCardModalState = {
+  message: Message;
+  title: string;
+  description: string;
+  stage: ProjectStageKey;
+  priority: ProjectPriority;
+  routeMode: CreateCardRouteMode;
+  selectedProjectId: string;
+  relatedProjects: ProjectDto[];
+};
+
+type QuickReplyFromMessageState = {
+  message: Message;
+  shortcut: string;
+  content: string;
+};
+
+type DeleteMessageState = {
+  message: Message;
+};
+
+function MessageContextMenu({
+  message,
+  outbound,
+  onSelect,
+}: {
+  message: Message;
+  outbound: boolean;
+  onSelect: (action: MessageActionId, message: Message) => void;
+}) {
+  const items: Array<{ id: MessageActionId; label: string; icon: string; tone?: 'default' | 'danger' }> = [
+    { id: 'create-card', label: 'Create Card', icon: 'add_card' },
+    { id: 'add-tag', label: 'Add Tag', icon: 'sell' },
+    ...(outbound ? [{ id: 'create-quick-reply' as const, label: 'Create Quick Reply', icon: 'quickreply' }] : []),
+    { id: 'delete', label: 'Delete', icon: 'delete', tone: 'danger' },
+  ];
+
+  return (
+    <div
+      className="min-w-[188px] rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.14)] ring-1 ring-black/5"
+      role="menu"
+      aria-label="Message actions"
+    >
+      {items.map((item, index) => (
+        <button
+          key={item.id}
+          type="button"
+          role="menuitem"
+          autoFocus={index === 0}
+          onClick={() => onSelect(item.id, message)}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors',
+            item.tone === 'danger'
+              ? 'text-rose-600 hover:bg-rose-50'
+              : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'
+          )}
+        >
+          <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function suggestCardTitle(message: Message, conversation: Conversation) {
+  const source = message.content.trim();
+  if (!source) return `${conversation.contact.name || 'Contact'} demand`;
+  const compact = source.replace(/\s+/g, ' ').trim();
+  return compact.length <= 72 ? compact : `${compact.slice(0, 69).trimEnd()}...`;
+}
+
+function CreateCardFromMessageModal({
+  state,
+  stages,
+  projects,
+  loadingProjects,
+  submitting,
+  onClose,
+  onChange,
+  onSubmit,
+}: {
+  state: CreateCardModalState;
+  stages: ProjectStage[];
+  projects: ProjectDto[];
+  loadingProjects: boolean;
+  submitting: boolean;
+  onClose: () => void;
+  onChange: (patch: Partial<CreateCardModalState>) => void;
+  onSubmit: () => void;
+}) {
+  const selectedProject = projects.find(project => project.id === state.selectedProjectId);
+  const hasCurrentConversationProject = state.relatedProjects.length > 0;
+
+  return (
+    <Modal title="Create Card from Message" onClose={onClose} maxWidth="max-w-2xl">
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <span className="material-symbols-outlined text-[16px] text-indigo-600">forum</span>
+            Source message
+          </div>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{state.message.content || 'No message content available.'}</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-2 md:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Card title</span>
+            <input
+              value={state.title}
+              onChange={(event) => onChange({ title: event.target.value })}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+              placeholder="Describe the demand to track"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 md:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Demand summary</span>
+            <textarea
+              value={state.description}
+              onChange={(event) => onChange({ description: event.target.value })}
+              className="min-h-[110px] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+              placeholder="Add context that should follow this card into Projects"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Initial stage</span>
+            <select
+              value={state.stage}
+              onChange={(event) => onChange({ stage: event.target.value as ProjectStageKey })}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            >
+              {stages.map(stage => (
+                <option key={stage.key} value={stage.key}>{stage.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Priority</span>
+            <select
+              value={state.priority}
+              onChange={(event) => onChange({ priority: event.target.value as ProjectPriority })}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Project routing</p>
+            <p className="mt-1 text-sm text-slate-500">
+              This first release routes the new card using the current conversation context or an existing Projects context.
+            </p>
+          </div>
+
+          {hasCurrentConversationProject ? (
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+              <input
+                type="radio"
+                checked={state.routeMode === 'current-conversation-project'}
+                onChange={() => onChange({ routeMode: 'current-conversation-project' })}
+                className="mt-1 accent-indigo-600"
+              />
+              <div>
+                <p className="text-sm font-semibold text-indigo-900">Use the current conversation project context</p>
+                <p className="mt-1 text-sm text-indigo-700">
+                  The card will inherit the routing context of the existing project already linked to this conversation.
+                </p>
+              </div>
+            </label>
+          ) : null}
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+            <input
+              type="radio"
+              checked={state.routeMode === 'new-project'}
+              onChange={() => onChange({ routeMode: 'new-project', selectedProjectId: '' })}
+              className="mt-1 accent-indigo-600"
+            />
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Create a new project card</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Best for new conversations that are not yet tied to any existing project context.
+              </p>
+            </div>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+            <input
+              type="radio"
+              checked={state.routeMode === 'existing-project'}
+              onChange={() => onChange({ routeMode: 'existing-project' })}
+              className="mt-1 accent-indigo-600"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900">Use an existing project context</p>
+              <p className="mt-1 text-sm text-slate-500">
+                The new card will inherit routing defaults from a selected existing project.
+              </p>
+              <select
+                value={state.selectedProjectId}
+                onChange={(event) => onChange({ selectedProjectId: event.target.value })}
+                disabled={loadingProjects || state.routeMode !== 'existing-project'}
+                className="mt-3 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+              >
+                <option value="">{loadingProjects ? 'Loading project contexts...' : 'Select an existing project'}</option>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    {project.reference} — {project.title}
+                  </option>
+                ))}
+              </select>
+              {selectedProject ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Context: {selectedProject.reference} · {selectedProject.priority} priority · {selectedProject.stage}
+                </p>
+              ) : null}
+            </div>
+          </label>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={submitting || !state.title.trim() || !state.description.trim() || (state.routeMode === 'existing-project' && !state.selectedProjectId)}
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          >
+            {submitting ? 'Creating...' : 'Create Card'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function AddTagFromMessageModal({
+  currentTag,
+  onClose,
+  onSelect,
+  saving,
+}: {
+  currentTag?: ConversationTag | null;
+  onClose: () => void;
+  onSelect: (tag: ConversationTag | null) => void;
+  saving: boolean;
+}) {
+  return (
+    <Modal title="Tag Conversation from Message" onClose={onClose} maxWidth="max-w-lg">
+      <div className="space-y-5">
+        <p className="text-sm leading-6 text-slate-500">
+          This action applies a tag to the whole conversation. Current release supports one tag per conversation.
+        </p>
+
+        <TagPills value={currentTag} onChange={onSelect} />
+
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect(null)}
+            disabled={saving}
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            {saving ? 'Saving...' : currentTag ? 'Remove tag' : 'Close'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function QuickReplyFromMessageModal({
+  state,
+  onClose,
+  onChange,
+  onSubmit,
+  saving,
+}: {
+  state: QuickReplyFromMessageState;
+  onClose: () => void;
+  onChange: (patch: Partial<QuickReplyFromMessageState>) => void;
+  onSubmit: () => void;
+  saving: boolean;
+}) {
+  return (
+    <Modal title="Create Quick Reply from Message" onClose={onClose} maxWidth="max-w-xl">
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <span className="material-symbols-outlined text-[16px] text-indigo-600">quickreply</span>
+            Source message
+          </div>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{state.message.content || 'No message content available.'}</p>
+        </div>
+
+        <label className="flex flex-col gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Shortcut</span>
+          <input
+            value={state.shortcut}
+            onChange={(event) => onChange({ shortcut: event.target.value })}
+            className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            placeholder="/followup"
+          />
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Content</span>
+          <textarea
+            value={state.content}
+            onChange={(event) => onChange({ content: event.target.value })}
+            className="min-h-[140px] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            placeholder="Quick reply text"
+          />
+        </label>
+
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={saving || !state.shortcut.trim() || !state.content.trim()}
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          >
+            {saving ? 'Creating...' : 'Create Quick Reply'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteMessageModal({
+  state,
+  deleting,
+  onDelete,
+  onClose,
+}: {
+  state: DeleteMessageState;
+  deleting: boolean;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title="Delete Message" onClose={onClose} maxWidth="max-w-lg">
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Selected message</p>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{state.message.content || 'No message content available.'}</p>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={deleting}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleting}
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+          >
+            {deleting ? 'Deleting...' : 'Delete Message'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function ChatPage() {
   // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
@@ -231,6 +638,19 @@ export default function ChatPage() {
   const [showAIDesktop, setShowAIDesktop] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'contact' | 'details' | 'history'>('contact');
   const [allQuickReplies, setAllQuickReplies] = useState<import('@/types/quickReply').QuickReply[]>([]);
+  const [openMessageMenuId, setOpenMessageMenuId] = useState<string | null>(null);
+  const [contextActionHint, setContextActionHint] = useState<string | null>(null);
+  const [projectStages, setProjectStages] = useState<ProjectStage[]>([]);
+  const [availableProjects, setAvailableProjects] = useState<ProjectDto[]>([]);
+  const [loadingProjectRouting, setLoadingProjectRouting] = useState(false);
+  const [submittingProjectCard, setSubmittingProjectCard] = useState(false);
+  const [createCardModal, setCreateCardModal] = useState<CreateCardModalState | null>(null);
+  const [savingConversationTag, setSavingConversationTag] = useState(false);
+  const [tagMessageModal, setTagMessageModal] = useState<Message | null>(null);
+  const [quickReplyModal, setQuickReplyModal] = useState<QuickReplyFromMessageState | null>(null);
+  const [creatingQuickReply, setCreatingQuickReply] = useState(false);
+  const [deleteMessageModal, setDeleteMessageModal] = useState<DeleteMessageState | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState(false);
 
   useEffect(() => {
     quickRepliesApi.listQuickReplies().then(r => setAllQuickReplies(r.data ?? [])).catch(() => {});
@@ -241,10 +661,199 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const messageActionsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!openMessageMenuId) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!messageActionsRef.current?.contains(event.target as Node)) {
+        setOpenMessageMenuId(null);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenMessageMenuId(null);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openMessageMenuId]);
+
+  useEffect(() => {
+    if (!contextActionHint) return;
+    const timeout = window.setTimeout(() => setContextActionHint(null), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [contextActionHint]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }, []);
+
+  const openCreateCardModalForMessage = useCallback(async (message: Message) => {
+    if (!activeConversation) return;
+
+    setLoadingProjectRouting(true);
+    try {
+      const [stages, projectsResponse] = await Promise.all([
+        projectsApi.getProjectStages(),
+        projectsApi.listProjects({ limit: 200 }),
+      ]);
+
+      const projects = projectsResponse.data;
+      const rootProjects = projects.filter(project => !project.project_context_id);
+      const relatedProjects = activeConversation.project_context_id
+        ? rootProjects.filter(project => project.id === activeConversation.project_context_id)
+        : [];
+      const primaryRelatedProject = relatedProjects[0];
+      const suggestedTitle = suggestCardTitle(message, activeConversation);
+
+      setProjectStages(stages);
+      setAvailableProjects(rootProjects);
+      setCreateCardModal({
+        message,
+        title: suggestedTitle,
+        description: message.content || suggestedTitle,
+        stage: 'lead',
+        priority: primaryRelatedProject?.priority ?? 'medium',
+        routeMode: activeConversation.project_context_id ? 'current-conversation-project' : 'new-project',
+        selectedProjectId: '',
+        relatedProjects,
+      });
+    } catch (error) {
+      setContextActionHint(error instanceof Error ? error.message : 'Failed to load project routing context.');
+    } finally {
+      setLoadingProjectRouting(false);
+    }
+  }, [activeConversation]);
+
+  const handleCreateCardSubmit = useCallback(async () => {
+    if (!createCardModal || !activeConversation) return;
+
+    const routingProject =
+      createCardModal.routeMode === 'current-conversation-project'
+        ? createCardModal.relatedProjects[0]
+        : createCardModal.routeMode === 'existing-project'
+          ? availableProjects.find(project => project.id === createCardModal.selectedProjectId)
+          : undefined;
+
+    try {
+      setSubmittingProjectCard(true);
+      await projectsApi.createProjectFromMessage(createCardModal.message.id, {
+        title: createCardModal.title.trim(),
+        description: createCardModal.description.trim(),
+        stage: createCardModal.stage,
+        priority: createCardModal.priority,
+        project_context_id: routingProject?.id ?? undefined,
+        attach_conversation_to_project: createCardModal.routeMode !== 'current-conversation-project',
+        owner_user_id: routingProject?.owner_id ?? undefined,
+        due_date: null,
+        value: 0,
+        progress: 0,
+        tag: routingProject?.tag ?? undefined,
+      });
+      setCreateCardModal(null);
+      setContextActionHint(
+        routingProject
+          ? `Card created using ${routingProject.reference} routing context.`
+          : 'Card created from message in Projects.'
+      );
+    } catch (error) {
+      setContextActionHint(error instanceof Error ? error.message : 'Failed to create card from message.');
+    } finally {
+      setSubmittingProjectCard(false);
+    }
+  }, [activeConversation, availableProjects, createCardModal]);
+
+  const handleConversationTagFromMessage = useCallback(async (tag: ConversationTag | null) => {
+    if (!activeConversation) return;
+
+    try {
+      setSavingConversationTag(true);
+      await updateConversation(activeConversation.id, { tag });
+      setTagMessageModal(null);
+      setContextActionHint(tag ? `Conversation tagged as ${TAG_META[tag].label}.` : 'Conversation tag removed.');
+    } catch (error) {
+      setContextActionHint(error instanceof Error ? error.message : 'Failed to update conversation tag.');
+    } finally {
+      setSavingConversationTag(false);
+    }
+  }, [activeConversation, updateConversation]);
+
+  const handleQuickReplyCreate = useCallback(async () => {
+    if (!quickReplyModal) return;
+
+    try {
+      setCreatingQuickReply(true);
+      const normalizedShortcut = quickReplyModal.shortcut.trim().startsWith('/')
+        ? quickReplyModal.shortcut.trim()
+        : `/${quickReplyModal.shortcut.trim()}`;
+
+      const created = await quickRepliesApi.createQuickReply({
+        shortcut: normalizedShortcut,
+        content: quickReplyModal.content.trim(),
+      });
+
+      setAllQuickReplies((current) => [created, ...current]);
+      setQuickReplyModal(null);
+      setContextActionHint(`Quick reply ${created.shortcut} created.`);
+    } catch (error) {
+      setContextActionHint(error instanceof Error ? error.message : 'Failed to create quick reply.');
+    } finally {
+      setCreatingQuickReply(false);
+    }
+  }, [quickReplyModal]);
+
+  const handleDeleteMessage = useCallback(async () => {
+    if (!deleteMessageModal || !activeConversation) return;
+
+    try {
+      setDeletingMessage(true);
+      await conversationsApi.deleteMessage(activeConversation.id, deleteMessageModal.message.id);
+      setDeleteMessageModal(null);
+      await fetchMessages(activeConversation.id);
+      await fetchConversations();
+      setContextActionHint('Message deleted.');
+    } catch (error) {
+      setContextActionHint(error instanceof Error ? error.message : 'Failed to delete message.');
+    } finally {
+      setDeletingMessage(false);
+    }
+  }, [activeConversation, deleteMessageModal, fetchConversations, fetchMessages]);
+
+  const handleMessageActionSelect = useCallback((action: MessageActionId, message: Message) => {
+    setOpenMessageMenuId(null);
+
+    if (action === 'create-quick-reply' && message.inbound) return;
+
+    if (action === 'create-card') {
+      void openCreateCardModalForMessage(message);
+      return;
+    }
+
+    if (action === 'add-tag') {
+      setTagMessageModal(message);
+      return;
+    }
+
+    if (action === 'create-quick-reply') {
+      const seed = message.content.trim().replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'reply';
+      setQuickReplyModal({
+        message,
+        shortcut: `/${seed}`,
+        content: message.content,
+      });
+      return;
+    }
+
+    if (action === 'delete') {
+      setDeleteMessageModal({ message });
+    }
+  }, [openCreateCardModalForMessage]);
 
   // ── Domain hooks ──────────────────────────────────────────────────────────
   const {
@@ -334,6 +943,11 @@ export default function ChatPage() {
     } else if (event.type === 'presence_update') {
       const { conversation_id, viewers } = event.data as { conversation_id: string; viewers: string[] };
       onPresenceUpdate(conversation_id, viewers);
+    } else if (event.type === 'message_deleted') {
+      if (activeConversationRef.current?.id === event.conversation_id) {
+        fetchMessages(event.conversation_id);
+      }
+      fetchConversations();
     } else if (event.type === 'conversation_updated') {
       onConversationUpdated();
     } else if (event.type === 'sla_risk_alert') {
@@ -343,7 +957,7 @@ export default function ChatPage() {
       const d = event.data as { channel: string; failure_count: number };
       setDeliveryAlert({ channel: d.channel, count: d.failure_count });
     }
-  }, [onNewMessage, onConversationNotification, onPresenceUpdate, onConversationUpdated, fetchConversations, appendMessage, activeConversationRef]);
+  }, [onNewMessage, onConversationNotification, onPresenceUpdate, onConversationUpdated, fetchConversations, fetchMessages, appendMessage, activeConversationRef]);
 
   const { subscribe, unsubscribe, connectionState } = useWebSocket(handleWsEvent);
 
@@ -789,9 +1403,16 @@ export default function ChatPage() {
               
               {/* Message History */}
               <div className="flex-1 overflow-y-auto pt-5 px-5 pb-2.5 flex flex-col gap-3.5 bg-[#f8fafc]">
+                {(contextActionHint || loadingProjectRouting) && (
+                  <div className="sticky top-0 z-10 flex justify-center pb-1">
+                    <div className="rounded-full border border-indigo-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm backdrop-blur">
+                      {loadingProjectRouting ? 'Loading project routing...' : contextActionHint}
+                    </div>
+                  </div>
+                )}
                 {messages.map((msg) => (
-                  <div key={msg.id} className={cn("flex max-w-[72%]", !msg.inbound ? "self-end" : "self-start")}>
-                    <div className={cn("flex flex-col gap-1", !msg.inbound ? "items-end" : "items-start")}>
+                  <div key={msg.id} className={cn("group/message relative flex max-w-[72%]", !msg.inbound ? "self-end" : "self-start")}>
+                    <div className={cn("relative flex flex-col gap-1", !msg.inbound ? "items-end" : "items-start")}>
                       <div className={cn("flex items-baseline gap-2", !msg.inbound ? "flex-row-reverse" : "")}>
                         <span className="text-[11px] font-semibold text-[#374151]">
                           {msg.inbound ? (activeConversation.contact.name || 'User').split(' ')[0] : 'You'}
@@ -799,6 +1420,40 @@ export default function ChatPage() {
                         <span className="text-[10px] text-[#94a3b8]">
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
+                      </div>
+
+                      <div
+                        ref={openMessageMenuId === msg.id ? messageActionsRef : null}
+                        className={cn(
+                          'absolute z-20',
+                          msg.inbound ? '-right-3 top-6' : '-left-3 top-6'
+                        )}
+                      >
+                        <button
+                          type="button"
+                          aria-label="Message actions"
+                          aria-haspopup="menu"
+                          aria-expanded={openMessageMenuId === msg.id}
+                          onClick={() => setOpenMessageMenuId((current) => current === msg.id ? null : msg.id)}
+                          className={cn(
+                            'flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200',
+                            openMessageMenuId === msg.id
+                              ? 'scale-100 opacity-100 text-indigo-700 border-indigo-200 ring-2 ring-indigo-100'
+                              : 'pointer-events-none scale-95 opacity-0 group-hover/message:pointer-events-auto group-hover/message:scale-100 group-hover/message:opacity-100 group-focus-within/message:pointer-events-auto group-focus-within/message:scale-100 group-focus-within/message:opacity-100 hover:text-indigo-700 hover:border-indigo-200'
+                          )}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">add</span>
+                        </button>
+
+                        {openMessageMenuId === msg.id && (
+                          <div className={cn('absolute top-10', msg.inbound ? 'left-0 origin-top-left' : 'right-0 origin-top-right')}>
+                            <MessageContextMenu
+                              message={msg}
+                              outbound={!msg.inbound}
+                              onSelect={handleMessageActionSelect}
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <div className={cn(
@@ -1367,6 +2022,47 @@ export default function ChatPage() {
           )}
         </aside>
       </main>
+
+      {createCardModal && (
+        <CreateCardFromMessageModal
+          state={createCardModal}
+          stages={projectStages}
+          projects={availableProjects}
+          loadingProjects={loadingProjectRouting}
+          submitting={submittingProjectCard}
+          onClose={() => setCreateCardModal(null)}
+          onChange={(patch) => setCreateCardModal(current => current ? { ...current, ...patch } : current)}
+          onSubmit={handleCreateCardSubmit}
+        />
+      )}
+
+      {tagMessageModal && (
+        <AddTagFromMessageModal
+          currentTag={activeConversation?.tag}
+          saving={savingConversationTag}
+          onClose={() => setTagMessageModal(null)}
+          onSelect={handleConversationTagFromMessage}
+        />
+      )}
+
+      {quickReplyModal && (
+        <QuickReplyFromMessageModal
+          state={quickReplyModal}
+          saving={creatingQuickReply}
+          onClose={() => setQuickReplyModal(null)}
+          onChange={(patch) => setQuickReplyModal(current => current ? { ...current, ...patch } : current)}
+          onSubmit={handleQuickReplyCreate}
+        />
+      )}
+
+      {deleteMessageModal && (
+        <DeleteMessageModal
+          state={deleteMessageModal}
+          deleting={deletingMessage}
+          onDelete={handleDeleteMessage}
+          onClose={() => setDeleteMessageModal(null)}
+        />
+      )}
     </div>
   );
 }

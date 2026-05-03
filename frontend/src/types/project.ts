@@ -22,6 +22,7 @@ export interface ProjectDto {
   source_type: ProjectSourceType;
   source_message_id?: string | null;
   conversation_id?: string | null;
+  project_context_id?: string | null;
   contact_name?: string | null;
   channel?: ProjectChannel | null;
   tag?: string | null;
@@ -43,6 +44,7 @@ export interface ProjectCreateRequest {
   source_type: ProjectSourceType;
   source_message_id?: string | null;
   source_conversation_id?: string | null;
+  project_context_id?: string | null;
   contact_name?: string | null;
   channel?: ProjectChannel | null;
   tag?: string | null;
@@ -60,6 +62,8 @@ export interface ProjectFromMessageRequest {
   stage: ProjectStageKey;
   priority: ProjectPriority;
   owner_user_id?: string | null;
+  project_context_id?: string | null;
+  attach_conversation_to_project?: boolean;
   due_date?: string | null;
   value?: number | null;
   progress: number;

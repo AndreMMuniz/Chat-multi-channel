@@ -21,6 +21,7 @@ class ProjectBase(BaseModel):
     source_type: ProjectSourceType = ProjectSourceType.MANUAL
     source_message_id: Optional[UUID] = None
     source_conversation_id: Optional[UUID] = None
+    project_context_id: Optional[UUID] = None
     contact_name: Optional[str] = None
     channel: Optional[ChannelType] = None
     tag: Optional[str] = None
@@ -50,6 +51,7 @@ class ProjectUpdate(BaseModel):
     source_type: Optional[ProjectSourceType] = None
     source_message_id: Optional[UUID] = None
     source_conversation_id: Optional[UUID] = None
+    project_context_id: Optional[UUID] = None
     contact_name: Optional[str] = None
     channel: Optional[ChannelType] = None
     tag: Optional[str] = None
@@ -78,6 +80,8 @@ class ProjectFromMessageCreate(BaseModel):
     stage: str = Field(default="lead", min_length=1, max_length=50)
     priority: ProjectPriority = ProjectPriority.MEDIUM
     owner_user_id: Optional[UUID] = None
+    project_context_id: Optional[UUID] = None
+    attach_conversation_to_project: bool = False
     due_date: Optional[datetime] = None
     value: Optional[int] = None
     progress: int = 0
@@ -110,6 +114,7 @@ class ProjectResponse(BaseModel):
     source_type: ProjectSourceType
     source_message_id: Optional[UUID] = None
     conversation_id: Optional[UUID] = None
+    project_context_id: Optional[UUID] = None
     contact_name: Optional[str] = None
     channel: Optional[ChannelType] = None
     tag: Optional[str] = None

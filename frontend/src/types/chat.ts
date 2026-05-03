@@ -26,6 +26,7 @@ export interface AssignedUser {
 export interface Conversation {
   id: string;
   contact_id: string;
+  project_context_id?: string | null;
   channel: ChannelType;
   status: ConversationStatus;
   tag?: ConversationTag | null;

@@ -38,11 +38,26 @@ class ProjectService:
             )
             raise HTTPException(status_code=status, detail=error_response)
 
+    async def ensure_project_context_exists(self, project_context_id: Optional[UUID]) -> None:
+        if not project_context_id:
+            return
+        project = await self.projects.find_project(project_context_id)
+        if not project:
+            error_response, status = create_error_response(
+                code="PROJECT_CONTEXT_NOT_FOUND",
+                message="Project context not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
     async def validate_payload(self, payload: ProjectCreate | ProjectUpdate) -> None:
         if payload.stage:
             await self.ensure_stage_exists(payload.stage)
         if payload.owner_user_id:
             await self.ensure_owner_exists(payload.owner_user_id)
+        project_context_id = getattr(payload, "project_context_id", None)
+        if project_context_id:
+            await self.ensure_project_context_exists(project_context_id)
         if payload.source_type == ProjectSourceType.MESSAGE and not payload.source_message_id:
             error_response, status = create_error_response(
                 code="SOURCE_MESSAGE_REQUIRED",
@@ -80,6 +95,8 @@ class ProjectService:
         await self.ensure_stage_exists(payload.stage)
         if payload.owner_user_id:
             await self.ensure_owner_exists(payload.owner_user_id)
+        if payload.project_context_id:
+            await self.ensure_project_context_exists(payload.project_context_id)
 
         message = (
             self.db.query(Message)
@@ -113,6 +130,7 @@ class ProjectService:
 
         title = payload.title or (contact_name and f"{contact_name} demand") or "Message demand"
         description = payload.description or message.content
+        project_context_id = payload.project_context_id or conversation.project_context_id
 
         project = await self.projects.create(
             {
@@ -124,6 +142,7 @@ class ProjectService:
                 "source_type": ProjectSourceType.MESSAGE,
                 "source_message_id": message.id,
                 "source_conversation_id": conversation.id,
+                "project_context_id": project_context_id,
                 "contact_name": contact_name,
                 "channel": conversation.channel,
                 "tag": payload.tag,
@@ -134,6 +153,9 @@ class ProjectService:
                 "progress": payload.progress,
             }
         )
+        if payload.attach_conversation_to_project:
+            conversation.project_context_id = project_context_id or project.id
+            self.db.commit()
         return await self.projects.find_project(project.id)
 
 
@@ -149,6 +171,7 @@ def serialize_project(project: Project) -> dict:
         "source_type": project.source_type,
         "source_message_id": project.source_message_id,
         "conversation_id": project.source_conversation_id,
+        "project_context_id": project.project_context_id,
         "contact_name": project.contact_name,
         "channel": project.channel,
         "tag": project.tag,

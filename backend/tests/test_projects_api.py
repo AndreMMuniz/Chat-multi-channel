@@ -284,3 +284,104 @@ def test_create_project_from_message_rejects_unknown_message(db):
     )
     assert response.status_code == 404
     assert response.json()["detail"]["error"]["code"] == "MESSAGE_NOT_FOUND"
+
+
+def test_create_project_from_message_can_adopt_created_project_as_conversation_context(db):
+    user = _seed_user_and_stages(db)
+    contact = Contact(name="Nova Client")
+    db.add(contact)
+    db.flush()
+
+    conversation = Conversation(
+        contact_id=contact.id,
+        assigned_user_id=user.id,
+        channel=ChannelType.WHATSAPP,
+        status=ConversationStatus.OPEN,
+    )
+    db.add(conversation)
+    db.flush()
+
+    message = Message(
+        conversation_id=conversation.id,
+        owner_id=user.id,
+        content="Need a brand new project",
+        inbound=True,
+        message_type=MessageType.TEXT,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    client = _make_client(db, user)
+    response = client.post(
+        f"/api/v1/admin/projects/from-message/{message.id}",
+        json={
+            "stage": "lead",
+            "priority": "medium",
+            "progress": 0,
+            "attach_conversation_to_project": True,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["project_context_id"] is None
+
+    db.refresh(conversation)
+    assert str(conversation.project_context_id) == data["id"]
+
+
+def test_create_project_from_message_can_route_to_existing_project_context(db):
+    user = _seed_user_and_stages(db)
+    contact = Contact(name="Existing Context")
+    db.add(contact)
+    db.flush()
+
+    conversation = Conversation(
+        contact_id=contact.id,
+        assigned_user_id=user.id,
+        channel=ChannelType.WHATSAPP,
+        status=ConversationStatus.OPEN,
+    )
+    db.add(conversation)
+    db.flush()
+
+    project_context = Project(
+        title="Main Project Context",
+        description="Top level project",
+        stage="lead",
+        priority=ProjectPriority.MEDIUM,
+        status=ProjectStatus.OPEN,
+        source_type=ProjectSourceType.MANUAL,
+        created_by_user_id=user.id,
+    )
+    db.add(project_context)
+    db.flush()
+
+    message = Message(
+        conversation_id=conversation.id,
+        owner_id=user.id,
+        content="Route this demand into existing context",
+        inbound=True,
+        message_type=MessageType.TEXT,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    client = _make_client(db, user)
+    response = client.post(
+        f"/api/v1/admin/projects/from-message/{message.id}",
+        json={
+            "stage": "lead",
+            "priority": "high",
+            "progress": 10,
+            "project_context_id": str(project_context.id),
+            "attach_conversation_to_project": True,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["project_context_id"] == str(project_context.id)
+
+    db.refresh(conversation)
+    assert conversation.project_context_id == project_context.id

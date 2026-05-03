@@ -70,6 +70,7 @@ class AssignedUserSlim(BaseModel):
 class ConversationResponse(ConversationBase):
     id: UUID
     contact_id: UUID
+    project_context_id: Optional[UUID] = None
     thread_id: Optional[str] = None
     last_message: Optional[str] = None
     last_message_date: Optional[datetime] = None

@@ -175,6 +175,7 @@ class Conversation(Base):
     thread_id = Column(String(255), nullable=True, index=True) # Thread ID for LangGraph or channel specific thread
     contact_id = Column(UUID(as_uuid=True), ForeignKey("contacts.id"), nullable=False)
     assigned_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    project_context_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
 
     channel = Column(Enum(ChannelType), default=ChannelType.WEB)
     status = Column(Enum(ConversationStatus), default=ConversationStatus.OPEN)
@@ -192,9 +193,14 @@ class Conversation(Base):
 
     contact = relationship("Contact", back_populates="conversations")
     assigned_user = relationship("User", foreign_keys=[assigned_user_id])
+    project_context = relationship("Project", foreign_keys=[project_context_id])
     messages = relationship("Message", back_populates="conversation")
     ai_suggestions = relationship("AISuggestion", back_populates="conversation")
-    source_projects = relationship("Project", back_populates="source_conversation")
+    source_projects = relationship(
+        "Project",
+        back_populates="source_conversation",
+        foreign_keys="Project.source_conversation_id",
+    )
 
 class Message(Base):
     __tablename__ = "messages"
@@ -331,6 +337,7 @@ class Project(Base):
     )
     source_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
     source_conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=True)
+    project_context_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
     contact_name = Column(String(255), nullable=True)
     channel = Column(
         Enum(ChannelType, values_callable=lambda obj: [e.value for e in obj], name="projectchanneltype"),
@@ -348,5 +355,10 @@ class Project(Base):
     stage_definition = relationship("ProjectStage", back_populates="projects")
     owner = relationship("User", foreign_keys=[owner_user_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
-    source_conversation = relationship("Conversation", back_populates="source_projects")
+    source_conversation = relationship(
+        "Conversation",
+        back_populates="source_projects",
+        foreign_keys=[source_conversation_id],
+    )
     source_message = relationship("Message", back_populates="source_projects")
+    project_context = relationship("Project", remote_side=[id], foreign_keys=[project_context_id])
