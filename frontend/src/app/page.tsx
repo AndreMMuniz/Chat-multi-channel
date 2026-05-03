@@ -131,11 +131,11 @@ const CHANNEL_META: Record<ChannelType, {
 };
 
 const TAG_META: Record<ConversationTag, { label: string; className: string; activeBg: string; activeText: string; activeBorder: string }> = {
-  SUPPORT:  { label: 'Suporte',  className: 'bg-blue-50 text-blue-700 border-blue-100',      activeBg: '#eff6ff', activeText: '#1d4ed8', activeBorder: '#bfdbfe' },
-  BILLING:  { label: 'Cobrança', className: 'bg-amber-50 text-amber-700 border-amber-100',   activeBg: '#fffbeb', activeText: '#92400e', activeBorder: '#fde68a' },
+  SUPPORT:  { label: 'Support',  className: 'bg-blue-50 text-blue-700 border-blue-100',      activeBg: '#eff6ff', activeText: '#1d4ed8', activeBorder: '#bfdbfe' },
+  BILLING:  { label: 'Billing',  className: 'bg-amber-50 text-amber-700 border-amber-100',   activeBg: '#fffbeb', activeText: '#92400e', activeBorder: '#fde68a' },
   FEEDBACK: { label: 'Feedback', className: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100', activeBg: '#fdf4ff', activeText: '#7e22ce', activeBorder: '#e9d5ff' },
-  SALES:    { label: 'Vendas',   className: 'bg-emerald-50 text-emerald-700 border-emerald-100', activeBg: '#f0fdf4', activeText: '#15803d', activeBorder: '#bbf7d0' },
-  GENERAL:  { label: 'Geral',    className: 'bg-slate-100 text-slate-700 border-slate-200',   activeBg: '#f8fafc', activeText: '#475569', activeBorder: '#e2e8f0' },
+  SALES:    { label: 'Sales',    className: 'bg-emerald-50 text-emerald-700 border-emerald-100', activeBg: '#f0fdf4', activeText: '#15803d', activeBorder: '#bbf7d0' },
+  GENERAL:  { label: 'General',  className: 'bg-slate-100 text-slate-700 border-slate-200',   activeBg: '#f8fafc', activeText: '#475569', activeBorder: '#e2e8f0' },
   SPAM:     { label: 'Spam',     className: 'bg-rose-50 text-rose-700 border-rose-100',       activeBg: '#fff1f2', activeText: '#be123c', activeBorder: '#fecdd3' },
 };
 
@@ -274,19 +274,15 @@ export default function ChatPage() {
   });
 
   const availableChannels = Object.keys(CHANNEL_META) as ChannelType[];
-  const tagCounts = TAG_OPTIONS.reduce<Record<ConversationTag, number>>((acc, tag) => {
-    acc[tag] = conversations.filter((c) => c.tag === tag).length;
-    return acc;
-  }, {} as Record<ConversationTag, number>);
   const hasActiveFilters = Boolean(searchQuery.trim()) || selectedChannel !== 'ALL' || selectedTag !== 'ALL';
   const selectedTagLabel = selectedTag === 'ALL' ? null : TAG_META[selectedTag].label;
   const emptyStateMessage = !hasActiveFilters
-    ? 'Nenhuma conversa ainda'
+    ? 'No conversations yet'
     : selectedTag !== 'ALL'
-      ? `Nenhuma conversa com a tag ${selectedTagLabel} nos filtros atuais`
+      ? `No conversations match the ${selectedTagLabel} tag with the current filters`
       : selectedChannel !== 'ALL'
-        ? `Nenhuma conversa no canal ${getChannelMeta(selectedChannel).label} com os filtros atuais`
-        : 'Nenhuma conversa corresponde aos filtros atuais';
+        ? `No conversations match the ${getChannelMeta(selectedChannel).label} channel with the current filters`
+        : 'No conversations match the current filters';
 
   const filteredConversations = sortedConversations.filter((c) => {
     const q = searchQuery.trim().toLowerCase();
@@ -449,10 +445,10 @@ export default function ChatPage() {
       {/* Header */}
       <header className="h-14 border-b border-[#E9ECEF] bg-white shrink-0 flex items-center px-5 gap-2.5">
         <span className="material-symbols-outlined text-[20px] text-[#7C4DFF]" style={{ fontVariationSettings: "'FILL' 1" }}>chat_bubble</span>
-        <span className="text-[16px] font-bold text-slate-900">Mensagens</span>
+        <span className="text-[16px] font-bold text-slate-900">Messages</span>
         {conversations.filter(c => c.is_unread).length > 0 && (
           <div className="ml-2 bg-[#eef2ff] text-[#4338ca] border border-[#c7d2fe] rounded-full px-2.5 py-0.5 text-[11px] font-bold">
-            {conversations.filter(c => c.is_unread).length} não lidas
+            {conversations.filter(c => c.is_unread).length} unread
           </div>
         )}
       </header>
@@ -464,7 +460,7 @@ export default function ChatPage() {
           connectionState === 'reconnecting' ? "bg-yellow-50 text-yellow-700 border-b border-yellow-200" : "bg-red-50 text-red-700 border-b border-red-200"
         )}>
           <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-          {connectionState === 'connecting' ? 'Conectando ao servidor…' : 'Conexão perdida — reconectando…'}
+          {connectionState === 'connecting' ? 'Connecting to server…' : 'Connection lost — reconnecting…'}
         </div>
       )}
 
@@ -473,7 +469,7 @@ export default function ChatPage() {
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-amber-50 text-amber-800 border-b border-amber-200">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]">schedule</span>
-            <span><strong>{slaAlert.count}</strong> conversa{slaAlert.count !== 1 ? 's' : ''} sem resposta há mais de {slaAlert.threshold} min</span>
+            <span><strong>{slaAlert.count}</strong> conversation{slaAlert.count !== 1 ? 's' : ''} unanswered for more than {slaAlert.threshold} min</span>
           </div>
           <button onClick={() => setSlaAlert(null)} className="ml-2 text-amber-600 hover:text-amber-900">
             <span className="material-symbols-outlined text-[16px]">close</span>
@@ -486,7 +482,7 @@ export default function ChatPage() {
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-red-50 text-red-800 border-b border-red-200">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]">error</span>
-            <span><strong>{deliveryAlert.count}</strong> falha{deliveryAlert.count !== 1 ? 's' : ''} de entrega em <strong className="uppercase">{deliveryAlert.channel}</strong> nos últimos minutos</span>
+            <span><strong>{deliveryAlert.count}</strong> delivery failure{deliveryAlert.count !== 1 ? 's' : ''} on <strong className="uppercase">{deliveryAlert.channel}</strong> in the last few minutes</span>
           </div>
           <button onClick={() => setDeliveryAlert(null)} className="ml-2 text-red-600 hover:text-red-900">
             <span className="material-symbols-outlined text-[16px]">close</span>
@@ -514,7 +510,7 @@ export default function ChatPage() {
               <span className="material-symbols-outlined ml-sm text-outline">search</span>
               <input
                 className="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm outline-none"
-                placeholder="Buscar conversas…"
+                placeholder="Search conversations…"
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -526,7 +522,7 @@ export default function ChatPage() {
                 <button onClick={() => setSelectedChannel('ALL')}
                   className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer"
                   style={selectedChannel === 'ALL' ? { background: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
-                  Todos
+                  All
                 </button>
                 {availableChannels.map((ch) => {
                   const m = CHANNEL_META[ch];
@@ -546,7 +542,7 @@ export default function ChatPage() {
                 <button onClick={() => setSelectedTag('ALL')}
                   className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors cursor-pointer"
                   style={selectedTag === 'ALL' ? { background: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
-                  Todas tags
+                  All tags
                 </button>
                 {TAG_OPTIONS.map((tag) => {
                   const m = TAG_META[tag];
@@ -577,7 +573,7 @@ export default function ChatPage() {
                     }}
                     className="mt-3 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-800"
                   >
-                    Limpar filtros
+                    Clear filters
                   </button>
                 )}
               </div>
@@ -742,15 +738,15 @@ export default function ChatPage() {
                     value={activeConversation.status}
                     onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
                     className={cn(
-                      "h-[30px] px-2.5 rounded-full text-[11px] font-semibold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-100",
-                      activeConversation.status === 'OPEN' && "bg-[#fdf4ff] text-[#7C4DFF] border-[#e9d5ff]",
-                      activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700 border-yellow-200",
-                      activeConversation.status === 'CLOSED' && "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      "h-[30px] px-2.5 rounded-full text-[11px] font-semibold border cursor-pointer focus:outline-none",
+                      activeConversation.status === 'OPEN' && "bg-[#fff7ed] text-[#f97316] border-[#fed7aa]",
+                      activeConversation.status === 'PENDING' && "bg-[#fffbeb] text-[#f59e0b] border-[#fde68a]",
+                      activeConversation.status === 'CLOSED' && "bg-[#f0fdf4] text-[#10b981] border-[#bbf7d0]"
                     )}
                   >
-                    <option value="OPEN">Aberto</option>
-                    <option value="PENDING">Pendente</option>
-                    <option value="CLOSED">Fechado</option>
+                    <option value="OPEN">Open</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="CLOSED">Closed</option>
                   </select>
                   {/* AI toggle — desktop */}
                   <button
@@ -798,7 +794,7 @@ export default function ChatPage() {
                     <div className={cn("flex flex-col gap-1", !msg.inbound ? "items-end" : "items-start")}>
                       <div className={cn("flex items-baseline gap-2", !msg.inbound ? "flex-row-reverse" : "")}>
                         <span className="text-[11px] font-semibold text-[#374151]">
-                          {msg.inbound ? (activeConversation.contact.name || 'Usuário').split(' ')[0] : 'Você'}
+                          {msg.inbound ? (activeConversation.contact.name || 'User').split(' ')[0] : 'You'}
                         </span>
                         <span className="text-[10px] text-[#94a3b8]">
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -829,8 +825,8 @@ export default function ChatPage() {
                         {(sendStatus[msg.id] === 'failed' || msg.delivery_status === 'failed') && (
                           <div className="mt-1.5 flex items-center gap-2 text-red-500 text-xs">
                             <span className="material-symbols-outlined text-[14px]">error</span>
-                            <span title={msg.delivery_error || 'Erro desconhecido'}>
-                              Falha no envio
+                            <span title={msg.delivery_error || 'Unknown error'}>
+                              Send failed
                               {msg.delivery_error && <span className="ml-1 opacity-60 font-mono">({msg.delivery_error.split(':').pop()})</span>}
                             </span>
                             {(msg.retry_count ?? 0) < 3 && (
@@ -838,11 +834,11 @@ export default function ChatPage() {
                                 onClick={() => retryMessage(msg.conversation_id, msg.id)}
                                 className="underline hover:text-red-700 transition-colors"
                               >
-                                Tentar novamente {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
+                                Retry {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
                               </button>
                             )}
                             {(msg.retry_count ?? 0) >= 3 && (
-                              <span className="opacity-60">Limite de tentativas atingido</span>
+                              <span className="opacity-60">Retry limit reached</span>
                             )}
                           </div>
                         )}
@@ -859,7 +855,7 @@ export default function ChatPage() {
                             {msg.delivery_status === 'delivered' ? 'done_all' : 'done'}
                           </span>
                           <span className="text-[10px] text-[#94a3b8]">
-                            {msg.delivery_status === 'delivered' ? 'Lido' : 'Enviado'}
+                            {msg.delivery_status === 'delivered' ? 'Read' : 'Sent'}
                           </span>
                         </div>
                       )}
@@ -885,7 +881,7 @@ export default function ChatPage() {
                   {allQuickReplies.length > 4 && (
                     <button className="shrink-0 flex items-center gap-1 h-[26px] px-2.5 rounded-full border border-[#e2e8f0] bg-white text-[11px] font-semibold text-[#575f67] hover:bg-slate-50 transition-colors">
                       <span className="material-symbols-outlined text-[14px]">more_horiz</span>
-                      Mais
+                      More
                     </button>
                   )}
                 </div>
@@ -934,8 +930,8 @@ export default function ChatPage() {
                   {isRecording ? (
                     <div className="flex-1 flex items-center gap-3 px-3 py-2 text-indigo-600">
                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                      <span className="text-sm font-semibold tabular-nums">Gravando: {formatDuration(recordingDuration)}</span>
-                      <button onClick={() => { setIsRecording(false); if(timerRef.current) clearInterval(timerRef.current); }} className="ml-auto text-xs font-medium hover:underline">Cancelar</button>
+                      <span className="text-sm font-semibold tabular-nums">Recording: {formatDuration(recordingDuration)}</span>
+                      <button onClick={() => { setIsRecording(false); if(timerRef.current) clearInterval(timerRef.current); }} className="ml-auto text-xs font-medium hover:underline">Cancel</button>
                     </div>
                   ) : (
                     <>
@@ -969,7 +965,7 @@ export default function ChatPage() {
                       <textarea
                         data-testid="message-input"
                         className="flex-1 bg-transparent border-none text-[13px] text-[#1d1a24] focus:ring-0 outline-none resize-none py-1 pl-1 max-h-[120px] overflow-y-auto"
-                        placeholder="Digite uma mensagem ou / para respostas rápidas…"
+                        placeholder="Type a message or / for quick replies…"
                         rows={1}
                         value={input}
                         onFocus={() => setShowEmojiPicker(false)}
@@ -1065,15 +1061,15 @@ export default function ChatPage() {
                   <div className="pt-2.5 px-3.5 pb-2 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <div className="w-5 h-5 rounded-[5px] bg-gradient-to-br from-[#7C4DFF] to-[#4338ca] flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[12px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                        <TbSparkles size={11} color="white" />
                       </div>
-                      <span className="text-[11px] font-bold text-[#7C4DFF] uppercase tracking-wider">Sugestões de IA</span>
+                      <span className="text-[11px] font-bold text-[#7C4DFF] uppercase tracking-wider">AI Suggestions</span>
                       {(aiGenerating || aiLoading) && (
                         <span className="w-3 h-3 border-2 border-[#7C4DFF]/30 border-t-[#7C4DFF] rounded-full animate-spin" />
                       )}
                       {aiSource && aiGeneratedAt && (
                         <span className="text-[10px] text-slate-400">
-                          {aiSource === 'generated' ? 'Gerado' : 'Cache'} · {aiGeneratedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {aiSource === 'generated' ? 'Generated' : 'Cached'} · {aiGeneratedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
                     </div>
@@ -1085,7 +1081,7 @@ export default function ChatPage() {
                       <span className={cn("material-symbols-outlined text-[13px]", (aiGenerating || aiLoading) && "animate-spin")}>
                         {(aiGenerating || aiLoading) ? "progress_activity" : "refresh"}
                       </span>
-                      {(aiGenerating || aiLoading) ? 'Gerando…' : 'Gerar'}
+                      {(aiGenerating || aiLoading) ? 'Generating…' : 'Generate'}
                     </button>
                   </div>
                   <div className="px-2.5 pb-2.5 flex flex-col gap-[5px]">
@@ -1098,7 +1094,7 @@ export default function ChatPage() {
                         className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-xs text-slate-400 hover:border-[#7C4DFF] hover:text-[#7C4DFF] transition-colors flex items-center justify-center gap-2"
                       >
                         <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                        Gerar sugestões de IA
+                        Generate AI suggestions
                       </button>
                     )}
                     {!aiGenerating && !aiLoading && suggestions.map((s, i) => {
@@ -1148,7 +1144,7 @@ export default function ChatPage() {
                       {/* Header */}
                       <div className="flex items-center gap-2 py-3 border-b border-slate-100 mb-3">
                         <TbSparkles size={16} className="text-indigo-600" />
-                        <span className="text-sm font-semibold text-indigo-600">Sugestões de IA</span>
+                        <span className="text-sm font-semibold text-indigo-600">AI Suggestions</span>
                         <button
                           onClick={() => setAiSheetOpen(false)}
                           className="ml-auto w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
@@ -1166,7 +1162,7 @@ export default function ChatPage() {
                           </div>
                         )}
                         {!aiGenerating && !aiLoading && suggestions.length === 0 && (
-                          <p className="text-sm text-slate-400 text-center py-4">Nenhuma sugestão disponível</p>
+                          <p className="text-sm text-slate-400 text-center py-4">No suggestions available</p>
                         )}
                         {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
                           <button
@@ -1201,9 +1197,9 @@ export default function ChatPage() {
               {/* Tab bar */}
               <div className="flex border-b border-outline-variant shrink-0">
                 {([
-                  ['contact', 'person', 'Contato'],
-                  ['details', 'info', 'Detalhes'],
-                  ['history', 'history', 'Histórico'],
+                  ['contact', 'person', 'Contact'],
+                  ['details', 'info', 'Details'],
+                  ['history', 'history', 'History'],
                 ] as const).map(([t, icon, label]) => (
                   <button
                     key={t}
@@ -1244,12 +1240,12 @@ export default function ChatPage() {
                       <ChannelBadge channel={activeConversation.channel} />
                     </div>
                     <div className="mb-3.5">
-                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Detalhes do contato</p>
+                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Contact details</p>
                       <div className="space-y-2 text-[12px]">
                         {[
-                          { label: 'Nome', value: activeConversation.contact.name || '-' },
-                          { label: 'Identificador', value: activeConversation.contact.channel_identifier },
-                          { label: 'Canal', value: getChannelMeta(activeConversation.channel).label },
+                          { label: 'Name', value: activeConversation.contact.name || '-' },
+                          { label: 'Identifier', value: activeConversation.contact.channel_identifier },
+                          { label: 'Channel', value: getChannelMeta(activeConversation.channel).label },
                         ].map(({ label, value }) => (
                           <div key={label} className="flex justify-between items-center">
                             <span className="text-[#7a7487]">{label}</span>
@@ -1258,7 +1254,7 @@ export default function ChatPage() {
                         ))}
                         {activeConversation.first_response_at && (
                           <div className="flex justify-between items-center">
-                            <span className="text-[#7a7487]">Primeira resposta</span>
+                            <span className="text-[#7a7487]">First response</span>
                             <span className="font-medium text-[#1d1a24]">
                               {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
                             </span>
@@ -1274,13 +1270,13 @@ export default function ChatPage() {
                   <div className="p-4 space-y-5">
                     {/* Status */}
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Status da conversa</p>
+                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Status</p>
                       <div className="flex gap-1.5">
                         {(['OPEN', 'PENDING', 'CLOSED'] as const).map(s => {
                           const styles = {
-                            OPEN:    { active: 'bg-[#fdf4ff] text-[#7C4DFF] border-[#e9d5ff]',   label: 'Aberto' },
-                            PENDING: { active: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Pendente' },
-                            CLOSED:  { active: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Fechado' },
+                            OPEN:    { active: 'bg-[#fdf4ff] text-[#7C4DFF] border-[#e9d5ff]',          label: 'Open' },
+                            PENDING: { active: 'bg-[#fffbeb] text-[#92400e] border-[#fde68a]',           label: 'Pending' },
+                            CLOSED:  { active: 'bg-[#f0fdf4] text-[#15803d] border-[#bbf7d0]',          label: 'Closed' },
                           };
                           const isActive = activeConversation.status === s;
                           return (
@@ -1301,7 +1297,7 @@ export default function ChatPage() {
 
                     {/* Assigned Agent */}
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Agente responsável</p>
+                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Assigned Agent</p>
                       <AssignmentPanel
                         conversation={activeConversation}
                         onAssign={async (userId) => {
@@ -1313,15 +1309,12 @@ export default function ChatPage() {
 
                     {/* Tag */}
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tag da conversa</p>
-                        {activeConversation.tag && <TagBadge tag={activeConversation.tag} />}
-                      </div>
+                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Conversation Tag</p>
                       <TagPills
                         value={activeConversation.tag}
                         onChange={(tag: ConversationTag | null) => updateConversation(activeConversation.id, { tag })}
                       />
-                      <p className="mt-1.5 text-[10px] text-slate-400">Uma tag por conversa nesta versão.</p>
+                      <p className="mt-1.5 text-[10px] text-slate-400">One tag per conversation in this release.</p>
                     </div>
                   </div>
                 )}
