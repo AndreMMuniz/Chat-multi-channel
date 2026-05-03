@@ -1,6 +1,6 @@
 # Story 12.2: Projects CRUD API and Filters
 
-**Status:** ready-for-dev  
+**Status:** done  
 **Epic:** 12 — Projects Backend Foundation  
 **Story Points:** 8  
 **Priority:** High  

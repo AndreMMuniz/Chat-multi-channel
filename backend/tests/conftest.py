@@ -8,6 +8,7 @@ The FastAPI app is patched to use this test DB.
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.core.database import Base, get_db
@@ -19,6 +20,7 @@ SQLITE_URL = "sqlite://"
 engine = create_engine(
     SQLITE_URL,
     connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 
 # SQLite doesn't enforce FK constraints by default — enable them

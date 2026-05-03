@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.repositories.user_repo import UserRepository
 from app.repositories.conversation_repo import ConversationRepository
 from app.repositories.message_repo import MessageRepository
+from app.repositories.project_repo import ProjectRepository, ProjectStageRepository
 from app.core.database import get_db
 from fastapi import Depends
 
@@ -24,6 +25,8 @@ class RepositoryFactory:
         self._user_repo: UserRepository | None = None
         self._conversation_repo: ConversationRepository | None = None
         self._message_repo: MessageRepository | None = None
+        self._project_repo: ProjectRepository | None = None
+        self._project_stage_repo: ProjectStageRepository | None = None
 
     @property
     def users(self) -> UserRepository:
@@ -46,6 +49,18 @@ class RepositoryFactory:
             self._message_repo = MessageRepository(self.session)
         return self._message_repo
 
+    @property
+    def projects(self) -> ProjectRepository:
+        if self._project_repo is None:
+            self._project_repo = ProjectRepository(self.session)
+        return self._project_repo
+
+    @property
+    def project_stages(self) -> ProjectStageRepository:
+        if self._project_stage_repo is None:
+            self._project_stage_repo = ProjectStageRepository(self.session)
+        return self._project_stage_repo
+
 
 async def get_repositories(session: Session = Depends(get_db)) -> RepositoryFactory:
     """
@@ -63,4 +78,6 @@ __all__ = [
     "UserRepository",
     "ConversationRepository",
     "MessageRepository",
+    "ProjectRepository",
+    "ProjectStageRepository",
 ]
