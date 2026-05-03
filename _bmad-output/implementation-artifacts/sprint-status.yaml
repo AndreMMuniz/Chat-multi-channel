@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-02  # epic 11 created for Projects / Pipeline Kanban planning
+last_updated: 2026-05-02  # epic 11 implemented and closed
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -198,13 +198,13 @@ development_status:
 
   # —— Epic 11: Projects / Pipeline Kanban ———————————————————————————————
   # Source: projects pipeline kanban spec + reference mock
-  # Scope: projects workspace shell, kanban board, deal modal, filters, KPI strip,
+  # Scope: projects workspace shell, kanban board, project modal, filters, KPI strip,
   #        secondary list/timeline views
-  epic-11: in-progress
+  epic-11: done
 
-  11-1-projects-workspace-shell-and-header: ready-for-dev
-  11-2-kanban-board-columns-and-project-cards: ready-for-dev
-  11-3-project-create-edit-and-stage-movement: ready-for-dev
-  11-4-pipeline-filters-kpis-and-secondary-views: ready-for-dev
+  11-1-projects-workspace-shell-and-header: done
+  11-2-kanban-board-columns-and-project-cards: done
+  11-3-project-create-edit-and-stage-movement: done
+  11-4-pipeline-filters-kpis-and-secondary-views: done
 
   epic-11-retrospective: optional
