@@ -64,6 +64,22 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const AVATAR_PALETTE = [
+  { bg: '#ede9fe', text: '#7C4DFF' },
+  { bg: '#fce7f3', text: '#be185d' },
+  { bg: '#dcfce7', text: '#15803d' },
+  { bg: '#fef9c3', text: '#854d0e' },
+  { bg: '#dbeafe', text: '#1e40af' },
+  { bg: '#fee2e2', text: '#b91c1c' },
+  { bg: '#d1fae5', text: '#065f46' },
+];
+
+function avatarColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+
 const SLA_THRESHOLD_MINUTES = 60;
 const TAG_OPTIONS: ConversationTag[] = ['SUPPORT', 'BILLING', 'FEEDBACK', 'SALES', 'GENERAL', 'SPAM'];
 
@@ -569,8 +585,9 @@ export default function ChatPage() {
             {filteredConversations.map((conv) => {
               const chMeta = getChannelMeta(conv.channel);
               const isActive = activeConversation?.id === conv.id;
-              const initials = (conv.contact.name || conv.contact.channel_identifier || 'U')
-                .split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+              const displayName = conv.contact.name || conv.contact.channel_identifier || 'U';
+              const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+              const avColor = avatarColor(displayName);
               const sla = waitingTime(conv.last_message_date, conv.is_unread);
               return (
                 <div
@@ -593,7 +610,8 @@ export default function ChatPage() {
                       <Image alt={initials} className="w-[38px] h-[38px] rounded-full object-cover"
                         src={conv.contact.avatar} width={38} height={38} />
                     ) : (
-                      <div className="w-[38px] h-[38px] rounded-full bg-[#ede9fe] text-[#7C4DFF] flex items-center justify-center text-[13px] font-bold uppercase">
+                      <div className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-[13px] font-bold uppercase"
+                        style={{ background: avColor.bg, color: avColor.text }}>
                         {initials}
                       </div>
                     )}
@@ -680,11 +698,15 @@ export default function ChatPage() {
                         width={48}
                         height={48}
                       />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-h2 text-h2 uppercase">
-                        {(activeConversation.contact.name || 'U')[0]}
-                      </div>
-                    )}
+                    ) : (() => {
+                      const ac = avatarColor(activeConversation.contact.name || activeConversation.contact.channel_identifier || 'U');
+                      const ini = (activeConversation.contact.name || activeConversation.contact.channel_identifier || 'U')
+                        .split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                      return (
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold uppercase"
+                          style={{ background: ac.bg, color: ac.text }}>{ini}</div>
+                      );
+                    })()}
                   </div>
                   <div>
                     <h2 className="font-h2 text-h2 text-on-surface">{activeConversation.contact.name || activeConversation.contact.channel_identifier}</h2>
@@ -847,7 +869,7 @@ export default function ChatPage() {
                       onClick={() => setInput(qr.content)}
                       className="shrink-0 flex items-center gap-1.5 h-7 px-3 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
                     >
-                      <span className="bg-indigo-50 text-indigo-600 border border-indigo-100 rounded px-1 py-0.5 text-[9px] font-bold">{qr.shortcut}</span>
+                      <span style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', borderRadius: 4, padding: '0 4px', fontSize: 9, fontWeight: 700 }}>{qr.shortcut}</span>
                       {qr.shortcut.replace('/', '').charAt(0).toUpperCase() + qr.shortcut.replace('/', '').slice(1)}
                     </button>
                   ))}
@@ -958,9 +980,27 @@ export default function ChatPage() {
                   )}
 
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
-                  
-                  <div className="flex items-center gap-1.5 ml-xs">
-                    {/* Sparkles button — mobile only, triggers AI suggestions Sheet */}
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Quick reply shortcut button */}
+                    <button
+                      onClick={() => { setInput('/'); qrSearch('/'); }}
+                      title="Respostas rápidas"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-[#94a3b8] hover:bg-slate-200 hover:text-[#4338ca] transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">quick_phrases</span>
+                    </button>
+                    {/* AI toggle — desktop */}
+                    <button
+                      title="Sugestões de IA"
+                      onClick={() => setShowAIDesktop(v => !v)}
+                      className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors"
+                      style={showAIDesktop ? { background: '#f5f3ff', color: '#7C4DFF' } : { color: '#94a3b8' }}
+                    >
+                      <span className="material-symbols-outlined text-[18px]"
+                        style={{ fontVariationSettings: `'FILL' ${showAIDesktop ? 1 : 0}` }}>auto_awesome</span>
+                    </button>
+                    {/* Mobile AI sheet button */}
                     <button
                       data-testid="ai-sparkles-button"
                       type="button"
@@ -971,40 +1011,39 @@ export default function ChatPage() {
                         setAiSheetOpen(true);
                       }}
                       disabled={aiGenerating || aiLoading}
-                      className={cn(
-                        "md:hidden w-9 h-9 flex items-center justify-center rounded-lg transition-all",
-                        aiGenerating || aiLoading
-                          ? "text-indigo-600 opacity-100"
-                          : "text-indigo-600 opacity-40 hover:opacity-100"
-                      )}
-                      aria-label="Sugestões de IA"
+                      className={cn("md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-all",
+                        aiGenerating || aiLoading ? "text-[#7C4DFF]" : "text-[#94a3b8] hover:text-[#7C4DFF]")}
                     >
                       {aiGenerating || aiLoading
-                        ? <span className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-                        : <TbSparkles size={18} />
+                        ? <span className="w-3.5 h-3.5 border-2 border-[#7C4DFF]/30 border-t-[#7C4DFF] rounded-full animate-spin" />
+                        : <TbSparkles size={17} />
                       }
                     </button>
+                    {/* Send / mic / stop */}
                     {!input.trim() && !selectedFile && !isRecording ? (
-                      <button onClick={startRecording} className="w-10 h-10 rounded-lg text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors">
-                        <span className="material-symbols-outlined text-[22px]">mic</span>
+                      <button onClick={startRecording}
+                        className="w-9 h-9 rounded-lg text-[#94a3b8] flex items-center justify-center hover:bg-slate-200 transition-colors">
+                        <span className="material-symbols-outlined text-[20px]">mic</span>
                       </button>
                     ) : (
-                      <button 
-                        onClick={isRecording ? stopRecording : handleSendMessage} 
+                      <button
+                        onClick={isRecording ? stopRecording : handleSendMessage}
                         disabled={loading}
                         className={cn(
-                          "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-all",
-                          isRecording ? "bg-red-500 text-white hover:bg-red-600" : "bg-indigo-600 text-white hover:bg-indigo-700",
+                          "w-9 h-9 rounded-[9px] flex items-center justify-center shrink-0 transition-all",
+                          isRecording ? "bg-red-500 text-white hover:bg-red-600"
+                            : input.trim() || selectedFile ? "bg-[#4f46e5] text-white hover:bg-[#4338ca]"
+                            : "bg-[#e2e8f0] text-[#94a3b8]",
                           loading && "opacity-50 cursor-not-allowed"
                         )}
+                        style={{ boxShadow: (input.trim() || selectedFile) && !isRecording ? '0 2px 8px rgba(79,70,229,0.3)' : 'none' }}
                       >
-                        {loading ? (
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                          <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                            {isRecording ? 'stop' : 'send'}
-                          </span>
-                        )}
+                        {loading
+                          ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          : <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                              {isRecording ? 'stop' : 'send'}
+                            </span>
+                        }
                       </button>
                     )}
                   </div>
@@ -1180,9 +1219,15 @@ export default function ChatPage() {
                 {rightPanelTab === 'contact' && (
                   <div className="p-4">
                     <div className="flex flex-col items-center gap-2 pb-4 mb-4 border-b border-outline-variant">
-                      <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-base font-bold">
-                        {(activeConversation.contact.name || activeConversation.contact.channel_identifier || 'U')[0].toUpperCase()}
-                      </div>
+                      {(() => {
+                        const rpName = activeConversation.contact.name || activeConversation.contact.channel_identifier || 'U';
+                        const rpColor = avatarColor(rpName);
+                        const rpIni = rpName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                        return (
+                          <div className="w-14 h-14 rounded-full flex items-center justify-center text-[18px] font-bold"
+                            style={{ background: rpColor.bg, color: rpColor.text }}>{rpIni}</div>
+                        );
+                      })()}
                       <div className="text-center">
                         <p className="text-sm font-bold text-slate-900">{activeConversation.contact.name || '-'}</p>
                         <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[220px]">{activeConversation.contact.channel_identifier}</p>
