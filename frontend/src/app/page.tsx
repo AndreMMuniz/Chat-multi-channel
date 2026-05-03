@@ -154,6 +154,20 @@ function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { 
   return { label: `${Math.floor(diffH / 24)}d ago`, color: 'text-red-600', slaBreached: true };
 }
 
+function formatRelativeTime(dateStr: string | undefined): string {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return new Date(dateStr).toLocaleDateString([], { weekday: 'short' });
+  return new Date(dateStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 function TagBadge({ tag, className }: { tag?: ConversationTag | null; className?: string }) {
   if (!tag) return null;
   const meta = TAG_META[tag];
@@ -1334,7 +1348,7 @@ export default function ChatPage() {
                           </span>
                         )}
                         <span className="text-[10px]" style={{ color: sla?.slaBreached ? '#ef4444' : '#94a3b8', fontWeight: sla?.slaBreached ? 600 : 400 }}>
-                          {conv.last_message_date ? new Date(conv.last_message_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          {formatRelativeTime(conv.last_message_date)}
                         </span>
                       </div>
                     </div>
