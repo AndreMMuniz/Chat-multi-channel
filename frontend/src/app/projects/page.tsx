@@ -333,10 +333,34 @@ const INITIAL_PROJECT_CARDS: ProjectCard[] = [
   },
 ];
 
+const TAG_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  upsell:    { bg: "bg-fuchsia-50",  text: "text-fuchsia-700", border: "border-fuchsia-100" },
+  renovação: { bg: "bg-blue-50",     text: "text-blue-700",    border: "border-blue-100"    },
+  novo:      { bg: "bg-emerald-50",  text: "text-emerald-700", border: "border-emerald-100" },
+  enterprise:{ bg: "bg-orange-50",   text: "text-orange-700",  border: "border-orange-100"  },
+  onboarding:{ bg: "bg-indigo-50",   text: "text-indigo-700",  border: "border-indigo-100"  },
+  contract:  { bg: "bg-amber-50",    text: "text-amber-700",   border: "border-amber-100"   },
+  support:   { bg: "bg-rose-50",     text: "text-rose-700",    border: "border-rose-100"    },
+  urgent:    { bg: "bg-rose-50",     text: "text-rose-700",    border: "border-rose-100"    },
+  migration: { bg: "bg-violet-50",   text: "text-violet-700",  border: "border-violet-100"  },
+  training:  { bg: "bg-sky-50",      text: "text-sky-700",     border: "border-sky-100"     },
+  rollout:   { bg: "bg-teal-50",     text: "text-teal-700",    border: "border-teal-100"    },
+  webhook:   { bg: "bg-slate-100",   text: "text-slate-600",   border: "border-slate-200"   },
+};
+
+function TagPill({ tag }: { tag: string }) {
+  const c = TAG_COLORS[tag] ?? { bg: "bg-slate-100", text: "text-slate-600", border: "border-slate-200" };
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${c.bg} ${c.text} ${c.border}`}>
+      {tag}
+    </span>
+  );
+}
+
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: "USD",
+    currency: "BRL",
     maximumFractionDigits: 0,
   }).format(value);
 }
@@ -535,16 +559,11 @@ function ProjectCardView({
         </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {card.tags.map((tag) => (
-          <span
-            key={tag}
-            className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600"
-          >
-            #{tag}
-          </span>
-        ))}
-      </div>
+      {card.tags.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {card.tags.map((tag) => <TagPill key={tag} tag={tag} />)}
+        </div>
+      )}
 
       <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
         <span className={overdue ? "font-semibold text-rose-600" : "font-medium text-slate-500"}>
@@ -581,12 +600,14 @@ function ProjectModal({
   setForm,
   onClose,
   onSave,
+  onDelete,
   isEditing,
 }: {
   form: ProjectFormState;
   setForm: React.Dispatch<React.SetStateAction<ProjectFormState | null>>;
   onClose: () => void;
   onSave: () => void;
+  onDelete?: () => void;
   isEditing: boolean;
 }) {
   return (
@@ -734,28 +755,127 @@ function ProjectModal({
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-500">
-            Keep the project inside the workspace. Stage movement and edits are saved without leaving the pipeline.
-          </p>
+          <div className="flex gap-3">
+            {isEditing && onDelete && (
+              <button
+                type="button"
+                onClick={() => { if (window.confirm("Excluir este projeto? Esta ação não pode ser desfeita.")) onDelete(); }}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                Excluir
+              </button>
+            )}
+          </div>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
               className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="button"
               onClick={onSave}
               className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
             >
-              {isEditing ? "Save changes" : "Create project"}
+              {isEditing ? "Salvar alterações" : "Criar projeto"}
             </button>
           </div>
         </div>
       </div>
     </Modal>
+  );
+}
+
+const DAY_PX = 30;
+const GANTT_WEEKS = 8;
+
+function GanttView({ cards, onCardClick }: { cards: ProjectCard[]; onCardClick: (c: ProjectCard) => void }) {
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - 7);
+  const totalDays = GANTT_WEEKS * 7;
+
+  const weeks: Date[] = [];
+  for (let w = 0; w < GANTT_WEEKS; w++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + w * 7);
+    weeks.push(d);
+  }
+
+  const todayOffset = ((today.getTime() - startDate.getTime()) / 86400000) * DAY_PX;
+
+  function getBarPos(card: ProjectCard) {
+    const due = new Date(`${card.dueDate}T00:00:00`);
+    const spanDays = Math.max(7, Math.round((card.progress / 100) * 21 + 7));
+    const cardStart = new Date(due.getTime() - spanDays * 86400000);
+    const leftDays = (cardStart.getTime() - startDate.getTime()) / 86400000;
+    return { left: Math.max(0, leftDays * DAY_PX), width: Math.max(80, spanDays * DAY_PX) };
+  }
+
+  const stage = (card: ProjectCard) => STAGES.find((s) => s.id === card.stage);
+
+  return (
+    <div className="overflow-hidden rounded-[20px] border border-[#DCE4EF] bg-white shadow-sm">
+      {/* Header */}
+      <div className="flex border-b border-[#DCE4EF]">
+        <div className="w-52 shrink-0 border-r border-[#DCE4EF] px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          Projeto
+        </div>
+        <div className="overflow-x-auto flex-1">
+          <div className="flex" style={{ minWidth: totalDays * DAY_PX }}>
+            {weeks.map((w, i) => (
+              <div key={i} className="border-r border-slate-100 px-2 py-2 text-[10px] font-semibold text-slate-400" style={{ width: 7 * DAY_PX }}>
+                {w.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Rows */}
+      <div className="max-h-[480px] overflow-y-auto">
+        {cards.map((card, i) => {
+          const { left, width } = getBarPos(card);
+          const s = stage(card);
+          const accentColor = s?.id === "lead" ? "#94a3b8" : s?.id === "qualification" ? "#7C4DFF" : s?.id === "proposal" ? "#F59E0B" : s?.id === "negotiation" ? "#F97316" : "#10B981";
+          return (
+            <div key={card.id} className={`flex items-center border-b border-slate-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`} style={{ height: 48 }}>
+              <button
+                type="button"
+                onClick={() => onCardClick(card)}
+                className="flex w-52 shrink-0 flex-col justify-center border-r border-[#DCE4EF] px-4 py-1 text-left hover:bg-indigo-50/40 transition"
+                style={{ height: 48 }}
+              >
+                <span className="truncate text-[12px] font-semibold text-slate-800">{card.title}</span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: accentColor }} />
+                  <span className="text-[10px] text-slate-400">{s?.label}</span>
+                </div>
+              </button>
+              <div className="relative flex-1 overflow-x-hidden" style={{ height: 48 }}>
+                <div className="relative" style={{ minWidth: totalDays * DAY_PX, height: "100%" }}>
+                  {/* Today line */}
+                  <div className="absolute top-0 bottom-0 z-10" style={{ left: todayOffset, width: 1.5, background: "#7C4DFF", opacity: 0.4 }} />
+                  {/* Bar */}
+                  <button
+                    type="button"
+                    onClick={() => onCardClick(card)}
+                    className="absolute top-1/2 -translate-y-1/2 flex items-center overflow-hidden rounded-lg px-2 text-[10px] font-semibold text-white transition hover:opacity-100"
+                    style={{ left, width, height: 22, background: accentColor, opacity: 0.82 }}
+                    title={card.title}
+                  >
+                    <div className="pointer-events-none absolute inset-0 rounded-lg" style={{ width: `${card.progress}%`, background: "rgba(255,255,255,0.22)" }} />
+                    <span className="relative truncate">{card.contact}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -890,6 +1010,12 @@ export default function ProjectsPage() {
       return [normalized, ...current];
     });
 
+    setForm(null);
+  };
+
+  const handleDelete = () => {
+    if (!form?.id) return;
+    setCards((current) => current.filter((card) => card.id !== form.id));
     setForm(null);
   };
 
@@ -1241,51 +1367,7 @@ export default function ProjectsPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              {timelineCards.map((card) => {
-                const owner = OWNERS.find((item) => item.id === card.ownerId);
-                const stage = STAGES.find((item) => item.id === card.stage);
-                const overdue = isOverdue(card.dueDate) && card.progress < 100;
-
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    onClick={() => openExistingProject(card)}
-                    className={`flex w-full items-start gap-4 rounded-[24px] border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                      overdue ? "border-rose-200 ring-1 ring-rose-100" : "border-slate-200"
-                    }`}
-                  >
-                    <div className="flex w-28 shrink-0 flex-col rounded-[18px] bg-slate-50 px-3 py-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Due</span>
-                      <span className={`mt-1 text-lg font-semibold ${overdue ? "text-rose-600" : "text-slate-900"}`}>
-                        {formatDate(card.dueDate)}
-                      </span>
-                      <span className="mt-1 text-xs text-slate-500">{card.reference}</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-semibold text-slate-900">{card.title}</h3>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                          {stage?.label ?? card.stage}
-                        </span>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${PRIORITY_META[card.priority].className}`}>
-                          {PRIORITY_META[card.priority].label}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-500">{card.contact} · {card.workType}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <ChannelBadge channel={card.channel} />
-                        {owner ? <OwnerBadge owner={owner} /> : null}
-                      </div>
-                      {card.origin === "message" && card.sourceMessage ? (
-                        <p className="mt-3 text-sm leading-6 text-slate-600">{card.sourceMessage}</p>
-                      ) : null}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <GanttView cards={timelineCards} onCardClick={openExistingProject} />
           )}
         </section>
       </div>
@@ -1296,6 +1378,7 @@ export default function ProjectsPage() {
           setForm={setForm}
           onClose={() => setForm(null)}
           onSave={handleSave}
+          onDelete={isEditing ? handleDelete : undefined}
           isEditing={isEditing}
         />
       ) : null}
