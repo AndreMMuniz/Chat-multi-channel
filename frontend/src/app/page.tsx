@@ -707,21 +707,6 @@ export default function ChatPage() {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }, []);
 
-  const handleConversationTagFromMessage = useCallback(async (tag: ConversationTag | null) => {
-    if (!activeConversation) return;
-
-    try {
-      setSavingConversationTag(true);
-      await updateConversation(activeConversation.id, { tag });
-      setTagMessageModal(null);
-      setContextActionHint({ message: tag ? `Conversation tagged as ${TAG_META[tag].label}.` : 'Conversation tag removed.' });
-    } catch (error) {
-      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to update conversation tag.' });
-    } finally {
-      setSavingConversationTag(false);
-    }
-  }, [activeConversation, updateConversation]);
-
   const handleQuickReplyCreate = useCallback(async () => {
     if (!quickReplyModal) return;
 
@@ -745,53 +730,6 @@ export default function ChatPage() {
       setCreatingQuickReply(false);
     }
   }, [quickReplyModal]);
-
-  const handleDeleteMessage = useCallback(async () => {
-    if (!deleteMessageModal || !activeConversation) return;
-
-    try {
-      setDeletingMessage(true);
-      await conversationsApi.deleteMessage(activeConversation.id, deleteMessageModal.message.id);
-      setDeleteMessageModal(null);
-      await fetchMessages(activeConversation.id);
-      await fetchConversations();
-      setContextActionHint({ message: 'Message deleted.' });
-    } catch (error) {
-      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to delete message.' });
-    } finally {
-      setDeletingMessage(false);
-    }
-  }, [activeConversation, deleteMessageModal, fetchConversations, fetchMessages]);
-
-  const handleMessageActionSelect = useCallback((action: MessageActionId, message: Message) => {
-    setOpenMessageMenuId(null);
-
-    if (action === 'create-quick-reply' && message.inbound) return;
-
-    if (action === 'create-card') {
-      void openCreateCardModalForMessage(message);
-      return;
-    }
-
-    if (action === 'add-tag') {
-      setTagMessageModal(message);
-      return;
-    }
-
-    if (action === 'create-quick-reply') {
-      const seed = message.content.trim().replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'reply';
-      setQuickReplyModal({
-        message,
-        shortcut: `/${seed}`,
-        content: message.content,
-      });
-      return;
-    }
-
-    if (action === 'delete') {
-      setDeleteMessageModal({ message });
-    }
-  }, [openCreateCardModalForMessage]);
 
   // ── Domain hooks ──────────────────────────────────────────────────────────
   const {
@@ -920,6 +858,51 @@ export default function ChatPage() {
     }
   }, [activeConversation, availableProjects, createCardModal]);
 
+  const handleConversationTagFromMessage = useCallback(async (tag: ConversationTag | null) => {
+    if (!activeConversation) return;
+
+    try {
+      setSavingConversationTag(true);
+      await updateConversation(activeConversation.id, { tag });
+      setTagMessageModal(null);
+      setContextActionHint({ message: tag ? `Conversation tagged as ${TAG_META[tag].label}.` : 'Conversation tag removed.' });
+    } catch (error) {
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to update conversation tag.' });
+    } finally {
+      setSavingConversationTag(false);
+    }
+  }, [activeConversation, updateConversation]);
+
+  const handleMessageActionSelect = useCallback((action: MessageActionId, message: Message) => {
+    setOpenMessageMenuId(null);
+
+    if (action === 'create-quick-reply' && message.inbound) return;
+
+    if (action === 'create-card') {
+      void openCreateCardModalForMessage(message);
+      return;
+    }
+
+    if (action === 'add-tag') {
+      setTagMessageModal(message);
+      return;
+    }
+
+    if (action === 'create-quick-reply') {
+      const seed = message.content.trim().replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'reply';
+      setQuickReplyModal({
+        message,
+        shortcut: `/${seed}`,
+        content: message.content,
+      });
+      return;
+    }
+
+    if (action === 'delete') {
+      setDeleteMessageModal({ message });
+    }
+  }, [openCreateCardModalForMessage]);
+
   const {
     messages,
     sendStatus,
@@ -944,6 +927,23 @@ export default function ChatPage() {
   } = useAISuggestions();
 
   const { matches: qrMatches, open: qrOpen, search: qrSearch, close: qrClose } = useQuickReplySearch();
+
+  const handleDeleteMessage = useCallback(async () => {
+    if (!deleteMessageModal || !activeConversation) return;
+
+    try {
+      setDeletingMessage(true);
+      await conversationsApi.deleteMessage(activeConversation.id, deleteMessageModal.message.id);
+      setDeleteMessageModal(null);
+      await fetchMessages(activeConversation.id);
+      await fetchConversations();
+      setContextActionHint({ message: 'Message deleted.' });
+    } catch (error) {
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to delete message.' });
+    } finally {
+      setDeletingMessage(false);
+    }
+  }, [activeConversation, deleteMessageModal, fetchConversations, fetchMessages]);
 
   // ── WebSocket event dispatcher ─────────────────────────────────────────────
   const handleWsEvent = useCallback((event: SequencedEvent) => {
