@@ -707,83 +707,6 @@ export default function ChatPage() {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }, []);
 
-  const openCreateCardModalForMessage = useCallback(async (message: Message) => {
-    if (!activeConversation) return;
-
-    setLoadingProjectRouting(true);
-    try {
-      const [stages, projectsResponse] = await Promise.all([
-        projectsApi.getProjectStages(),
-        projectsApi.listProjects({ limit: 200 }),
-      ]);
-
-      const projects = projectsResponse.data;
-      const rootProjects = projects.filter(project => !project.project_context_id);
-      const relatedProjects = activeConversation.project_context_id
-        ? rootProjects.filter(project => project.id === activeConversation.project_context_id)
-        : [];
-      const primaryRelatedProject = relatedProjects[0];
-      const suggestedTitle = suggestCardTitle(message, activeConversation);
-
-      setProjectStages(stages);
-      setAvailableProjects(rootProjects);
-      setCreateCardModal({
-        message,
-        title: suggestedTitle,
-        description: message.content || suggestedTitle,
-        stage: 'lead',
-        priority: primaryRelatedProject?.priority ?? 'medium',
-        routeMode: activeConversation.project_context_id ? 'current-conversation-project' : 'new-project',
-        selectedProjectId: '',
-        relatedProjects,
-      });
-    } catch (error) {
-      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to load project routing context.' });
-    } finally {
-      setLoadingProjectRouting(false);
-    }
-  }, [activeConversation]);
-
-  const handleCreateCardSubmit = useCallback(async () => {
-    if (!createCardModal || !activeConversation) return;
-
-    const routingProject =
-      createCardModal.routeMode === 'current-conversation-project'
-        ? createCardModal.relatedProjects[0]
-        : createCardModal.routeMode === 'existing-project'
-          ? availableProjects.find(project => project.id === createCardModal.selectedProjectId)
-          : undefined;
-
-    try {
-      setSubmittingProjectCard(true);
-      const createdProject = await projectsApi.createProjectFromMessage(createCardModal.message.id, {
-        title: createCardModal.title.trim(),
-        description: createCardModal.description.trim(),
-        stage: createCardModal.stage,
-        priority: createCardModal.priority,
-        project_context_id: routingProject?.id ?? undefined,
-        attach_conversation_to_project: createCardModal.routeMode !== 'current-conversation-project',
-        owner_user_id: routingProject?.owner_id ?? undefined,
-        due_date: null,
-        value: 0,
-        progress: 0,
-        tag: routingProject?.tag ?? undefined,
-      });
-      setCreateCardModal(null);
-      setContextActionHint({
-        message: routingProject
-          ? `Card created using ${routingProject.reference} routing context.`
-          : `Card ${createdProject.reference} created from message in Projects.`,
-        projectId: createdProject.id,
-        projectReference: createdProject.reference,
-      });
-    } catch (error) {
-      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to create card from message.' });
-    } finally {
-      setSubmittingProjectCard(false);
-    }
-  }, [activeConversation, availableProjects, createCardModal]);
-
   const handleConversationTagFromMessage = useCallback(async (tag: ConversationTag | null) => {
     if (!activeConversation) return;
 
@@ -919,6 +842,83 @@ export default function ChatPage() {
 
     return matchesSearch && matchesChannel && matchesTag;
   });
+
+  const openCreateCardModalForMessage = useCallback(async (message: Message) => {
+    if (!activeConversation) return;
+
+    setLoadingProjectRouting(true);
+    try {
+      const [stages, projectsResponse] = await Promise.all([
+        projectsApi.getProjectStages(),
+        projectsApi.listProjects({ limit: 200 }),
+      ]);
+
+      const projects = projectsResponse.data;
+      const rootProjects = projects.filter(project => !project.project_context_id);
+      const relatedProjects = activeConversation.project_context_id
+        ? rootProjects.filter(project => project.id === activeConversation.project_context_id)
+        : [];
+      const primaryRelatedProject = relatedProjects[0];
+      const suggestedTitle = suggestCardTitle(message, activeConversation);
+
+      setProjectStages(stages);
+      setAvailableProjects(rootProjects);
+      setCreateCardModal({
+        message,
+        title: suggestedTitle,
+        description: message.content || suggestedTitle,
+        stage: 'lead',
+        priority: primaryRelatedProject?.priority ?? 'medium',
+        routeMode: activeConversation.project_context_id ? 'current-conversation-project' : 'new-project',
+        selectedProjectId: '',
+        relatedProjects,
+      });
+    } catch (error) {
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to load project routing context.' });
+    } finally {
+      setLoadingProjectRouting(false);
+    }
+  }, [activeConversation]);
+
+  const handleCreateCardSubmit = useCallback(async () => {
+    if (!createCardModal || !activeConversation) return;
+
+    const routingProject =
+      createCardModal.routeMode === 'current-conversation-project'
+        ? createCardModal.relatedProjects[0]
+        : createCardModal.routeMode === 'existing-project'
+          ? availableProjects.find(project => project.id === createCardModal.selectedProjectId)
+          : undefined;
+
+    try {
+      setSubmittingProjectCard(true);
+      const createdProject = await projectsApi.createProjectFromMessage(createCardModal.message.id, {
+        title: createCardModal.title.trim(),
+        description: createCardModal.description.trim(),
+        stage: createCardModal.stage,
+        priority: createCardModal.priority,
+        project_context_id: routingProject?.id ?? undefined,
+        attach_conversation_to_project: createCardModal.routeMode !== 'current-conversation-project',
+        owner_user_id: routingProject?.owner_id ?? undefined,
+        due_date: null,
+        value: 0,
+        progress: 0,
+        tag: routingProject?.tag ?? undefined,
+      });
+      setCreateCardModal(null);
+      setContextActionHint({
+        message: routingProject
+          ? `Card created using ${routingProject.reference} routing context.`
+          : `Card ${createdProject.reference} created from message in Projects.`,
+        projectId: createdProject.id,
+        projectReference: createdProject.reference,
+      });
+    } catch (error) {
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to create card from message.' });
+    } finally {
+      setSubmittingProjectCard(false);
+    }
+  }, [activeConversation, availableProjects, createCardModal]);
 
   const {
     messages,
