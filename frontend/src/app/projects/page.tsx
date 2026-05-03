@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { IconType } from "react-icons";
 import { FaCommentDots, FaWhatsapp } from "react-icons/fa";
 import { FaGlobe, FaTelegram } from "react-icons/fa6";
@@ -792,6 +793,8 @@ function GanttView({
 }
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("kanban");
   const [cards, setCards] = useState<ProjectCard[]>([]);
@@ -807,6 +810,7 @@ export default function ProjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [handledQueryProjectId, setHandledQueryProjectId] = useState<string | null>(null);
 
   const owners = useMemo<Owner[]>(() => {
     const ownerMap = new Map<string, Owner>();
@@ -973,6 +977,24 @@ export default function ProjectsPage() {
   const openExistingProject = (card: ProjectCard) => {
     setForm(toFormState(card));
   };
+
+  useEffect(() => {
+    const queryProjectId = searchParams.get("projectId");
+    if (!queryProjectId || isLoading || handledQueryProjectId === queryProjectId || cards.length === 0) return;
+
+    const targetProject = cards.find((card) => card.id === queryProjectId);
+    if (!targetProject) return;
+
+    startTransition(() => {
+      setActiveView("kanban");
+      setForm(toFormState(targetProject));
+      setHandledQueryProjectId(queryProjectId);
+    });
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("projectId");
+    router.replace(nextParams.toString() ? `/projects?${nextParams.toString()}` : "/projects", { scroll: false });
+  }, [cards, handledQueryProjectId, isLoading, router, searchParams]);
 
   const handleSave = async () => {
     if (!form) return;

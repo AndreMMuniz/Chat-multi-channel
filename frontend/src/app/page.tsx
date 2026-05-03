@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { ChevronLeft } from 'lucide-react';
@@ -237,6 +238,12 @@ type QuickReplyFromMessageState = {
 
 type DeleteMessageState = {
   message: Message;
+};
+
+type ContextActionHintState = {
+  message: string;
+  projectId?: string;
+  projectReference?: string;
 };
 
 function MessageContextMenu({
@@ -621,6 +628,7 @@ function DeleteMessageModal({
 }
 
 export default function ChatPage() {
+  const router = useRouter();
   // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -639,7 +647,7 @@ export default function ChatPage() {
   const [rightPanelTab, setRightPanelTab] = useState<'contact' | 'details' | 'history'>('contact');
   const [allQuickReplies, setAllQuickReplies] = useState<import('@/types/quickReply').QuickReply[]>([]);
   const [openMessageMenuId, setOpenMessageMenuId] = useState<string | null>(null);
-  const [contextActionHint, setContextActionHint] = useState<string | null>(null);
+  const [contextActionHint, setContextActionHint] = useState<ContextActionHintState | null>(null);
   const [projectStages, setProjectStages] = useState<ProjectStage[]>([]);
   const [availableProjects, setAvailableProjects] = useState<ProjectDto[]>([]);
   const [loadingProjectRouting, setLoadingProjectRouting] = useState(false);
@@ -686,7 +694,10 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!contextActionHint) return;
-    const timeout = window.setTimeout(() => setContextActionHint(null), 2500);
+    const timeout = window.setTimeout(
+      () => setContextActionHint(null),
+      contextActionHint.projectId ? 6000 : 2500
+    );
     return () => window.clearTimeout(timeout);
   }, [contextActionHint]);
 
@@ -725,7 +736,7 @@ export default function ChatPage() {
         relatedProjects,
       });
     } catch (error) {
-      setContextActionHint(error instanceof Error ? error.message : 'Failed to load project routing context.');
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to load project routing context.' });
     } finally {
       setLoadingProjectRouting(false);
     }
@@ -743,7 +754,7 @@ export default function ChatPage() {
 
     try {
       setSubmittingProjectCard(true);
-      await projectsApi.createProjectFromMessage(createCardModal.message.id, {
+      const createdProject = await projectsApi.createProjectFromMessage(createCardModal.message.id, {
         title: createCardModal.title.trim(),
         description: createCardModal.description.trim(),
         stage: createCardModal.stage,
@@ -757,13 +768,15 @@ export default function ChatPage() {
         tag: routingProject?.tag ?? undefined,
       });
       setCreateCardModal(null);
-      setContextActionHint(
-        routingProject
+      setContextActionHint({
+        message: routingProject
           ? `Card created using ${routingProject.reference} routing context.`
-          : 'Card created from message in Projects.'
-      );
+          : `Card ${createdProject.reference} created from message in Projects.`,
+        projectId: createdProject.id,
+        projectReference: createdProject.reference,
+      });
     } catch (error) {
-      setContextActionHint(error instanceof Error ? error.message : 'Failed to create card from message.');
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to create card from message.' });
     } finally {
       setSubmittingProjectCard(false);
     }
@@ -776,9 +789,9 @@ export default function ChatPage() {
       setSavingConversationTag(true);
       await updateConversation(activeConversation.id, { tag });
       setTagMessageModal(null);
-      setContextActionHint(tag ? `Conversation tagged as ${TAG_META[tag].label}.` : 'Conversation tag removed.');
+      setContextActionHint({ message: tag ? `Conversation tagged as ${TAG_META[tag].label}.` : 'Conversation tag removed.' });
     } catch (error) {
-      setContextActionHint(error instanceof Error ? error.message : 'Failed to update conversation tag.');
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to update conversation tag.' });
     } finally {
       setSavingConversationTag(false);
     }
@@ -800,9 +813,9 @@ export default function ChatPage() {
 
       setAllQuickReplies((current) => [created, ...current]);
       setQuickReplyModal(null);
-      setContextActionHint(`Quick reply ${created.shortcut} created.`);
+      setContextActionHint({ message: `Quick reply ${created.shortcut} created.` });
     } catch (error) {
-      setContextActionHint(error instanceof Error ? error.message : 'Failed to create quick reply.');
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to create quick reply.' });
     } finally {
       setCreatingQuickReply(false);
     }
@@ -817,9 +830,9 @@ export default function ChatPage() {
       setDeleteMessageModal(null);
       await fetchMessages(activeConversation.id);
       await fetchConversations();
-      setContextActionHint('Message deleted.');
+      setContextActionHint({ message: 'Message deleted.' });
     } catch (error) {
-      setContextActionHint(error instanceof Error ? error.message : 'Failed to delete message.');
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to delete message.' });
     } finally {
       setDeletingMessage(false);
     }
@@ -1405,8 +1418,18 @@ export default function ChatPage() {
               <div className="flex-1 overflow-y-auto pt-5 px-5 pb-2.5 flex flex-col gap-3.5 bg-[#f8fafc]">
                 {(contextActionHint || loadingProjectRouting) && (
                   <div className="sticky top-0 z-10 flex justify-center pb-1">
-                    <div className="rounded-full border border-indigo-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm backdrop-blur">
-                      {loadingProjectRouting ? 'Loading project routing...' : contextActionHint}
+                    <div className="flex items-center gap-2 rounded-full border border-indigo-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm backdrop-blur">
+                      <span>{loadingProjectRouting ? 'Loading project routing...' : contextActionHint?.message}</span>
+                      {!loadingProjectRouting && contextActionHint?.projectId ? (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/projects?projectId=${contextActionHint.projectId}`)}
+                          className="inline-flex items-center gap-1 rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-indigo-700"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                          Open {contextActionHint.projectReference ?? 'card'}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 )}
