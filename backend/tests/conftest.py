@@ -33,16 +33,25 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+def reset_sqlite_schema() -> None:
+    """Force-reset the in-memory SQLite schema even when FKs form cycles."""
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        Base.metadata.drop_all(bind=connection)
+        Base.metadata.create_all(bind=connection)
+        connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
 @pytest.fixture(scope="function")
 def db() -> Session:
     """Fresh DB session per test — rolls back after each test."""
-    Base.metadata.create_all(bind=engine)
+    reset_sqlite_schema()
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
+        reset_sqlite_schema()
 
 
 @pytest.fixture(scope="function")

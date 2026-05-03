@@ -1,6 +1,6 @@
 # Story 13.2: Create Card from Message with Project Routing
 
-**Status:** in-progress  
+**Status:** done  
 **Epic:** 13 — Message-to-Project Operational Bridge  
 **Story Points:** 8  
 **Priority:** High  
@@ -44,12 +44,12 @@ The created card must preserve:
 
 ## Acceptance Criteria
 
-- [ ] `Create Card` is the primary action in the message contextual menu
-- [ ] The create-card UI shows the source message preview before confirmation
-- [ ] If the conversation already belongs to a project, the card is routed to that project's backlog
-- [ ] If the conversation does not belong to a project, the operator can choose existing project or new project
-- [ ] Card creation uses the real backend message-to-project flow, not local-only state
-- [ ] Success feedback confirms creation and offers a way to open the created card or project
+- [x] `Create Card` is the primary action in the message contextual menu
+- [x] The create-card UI shows the source message preview before confirmation
+- [x] If the conversation already belongs to a project, the card is routed to that project's backlog
+- [x] If the conversation does not belong to a project, the operator can choose existing project or new project
+- [x] Card creation uses the real backend message-to-project flow, not local-only state
+- [x] Success feedback confirms creation and offers a way to open the created card or project
 
 ---
 
