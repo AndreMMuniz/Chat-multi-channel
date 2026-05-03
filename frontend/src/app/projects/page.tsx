@@ -503,14 +503,14 @@ function ProjectCardView({
       draggable
       onDragStart={() => onDragStart(card.id, card.stage)}
       onClick={() => onOpen(card)}
-      className={`cursor-pointer rounded-[22px] border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`cursor-pointer rounded-[18px] border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         overdue ? "border-rose-200 ring-1 ring-rose-100" : "border-slate-200"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{card.reference}</p>
-          <h4 className="mt-1 text-sm font-semibold leading-6 text-slate-900">{card.title}</h4>
+          <h4 className="mt-1 text-[15px] font-semibold leading-5 text-slate-900">{card.title}</h4>
           <p className="mt-1 text-xs text-slate-500">{card.contact}</p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${priority.className}`}>
@@ -518,16 +518,16 @@ function ProjectCardView({
         </span>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-3">
+        <p className="text-[28px] font-semibold leading-none tracking-[-0.03em] text-indigo-600">
+          {formatCurrency(card.value)}
+        </p>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
         <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
           {card.workType}
         </span>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-          {formatCurrency(card.value)}
-        </span>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
         <ChannelBadge channel={card.channel} />
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${origin.className}`}>
           <OriginIcon className="text-[12px]" />
@@ -535,7 +535,7 @@ function ProjectCardView({
         </span>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {card.tags.map((tag) => (
           <span
             key={tag}
@@ -546,33 +546,28 @@ function ProjectCardView({
         ))}
       </div>
 
-      {card.origin === "message" && card.sourceMessage ? (
-        <div className="mt-4 rounded-2xl bg-sky-50 px-3 py-3 text-xs leading-5 text-sky-800 ring-1 ring-sky-100">
-          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-sky-600">
-            Demand Summary
-          </span>
-          {card.sourceMessage}
-        </div>
-      ) : null}
-
-      <div className="mt-4 flex items-center justify-between gap-3">
-        {owner ? <OwnerBadge owner={owner} /> : <div />}
-        <div className="text-right">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Due</p>
-          <p className={`text-sm font-semibold ${overdue ? "text-rose-600" : "text-slate-700"}`}>
-            {formatDate(card.dueDate)}
-          </p>
-        </div>
+      <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+        <span className={overdue ? "font-semibold text-rose-600" : "font-medium text-slate-500"}>
+          {formatDate(card.dueDate)}
+        </span>
+        <span className="text-slate-300">•</span>
+        <span>{card.progress}% progress</span>
       </div>
 
-      <div className="mt-4">
-        <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-slate-500">
-          <span>Progress</span>
-          <span>{card.progress}%</span>
-        </div>
-        <div className="h-2 rounded-full bg-slate-100">
+      <div className="mt-3 flex items-center justify-between gap-3">
+        {owner ? <OwnerBadge owner={owner} /> : <div />}
+        {overdue ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700">
+            <span className="material-symbols-outlined text-[14px]">warning</span>
+            Overdue
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-3">
+        <div className="h-1.5 rounded-full bg-slate-100">
           <div
-            className={`h-2 rounded-full ${card.progress === 100 ? "bg-emerald-500" : "bg-indigo-500"}`}
+            className={`h-1.5 rounded-full ${card.progress === 100 ? "bg-emerald-500" : "bg-indigo-500"}`}
             style={{ width: `${card.progress}%` }}
           />
         </div>
@@ -937,36 +932,29 @@ export default function ProjectsPage() {
 
   return (
     <main className="flex-1 overflow-y-auto bg-[var(--color-background)]">
-      <section className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 p-4 sm:p-6">
-        <header className="overflow-hidden rounded-[28px] border border-[var(--color-outline-variant)] bg-white shadow-sm">
-          <div className="border-b border-[var(--color-outline-variant)] bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-500 px-5 py-6 text-white sm:px-6">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/14 text-white ring-1 ring-white/20">
-                  <span
-                    className="material-symbols-outlined text-[28px]"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                  >
-                    view_kanban
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-indigo-50 uppercase ring-1 ring-white/15">
-                    <span className="material-symbols-outlined text-[14px]">conversion_path</span>
-                    Projects Workspace
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">Projects</h1>
-                    <p className="mt-2 max-w-3xl text-sm text-indigo-50/90 sm:text-[15px]">
-                      Track project cards across a shared pipeline and turn message demands into work that can be owned,
-                      prioritized, and completed.
-                    </p>
-                  </div>
-                </div>
+      <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 p-4 sm:p-6">
+        <header className="overflow-hidden rounded-[22px] border border-[var(--color-outline-variant)] bg-white shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-[var(--color-outline-variant)] px-4 py-4 sm:px-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+                <span
+                  className="material-symbols-outlined text-[22px]"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
+                  view_kanban
+                </span>
               </div>
+              <div className="min-w-0">
+                <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-slate-900">Projects</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  Project pipeline integrated with Messages, owners, and operational follow-up.
+                </p>
+              </div>
+            </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
-                <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/10 p-1 ring-1 ring-white/15">
+            <div className="flex flex-col gap-2 lg:items-end">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
                   {VIEW_OPTIONS.map((view) => {
                     const active = activeView === view.id;
                     return (
@@ -974,12 +962,14 @@ export default function ProjectsPage() {
                         key={view.id}
                         type="button"
                         onClick={() => setActiveView(view.id)}
-                        className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition ${
-                          active ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-50 hover:bg-white/10"
+                        className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
+                          active
+                            ? "bg-white text-indigo-700 shadow-sm"
+                            : "text-slate-500 hover:bg-white hover:text-slate-700"
                         }`}
                       >
                         <span
-                          className="material-symbols-outlined text-[18px]"
+                          className="material-symbols-outlined text-[16px]"
                           style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}
                         >
                           {view.icon}
@@ -990,33 +980,37 @@ export default function ProjectsPage() {
                   })}
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={openNewDemandProject}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">forum</span>
-                    New From Demand
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openNewProject()}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">add</span>
-                    New Project
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={openNewDemandProject}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                >
+                  <span className="material-symbols-outlined text-[16px]">forum</span>
+                  New From Demand
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openNewProject()}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  New Project
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 font-semibold text-sky-700">
+                  <span className="material-symbols-outlined text-[14px]">forum</span>
+                  Messages can generate project cards
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 px-5 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Search</span>
-                <div className="flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
+          <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+              <div className="flex min-w-0 flex-1 flex-col gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-[minmax(240px,1.2fr)_repeat(4,minmax(160px,0.8fr))]">
+                <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
                   <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
                   <input
                     value={searchQuery}
@@ -1025,11 +1019,8 @@ export default function ProjectsPage() {
                     className="h-full w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                   />
                 </div>
-              </label>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Owner</span>
-                <FieldSelect value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+                <FieldSelect value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-10 rounded-xl">
                   <option value="ALL">All owners</option>
                   {OWNERS.map((owner) => (
                     <option key={owner.id} value={owner.id}>
@@ -1037,13 +1028,11 @@ export default function ProjectsPage() {
                     </option>
                   ))}
                 </FieldSelect>
-              </label>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Priority</span>
                 <FieldSelect
                   value={priorityFilter}
                   onChange={(event) => setPriorityFilter(event.target.value as PriorityId | "ALL")}
+                  className="h-10 rounded-xl"
                 >
                   <option value="ALL">All priorities</option>
                   {Object.entries(PRIORITY_META).map(([id, meta]) => (
@@ -1052,27 +1041,11 @@ export default function ProjectsPage() {
                     </option>
                   ))}
                 </FieldSelect>
-              </label>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Origin</span>
-                <FieldSelect
-                  value={originFilter}
-                  onChange={(event) => setOriginFilter(event.target.value as OriginId | "ALL")}
-                >
-                  <option value="ALL">Manual and Messages</option>
-                  <option value="manual">Manual</option>
-                  <option value="message">From Messages</option>
-                </FieldSelect>
-              </label>
-            </div>
-
-            <div className="space-y-3">
-              <label className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Channel</span>
                 <FieldSelect
                   value={channelFilter}
                   onChange={(event) => setChannelFilter(event.target.value as ChannelId | "ALL")}
+                  className="h-10 rounded-xl"
                 >
                   <option value="ALL">All channels</option>
                   {Object.entries(CHANNEL_META).map(([id, meta]) => (
@@ -1081,66 +1054,34 @@ export default function ProjectsPage() {
                     </option>
                   ))}
                 </FieldSelect>
-              </label>
 
-              <div className="rounded-3xl border border-indigo-100 bg-indigo-50/70 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-indigo-700 shadow-sm">
-                    <span
-                      className="material-symbols-outlined text-[20px]"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      forum
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-slate-900">Message-to-project flow</p>
-                    <p className="text-sm leading-6 text-slate-600">
-                      A demand that starts in <span className="font-semibold text-indigo-700">Messages</span> can become a
-                      project card here without losing context about channel, owner, and follow-up.
-                    </p>
-                  </div>
-                </div>
+                <FieldSelect
+                  value={originFilter}
+                  onChange={(event) => setOriginFilter(event.target.value as OriginId | "ALL")}
+                  className="h-10 rounded-xl"
+                >
+                  <option value="ALL">Manual and Messages</option>
+                  <option value="manual">Manual</option>
+                  <option value="message">From Messages</option>
+                </FieldSelect>
               </div>
-            </div>
-          </div>
-        </header>
 
-        <section className="grid gap-4 xl:grid-cols-4">
-          {kpis.map((item) => (
-            <article
-              key={item.label}
-              className="rounded-[24px] border border-[var(--color-outline-variant)] bg-white p-5 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">{item.label}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-slate-900">{item.value}</p>
-                </div>
-                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${item.tint}`}>
+              <div className="flex items-center gap-2 xl:pl-3">
+                {OWNERS.map((owner, index) => (
                   <span
-                    className="material-symbols-outlined text-[20px]"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
+                    key={owner.id}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold ${owner.tint} ${owner.text} ${index > 0 ? "-ml-1.5" : ""}`}
+                    title={owner.name}
                   >
-                    {item.icon}
+                    {owner.initials}
                   </span>
-                </div>
+                ))}
+                <span className="ml-1 text-xs text-slate-500">{OWNERS.length} owners</span>
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-500">{item.hint}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="rounded-[28px] border border-[var(--color-outline-variant)] bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-900">Pipeline Surface</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Projects can now be filtered, reviewed in secondary views, and managed without leaving the workspace.
-              </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {hasActiveFilters ? (
+
+            {hasActiveFilters ? (
+              <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={clearFilters}
@@ -1149,11 +1090,45 @@ export default function ProjectsPage() {
                   <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
                   Clear filters
                 </button>
-              ) : null}
-              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700">
-                <span className="material-symbols-outlined text-[16px]">insights</span>
-                Story 11.4 active
               </div>
+            ) : null}
+          </div>
+        </header>
+
+        <section className="grid gap-3 xl:grid-cols-4">
+          {kpis.map((item) => (
+            <article
+              key={item.label}
+              className="rounded-[18px] border border-[var(--color-outline-variant)] bg-white px-4 py-3 shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${item.tint}`}>
+                  <span
+                    className="material-symbols-outlined text-[18px]"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    {item.icon}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[15px] font-semibold text-slate-900">{item.value}</p>
+                  <p className="text-xs font-medium text-slate-500">{item.label}</p>
+                </div>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{item.hint}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="rounded-[22px] border border-[var(--color-outline-variant)] bg-white p-3 shadow-sm sm:p-4">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Project Pipeline</h2>
+              <p className="mt-1 text-sm text-slate-500">Compact board integrated with the main app workspace.</p>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700">
+              <span className="material-symbols-outlined text-[16px]">view_kanban</span>
+              {filteredCards.length} projects in current view
             </div>
           </div>
 
@@ -1182,7 +1157,7 @@ export default function ProjectsPage() {
               ) : null}
             </div>
           ) : activeView === "kanban" ? (
-            <div className="flex gap-4 overflow-x-auto pb-2">
+            <div className="flex gap-3 overflow-x-auto pb-1">
               {STAGES.map((stage) => {
                 const stageCards = cardsByStage[stage.id];
                 const stageValue = stageCards.reduce((sum, card) => sum + card.value, 0);
@@ -1197,13 +1172,13 @@ export default function ProjectsPage() {
                     }}
                     onDragLeave={() => setDragOverStage((current) => (current === stage.id ? null : current))}
                     onDrop={() => handleDrop(stage.id)}
-                    className={`min-h-[520px] min-w-[300px] flex-1 rounded-[24px] border p-4 transition ${
+                    className={`min-h-[520px] min-w-[272px] flex-1 rounded-[18px] border p-2.5 transition ${
                       draggingOver
                         ? "border-indigo-300 bg-indigo-50/70 ring-2 ring-indigo-100"
                         : "border-slate-200 bg-slate-50/80"
                     }`}
                   >
-                    <div className={`rounded-[20px] bg-gradient-to-br ${stage.surface} p-4`}>
+                    <div className="rounded-[14px] border border-slate-200 bg-white/75 p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
@@ -1215,28 +1190,28 @@ export default function ProjectsPage() {
                         <button
                           type="button"
                           onClick={() => openNewProject(stage.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/60 bg-white/70 text-slate-500 transition hover:border-indigo-200 hover:text-indigo-700"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-200 hover:text-indigo-700"
                           title={`Add project in ${stage.label}`}
                         >
                           <span className="material-symbols-outlined text-[18px]">add</span>
                         </button>
                       </div>
 
-                      <div className="mt-4 flex items-center justify-between rounded-2xl bg-white/80 px-3 py-2">
+                      <div className="mt-3 flex items-center justify-between">
                         <div>
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
                             Stage Value
                           </p>
                           <p className="text-sm font-semibold text-slate-900">{formatCurrency(stageValue)}</p>
                         </div>
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
                           {stageCards.filter((card) => card.origin === "message").length} from Messages
                         </span>
                       </div>
                     </div>
 
                     {stageCards.length > 0 ? (
-                      <div className="mt-4 space-y-3">
+                      <div className="mt-3 space-y-2.5">
                         {stageCards.map((card) => (
                           <ProjectCardView
                             key={card.id}
@@ -1247,7 +1222,7 @@ export default function ProjectsPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-slate-500">
+                      <div className="mt-3 rounded-[14px] border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-slate-500">
                         No projects in this stage for the current filters.
                       </div>
                     )}
