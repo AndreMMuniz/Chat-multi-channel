@@ -67,6 +67,13 @@ class ProjectSourceType(enum.Enum):
     MESSAGE = "message"
 
 
+class ProjectTaskStatus(enum.Enum):
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
 OFFICIAL_PROJECT_STAGES = [
     ("lead", "Lead", 1),
     ("qualification", "Qualification", 2),
@@ -362,3 +369,39 @@ class Project(Base):
     )
     source_message = relationship("Message", back_populates="source_projects")
     project_context = relationship("Project", remote_side=[id], foreign_keys=[project_context_id])
+    tasks = relationship(
+        "ProjectTask",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="ProjectTask.created_at.desc()",
+    )
+
+
+class ProjectTask(Base):
+    __tablename__ = "project_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(
+        Enum(ProjectTaskStatus, values_callable=lambda obj: [e.value for e in obj], name="projecttaskstatus"),
+        nullable=False,
+        default=ProjectTaskStatus.OPEN,
+    )
+    priority = Column(
+        Enum(ProjectPriority, values_callable=lambda obj: [e.value for e in obj], name="projectpriority"),
+        nullable=False,
+        default=ProjectPriority.MEDIUM,
+    )
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    source_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
+    source_conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    project = relationship("Project", back_populates="tasks")
+    owner = relationship("User", foreign_keys=[owner_user_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])

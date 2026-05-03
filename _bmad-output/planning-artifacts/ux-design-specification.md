@@ -30,7 +30,6 @@ Top-level navigation should be domain-based and remain in English:
 - `Messages`
 - `Projects`
 - `Catalog`
-- `Tasks`
 - `Users`
 - `Config`
 
@@ -74,7 +73,7 @@ Give managers and operators a fast operational snapshot, not a wall of overlappi
 3. **Expandable Future Area**
    Leave space for:
    - projects pipeline widgets
-   - task summary
+   - project task summary
    - CRM-related panels
 
 #### UX Rules
@@ -159,13 +158,34 @@ Must clearly show:
 
 #### Objective
 
-Represent the future pipeline / kanban domain without overloading the `Messages` area.
+Represent the pipeline / kanban domain and the execution layer attached to each project without overloading the `Messages` area.
 
 #### Initial UX Position
 
 This area should be reserved as a separate product domain and should not be mixed into chat navigation or admin settings.
 
-At this stage, the UX spec only establishes domain ownership, not full kanban mechanics.
+At this stage, the UX spec establishes:
+
+- the project pipeline as the primary tracking surface
+- project tasks as subitems inside a project
+- message-to-project and message-to-task operational continuity
+
+#### Project Task Rule
+
+Tasks are not a top-level product domain in the current model.
+
+Tasks must behave as execution items that belong to a project and help agents complete concrete work inside the broader project demand.
+
+Tasks may be created:
+
+- directly inside a project
+- from a message, with provenance preserved
+- manually while editing a project
+
+Tasks should support future scheduled automation, including:
+
+- sending a message later
+- triggering a scheduled operational action
 
 ### 4. Catalog
 
@@ -184,17 +204,7 @@ Possible future subsections:
 - Categories
 - Templates
 
-### 5. Tasks
-
-#### Objective
-
-Provide a dedicated operational area for follow-up work that should not remain implicit inside conversations.
-
-#### UX Rule
-
-Tasks should remain a separate mental model from messages, even if created from conversations later.
-
-### 6. Users
+### 5. Users
 
 #### Objective
 
@@ -221,7 +231,7 @@ Optional future sections:
 - users should not need to jump across unrelated pages to manage people and roles
 - lateral navigation should scale cleanly
 
-### 7. Config
+### 6. Config
 
 #### Objective
 

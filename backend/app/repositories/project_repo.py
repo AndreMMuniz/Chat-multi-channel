@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.models import Project, ProjectStage
+from app.models.models import Project, ProjectStage, ProjectTask
 from app.repositories.base_repo import BaseRepository
 
 
@@ -117,3 +117,27 @@ class ProjectStageRepository(BaseRepository[ProjectStage]):
         )
         result = self.session.execute(stmt)
         return result.scalars().all()
+
+
+class ProjectTaskRepository(BaseRepository[ProjectTask]):
+    def __init__(self, session: Session):
+        super().__init__(ProjectTask, session)
+
+    async def list_for_project(self, project_id: str) -> List[ProjectTask]:
+        stmt = (
+            select(ProjectTask)
+            .options(joinedload(ProjectTask.owner), joinedload(ProjectTask.project))
+            .where(ProjectTask.project_id == project_id)
+            .order_by(ProjectTask.created_at.desc())
+        )
+        result = self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def find_task(self, project_id: str, task_id: str) -> Optional[ProjectTask]:
+        stmt = (
+            select(ProjectTask)
+            .options(joinedload(ProjectTask.owner), joinedload(ProjectTask.project))
+            .where(ProjectTask.project_id == project_id, ProjectTask.id == task_id)
+        )
+        result = self.session.execute(stmt)
+        return result.scalars().first()

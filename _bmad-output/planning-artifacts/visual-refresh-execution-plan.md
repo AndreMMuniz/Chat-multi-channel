@@ -80,7 +80,6 @@ Candidate target menu:
 - `Messages`
 - `Projects`
 - `Catalog`
-- `Tasks`
 - `Users`
 - `Config`
 
@@ -121,7 +120,7 @@ Priority surfaces:
 - inbox refinements
 - admin pages
 - auth pages
-- future domain modules such as projects, tasks, and data/catalog areas
+- future domain modules such as projects, project-task surfaces, and catalog areas
 
 ### Phase 8. Validation and Cleanup
 

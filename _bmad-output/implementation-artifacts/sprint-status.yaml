@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-03  # epic 13 retrospective completed
+last_updated: 2026-05-03  # story 14.1 implemented
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -233,3 +233,14 @@ development_status:
   13-3-message-tag-delete-and-quick-reply-actions: done
 
   epic-13-retrospective: done
+
+  # —— Epic 14: Project Tasks Execution Layer ——————————————————————————————————————————————
+  # Source: party mode decision 2026-05-03 after Epic 13 retrospective
+  # Scope: tasks as subitems of projects, message-to-task creation, scheduled automation,
+  #        lightweight productivity visibility inside Projects
+  epic-14: in-progress
+
+  14-1-project-task-model-and-detail-surface: done
+  14-2-create-task-from-message-with-project-routing: ready-for-dev
+  14-3-task-automation-and-scheduled-actions: ready-for-dev
+  14-4-task-visibility-and-productivity-views: ready-for-dev

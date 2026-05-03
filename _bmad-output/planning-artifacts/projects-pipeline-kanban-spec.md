@@ -10,7 +10,7 @@
 
 Turn the `Projects` top-level navigation area into a real operational pipeline workspace for project tracking, stage movement, and demand follow-up.
 
-The target experience is not a generic kanban board. It should feel like an operational project pipeline that sits naturally beside `Messages`, `Catalog`, and `Tasks`.
+The target experience is not a generic kanban board. It should feel like an operational project pipeline that sits naturally beside `Messages`, `Catalog`, `Users`, and `Config`.
 
 ---
 
@@ -19,11 +19,14 @@ The target experience is not a generic kanban board. It should feel like an oper
 The new `Projects` domain should support:
 
 - project card tracking across a shared pipeline
+- project task execution inside each project
 - message-driven demand intake from `Messages`
+- message-driven task intake from `Messages`
 - stage-based pipeline management
 - visibility into responsible agent, priority, channel, tags, due date, and status
 - quick scanning of pipeline health
 - future expansion toward CRM and operational workflows
+- future task automation and scheduled actions
 
 This epic should establish the **UI and interaction foundation** first. It does not need full CRM automation yet.
 
@@ -31,7 +34,8 @@ Important business rule:
 
 - cards in this workspace represent `Projects`
 - a conversation message containing a demand can be marked and turned into a project card
-- in the first operational model, this message-originated project card may behave like a task or demand item inside the projects pipeline
+- tasks are subitems of projects, not a separate top-level domain
+- a conversation message may also generate a task attached to a project
 
 ---
 
@@ -81,6 +85,8 @@ If delivery needs to be phased, `Kanban` must ship first and the others can foll
 
 ## Core Entities in UI
 
+### Project card
+
 The visual model implied by the mock includes:
 
 - project title
@@ -97,6 +103,26 @@ The visual model implied by the mock includes:
 - linked conversation when the card originated from `Messages`
 
 This epic should treat these as **pipeline card fields**, even if backend persistence begins with mocked or local state.
+
+### Project task
+
+Project tasks should be modeled as execution units inside a project, not as parallel pipeline cards.
+
+Each task should be able to carry:
+
+- title
+- short description
+- assignee
+- priority
+- due date
+- simple execution status
+- optional source message / conversation provenance
+- optional scheduled automation behavior
+
+Examples of future automation attached to a task:
+
+- send a follow-up message at a scheduled time
+- trigger a scheduled internal operational action
 
 ---
 
@@ -158,6 +184,8 @@ The modal should support:
 - delete or archive later if the story includes it
 - show or preserve conversation origin when applicable
 
+Project detail should also be ready to host a task execution block, even if the first release only introduces this in a later epic.
+
 ---
 
 ## Scope Guidance for Epic 11
@@ -185,7 +213,7 @@ The modal should support:
 - CRM automation
 - backend workflow rules
 - custom stage administration
-- full cross-module automation with Tasks
+- standalone Tasks top-level module
 - reports beyond the pipeline workspace
 
 ---

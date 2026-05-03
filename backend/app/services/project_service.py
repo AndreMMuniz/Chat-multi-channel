@@ -4,10 +4,17 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.models import Conversation, Message, Project, ProjectSourceType, User
-from app.repositories.project_repo import ProjectRepository, ProjectStageRepository
+from app.models.models import Conversation, Message, Project, ProjectSourceType, ProjectTask, User
+from app.repositories.project_repo import ProjectRepository, ProjectStageRepository, ProjectTaskRepository
 from app.schemas.common import create_error_response
-from app.schemas.project import ProjectCreate, ProjectFromMessageCreate, ProjectUpdate
+from app.schemas.project import (
+    ProjectCreate,
+    ProjectFromMessageCreate,
+    ProjectTaskCreate,
+    ProjectTaskFromMessageCreate,
+    ProjectTaskUpdate,
+    ProjectUpdate,
+)
 
 
 class ProjectService:
@@ -15,6 +22,7 @@ class ProjectService:
         self.db = db
         self.projects = ProjectRepository(db)
         self.stages = ProjectStageRepository(db)
+        self.tasks = ProjectTaskRepository(db)
 
     async def ensure_stage_exists(self, stage_key: str) -> None:
         stage = await self.stages.find_by_key(stage_key)
@@ -158,6 +166,137 @@ class ProjectService:
             self.db.commit()
         return await self.projects.find_project(project.id)
 
+    async def list_project_tasks(self, project: Project) -> list[ProjectTask]:
+        return await self.tasks.list_for_project(project.id)
+
+    async def create_project_task(
+        self,
+        project: Project,
+        payload: ProjectTaskCreate,
+        current_user: User,
+    ) -> ProjectTask:
+        if payload.owner_user_id:
+            await self.ensure_owner_exists(payload.owner_user_id)
+
+        task = await self.tasks.create(
+            {
+                **payload.model_dump(),
+                "project_id": project.id,
+                "created_by_user_id": current_user.id,
+            }
+        )
+        return await self.tasks.find_task(project.id, task.id)
+
+    async def create_project_task_from_message(
+        self,
+        message_id: UUID,
+        payload: ProjectTaskFromMessageCreate,
+        current_user: User,
+    ) -> ProjectTask:
+        if payload.owner_user_id:
+            await self.ensure_owner_exists(payload.owner_user_id)
+        if payload.project_context_id:
+            await self.ensure_project_context_exists(payload.project_context_id)
+
+        message = (
+            self.db.query(Message)
+            .options(joinedload(Message.conversation).joinedload(Conversation.contact))
+            .filter(Message.id == message_id)
+            .first()
+        )
+        if not message:
+            error_response, status = create_error_response(
+                code="MESSAGE_NOT_FOUND",
+                message="Message not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        conversation = message.conversation
+        if not conversation:
+            error_response, status = create_error_response(
+                code="CONVERSATION_REQUIRED",
+                message="Message is not linked to a valid conversation",
+                status_code=422,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        contact_name = None
+        if conversation.contact:
+            contact_name = conversation.contact.name or conversation.contact.email or conversation.contact.phone
+
+        project_context_id = payload.project_context_id or conversation.project_context_id
+        project = None
+
+        if project_context_id:
+            project = await self.projects.find_project(project_context_id)
+        elif payload.create_project_context:
+            project_title = payload.new_project_title or payload.title or (contact_name and f"{contact_name} demand") or "Message demand"
+            project = await self.projects.create(
+                {
+                    "title": project_title,
+                    "description": payload.description or message.content,
+                    "stage": "lead",
+                    "status": "open",
+                    "priority": payload.priority,
+                    "source_type": ProjectSourceType.MESSAGE,
+                    "source_message_id": message.id,
+                    "source_conversation_id": conversation.id,
+                    "contact_name": contact_name,
+                    "channel": conversation.channel,
+                    "tag": None,
+                    "owner_user_id": payload.owner_user_id,
+                    "created_by_user_id": current_user.id,
+                    "due_date": payload.due_date,
+                    "value": 0,
+                    "progress": 0,
+                }
+            )
+            project_context_id = project.id
+        else:
+            error_response, status = create_error_response(
+                code="PROJECT_CONTEXT_REQUIRED",
+                message="A project context is required to create a task from message",
+                status_code=422,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        if not project:
+            project = await self.projects.find_project(project_context_id)
+
+        task = await self.tasks.create(
+            {
+                "project_id": project.id,
+                "title": payload.title or "Message follow-up task",
+                "description": payload.description or message.content,
+                "status": payload.status,
+                "priority": payload.priority,
+                "owner_user_id": payload.owner_user_id or project.owner_user_id,
+                "source_message_id": message.id,
+                "source_conversation_id": conversation.id,
+                "due_date": payload.due_date,
+                "created_by_user_id": current_user.id,
+            }
+        )
+
+        if payload.attach_conversation_to_project:
+            conversation.project_context_id = project.id
+            self.db.commit()
+
+        return await self.tasks.find_task(project.id, task.id)
+
+    async def update_project_task(
+        self,
+        project: Project,
+        task: ProjectTask,
+        payload: ProjectTaskUpdate,
+    ) -> ProjectTask:
+        if payload.owner_user_id:
+            await self.ensure_owner_exists(payload.owner_user_id)
+
+        updated = await self.tasks.update(task.id, payload.model_dump(exclude_unset=True))
+        return await self.tasks.find_task(project.id, updated.id)
+
 
 def serialize_project(project: Project) -> dict:
     return {
@@ -182,4 +321,23 @@ def serialize_project(project: Project) -> dict:
         "progress": project.progress,
         "created_at": project.created_at,
         "updated_at": project.updated_at,
+    }
+
+
+def serialize_project_task(task: ProjectTask) -> dict:
+    return {
+        "id": task.id,
+        "project_id": task.project_id,
+        "project_reference": task.project.reference_code if task.project else None,
+        "title": task.title,
+        "description": task.description,
+        "status": task.status,
+        "priority": task.priority,
+        "owner_id": task.owner_user_id,
+        "owner_name": task.owner.full_name if task.owner else None,
+        "source_message_id": task.source_message_id,
+        "source_conversation_id": task.source_conversation_id,
+        "due_date": task.due_date,
+        "created_at": task.created_at,
+        "updated_at": task.updated_at,
     }

@@ -18,6 +18,7 @@ from app.models.models import (
     ProjectSourceType,
     ProjectStage,
     ProjectStatus,
+    ProjectTaskStatus,
     User,
     UserType,
 )
@@ -192,6 +193,56 @@ def test_update_move_stage_and_delete_project(db):
     delete_response = client.delete(f"/api/v1/admin/projects/{project.id}")
     assert delete_response.status_code == 200
     assert delete_response.json()["data"]["deleted"] is True
+
+
+def test_create_list_and_update_project_tasks(db):
+    user = _seed_user_and_stages(db)
+    project = Project(
+        title="Task container project",
+        description="Project with execution items",
+        stage="lead",
+        priority=ProjectPriority.MEDIUM,
+        status=ProjectStatus.OPEN,
+        source_type=ProjectSourceType.MANUAL,
+        created_by_user_id=user.id,
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    client = _make_client(db, user)
+
+    create_response = client.post(
+        f"/api/v1/admin/projects/{project.id}/tasks",
+        json={
+            "title": "Send contract",
+            "description": "Follow up with the latest contract version",
+            "priority": "high",
+            "status": "open",
+        },
+    )
+    assert create_response.status_code == 200
+    created = create_response.json()["data"]
+    assert created["project_id"] == str(project.id)
+    assert created["title"] == "Send contract"
+    assert created["status"] == "open"
+
+    list_response = client.get(f"/api/v1/admin/projects/{project.id}/tasks")
+    assert list_response.status_code == 200
+    assert len(list_response.json()["data"]) == 1
+
+    update_response = client.patch(
+        f"/api/v1/admin/projects/{project.id}/tasks/{created['id']}",
+        json={"status": "done", "title": "Send signed contract"},
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()["data"]
+    assert updated["status"] == "done"
+    assert updated["title"] == "Send signed contract"
+
+    db.refresh(project)
+    task = project.tasks[0]
+    assert task.status == ProjectTaskStatus.DONE
 
 
 def test_reject_invalid_progress_and_missing_message_source(db):

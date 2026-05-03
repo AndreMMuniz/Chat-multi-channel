@@ -3,6 +3,7 @@ export type ProjectPriority = "high" | "medium" | "low";
 export type ProjectStatus = "open" | "done" | "archived";
 export type ProjectSourceType = "manual" | "message";
 export type ProjectChannel = "whatsapp" | "telegram" | "email" | "sms" | "web";
+export type ProjectTaskStatus = "open" | "in_progress" | "done" | "cancelled";
 
 export interface ProjectStage {
   key: ProjectStageKey;
@@ -69,3 +70,32 @@ export interface ProjectFromMessageRequest {
   progress: number;
   tag?: string | null;
 }
+
+export interface ProjectTaskDto {
+  id: string;
+  project_id: string;
+  title: string;
+  description?: string | null;
+  status: ProjectTaskStatus;
+  priority: ProjectPriority;
+  owner_id?: string | null;
+  owner_name?: string | null;
+  source_message_id?: string | null;
+  source_conversation_id?: string | null;
+  due_date?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectTaskCreateRequest {
+  title: string;
+  description?: string | null;
+  status: ProjectTaskStatus;
+  priority: ProjectPriority;
+  owner_user_id?: string | null;
+  source_message_id?: string | null;
+  source_conversation_id?: string | null;
+  due_date?: string | null;
+}
+
+export type ProjectTaskUpdateRequest = Partial<ProjectTaskCreateRequest>;

@@ -116,7 +116,6 @@ Proposed main navigation from the user:
 - `Messages`
 - `Projects`
 - `Catalog`
-- `Tasks`
 - `Users`
 - `Config`
 
@@ -125,6 +124,7 @@ Notes from the roundtable:
 - `Users` and `Config` should be separate domains
 - both `Users` and `Config` should use lateral internal navigation
 - `Catalog` replaces the previous temporary data-domain label
+- `Tasks` are no longer treated as a top-level navigation domain and should evolve inside `Projects`
 - the product should use English consistently across navigation labels
 
 ### 6. Conversation Workspace Direction

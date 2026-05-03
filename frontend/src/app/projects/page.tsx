@@ -9,7 +9,15 @@ import { MdOutlineEmail, MdSms } from "react-icons/md";
 import Modal from "@/components/shared/Modal";
 import { useAuth } from "@/hooks/useAuth";
 import { projectsApi } from "@/lib/api/index";
-import type { ProjectCreateRequest, ProjectDto, ProjectUpdateRequest } from "@/types/project";
+import type {
+  ProjectCreateRequest,
+  ProjectDto,
+  ProjectTaskCreateRequest,
+  ProjectTaskDto,
+  ProjectTaskStatus,
+  ProjectTaskUpdateRequest,
+  ProjectUpdateRequest,
+} from "@/types/project";
 
 type ViewId = "kanban" | "list" | "timeline";
 type StageId = "lead" | "qualification" | "proposal" | "negotiation" | "closed";
@@ -44,6 +52,32 @@ type ProjectCard = {
   sourceMessage?: string;
   sourceMessageId?: string;
   sourceConversationId?: string;
+};
+
+type TaskStatusId = ProjectTaskStatus;
+
+type ProjectTask = {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  status: TaskStatusId;
+  priority: PriorityId;
+  ownerId: string;
+  ownerName?: string;
+  dueDate: string;
+  sourceMessageId?: string;
+  sourceConversationId?: string;
+};
+
+type ProjectTaskDraft = {
+  id: string | null;
+  title: string;
+  description: string;
+  status: TaskStatusId;
+  priority: PriorityId;
+  ownerId: string;
+  dueDate: string;
 };
 
 type ProjectFormState = {
@@ -132,6 +166,13 @@ const PRIORITY_META: Record<PriorityId, { label: string; className: string }> = 
 const ORIGIN_META: Record<OriginId, { label: string; className: string; icon: IconType }> = {
   message: { label: "From Messages", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100", icon: FaCommentDots },
   manual: { label: "Manual", className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200", icon: FaGlobe },
+};
+
+const TASK_STATUS_META: Record<TaskStatusId, { label: string; className: string }> = {
+  open: { label: "Open", className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200" },
+  in_progress: { label: "In Progress", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
+  done: { label: "Done", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
+  cancelled: { label: "Cancelled", className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
 };
 
 const TAG_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -268,6 +309,22 @@ function adaptProject(project: ProjectDto): ProjectCard {
   };
 }
 
+function adaptProjectTask(task: ProjectTaskDto): ProjectTask {
+  return {
+    id: task.id,
+    projectId: task.project_id,
+    title: task.title,
+    description: task.description ?? "",
+    status: task.status,
+    priority: task.priority,
+    ownerId: task.owner_id ?? "",
+    ownerName: task.owner_name ?? undefined,
+    dueDate: task.due_date ? task.due_date.slice(0, 10) : "",
+    sourceMessageId: task.source_message_id ?? undefined,
+    sourceConversationId: task.source_conversation_id ?? undefined,
+  };
+}
+
 function toFormState(card: ProjectCard): ProjectFormState {
   return {
     id: card.id,
@@ -310,6 +367,31 @@ function createEmptyForm(cards: ProjectCard[], owners: Owner[], overrides?: Part
     sourceMessageId: "",
     sourceConversationId: "",
     ...overrides,
+  };
+}
+
+function createEmptyTaskDraft(defaultOwnerId = "", overrides?: Partial<ProjectTaskDraft>): ProjectTaskDraft {
+  return {
+    id: null,
+    title: "",
+    description: "",
+    status: "open",
+    priority: "medium",
+    ownerId: defaultOwnerId,
+    dueDate: "",
+    ...overrides,
+  };
+}
+
+function toTaskDraft(task: ProjectTask): ProjectTaskDraft {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    priority: task.priority,
+    ownerId: task.ownerId,
+    dueDate: task.dueDate,
   };
 }
 
@@ -391,6 +473,233 @@ function FieldTextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>)
       {...props}
       className={`min-h-[96px] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 ${props.className ?? ""}`}
     />
+  );
+}
+
+function ProjectTaskSection({
+  projectId,
+  tasks,
+  taskDraft,
+  setTaskDraft,
+  owners,
+  isTasksLoading,
+  isTaskSaving,
+  onTaskSave,
+  onTaskEdit,
+  onTaskToggle,
+  onTaskCancel,
+}: {
+  projectId?: string | null;
+  tasks: ProjectTask[];
+  taskDraft: ProjectTaskDraft;
+  setTaskDraft: React.Dispatch<React.SetStateAction<ProjectTaskDraft>>;
+  owners: Owner[];
+  isTasksLoading: boolean;
+  isTaskSaving: boolean;
+  onTaskSave: () => void;
+  onTaskEdit: (task: ProjectTask) => void;
+  onTaskToggle: (task: ProjectTask) => void;
+  onTaskCancel: () => void;
+}) {
+  if (!projectId) {
+    return (
+      <section className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm">
+            <span className="material-symbols-outlined text-[18px]">checklist</span>
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-900">Project tasks</h3>
+            <p className="text-sm leading-6 text-slate-500">
+              Save the project first, then add execution tasks such as follow-ups, document review, and delivery steps.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const openCount = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").length;
+  const completedCount = tasks.filter((task) => task.status === "done").length;
+
+  return (
+    <section className="space-y-4 rounded-[22px] border border-slate-200 bg-slate-50/70 p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">Project tasks</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Break this project into next actions without creating a second pipeline.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-white px-3 py-1 text-slate-600 ring-1 ring-slate-200">
+            {openCount} open
+          </span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-100">
+            {completedCount} done
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {isTasksLoading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+            Loading project tasks...
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+            No tasks yet. Add the first execution item for this project.
+          </div>
+        ) : (
+          tasks.map((task) => {
+            const priority = PRIORITY_META[task.priority];
+            const status = TASK_STATUS_META[task.status];
+            const overdue = isOverdue(task.dueDate) && task.status !== "done" && task.status !== "cancelled";
+            return (
+              <article
+                key={task.id}
+                className={`rounded-2xl border bg-white px-4 py-3 ${overdue ? "border-rose-200 ring-1 ring-rose-100" : "border-slate-200"}`}
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-semibold text-slate-900">{task.title}</h4>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${priority.className}`}>
+                        {priority.label}
+                      </span>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${status.className}`}>
+                        {status.label}
+                      </span>
+                    </div>
+                    {task.description ? <p className="text-sm leading-6 text-slate-600">{task.description}</p> : null}
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                      <span>{task.ownerName ?? "Unassigned"}</span>
+                      <span>•</span>
+                      <span>{task.dueDate ? formatDate(task.dueDate) : "No due date"}</span>
+                      {overdue ? (
+                        <>
+                          <span>•</span>
+                          <span className="font-semibold text-rose-600">Overdue</span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onTaskEdit(task)}
+                      disabled={isTaskSaving}
+                      className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onTaskToggle(task)}
+                      disabled={isTaskSaving}
+                      className="inline-flex h-9 items-center justify-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white transition hover:bg-indigo-700"
+                    >
+                      {task.status === "done" ? "Reopen" : "Mark done"}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+
+      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-2">
+        <label className="flex flex-col gap-2 md:col-span-2">
+          <FieldLabel label={taskDraft.id ? "Edit task title" : "New task title"} />
+          <FieldInput
+            value={taskDraft.title}
+            onChange={(e) => setTaskDraft((current) => ({ ...current, title: e.target.value }))}
+            placeholder="Send contract, review onboarding notes, follow up tomorrow..."
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 md:col-span-2">
+          <FieldLabel label="Notes" />
+          <FieldTextArea
+            value={taskDraft.description}
+            onChange={(e) => setTaskDraft((current) => ({ ...current, description: e.target.value }))}
+            placeholder="Optional execution details for the assigned agent"
+            className="min-h-[84px]"
+          />
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <FieldLabel label="Assignee" />
+          <FieldSelect value={taskDraft.ownerId} onChange={(e) => setTaskDraft((current) => ({ ...current, ownerId: e.target.value }))}>
+            <option value="">Unassigned</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.name}
+              </option>
+            ))}
+          </FieldSelect>
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <FieldLabel label="Priority" />
+          <FieldSelect
+            value={taskDraft.priority}
+            onChange={(e) => setTaskDraft((current) => ({ ...current, priority: e.target.value as PriorityId }))}
+          >
+            {Object.entries(PRIORITY_META).map(([id, meta]) => (
+              <option key={id} value={id}>
+                {meta.label}
+              </option>
+            ))}
+          </FieldSelect>
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <FieldLabel label="Status" />
+          <FieldSelect
+            value={taskDraft.status}
+            onChange={(e) => setTaskDraft((current) => ({ ...current, status: e.target.value as TaskStatusId }))}
+          >
+            {Object.entries(TASK_STATUS_META).map(([id, meta]) => (
+              <option key={id} value={id}>
+                {meta.label}
+              </option>
+            ))}
+          </FieldSelect>
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <FieldLabel label="Due date" />
+          <FieldInput
+            type="date"
+            value={taskDraft.dueDate}
+            onChange={(e) => setTaskDraft((current) => ({ ...current, dueDate: e.target.value }))}
+          />
+        </label>
+
+        <div className="flex gap-3 md:col-span-2 md:justify-end">
+          {taskDraft.id ? (
+            <button
+              type="button"
+              onClick={onTaskCancel}
+              disabled={isTaskSaving}
+              className="inline-flex h-10 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              Cancel edit
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onTaskSave}
+            disabled={isTaskSaving}
+            className="inline-flex h-10 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            {isTaskSaving ? "Saving..." : taskDraft.id ? "Save task" : "Add task"}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -486,25 +795,43 @@ function ProjectCardView({
 function ProjectModal({
   form,
   setForm,
+  taskDraft,
+  setTaskDraft,
+  tasks,
   onClose,
   onSave,
+  onTaskSave,
+  onTaskEdit,
+  onTaskToggle,
+  onTaskCancel,
   onOpenConversation,
   onDelete,
   owners,
   isEditing,
   stages,
   isSaving,
+  isTasksLoading,
+  isTaskSaving,
 }: {
   form: ProjectFormState;
   setForm: React.Dispatch<React.SetStateAction<ProjectFormState | null>>;
+  taskDraft: ProjectTaskDraft;
+  setTaskDraft: React.Dispatch<React.SetStateAction<ProjectTaskDraft>>;
+  tasks: ProjectTask[];
   onClose: () => void;
   onSave: () => void;
+  onTaskSave: () => void;
+  onTaskEdit: (task: ProjectTask) => void;
+  onTaskToggle: (task: ProjectTask) => void;
+  onTaskCancel: () => void;
   onOpenConversation?: () => void;
   onDelete?: () => void;
   owners: Owner[];
   isEditing: boolean;
   stages: StageOption[];
   isSaving: boolean;
+  isTasksLoading: boolean;
+  isTaskSaving: boolean;
 }) {
   return (
     <Modal title={isEditing ? "Edit Project" : "New Project"} onClose={onClose} maxWidth="max-w-3xl">
@@ -655,6 +982,20 @@ function ProjectModal({
             </label>
           ) : null}
         </div>
+
+        <ProjectTaskSection
+          projectId={form.id}
+          tasks={tasks}
+          taskDraft={taskDraft}
+          setTaskDraft={setTaskDraft}
+          owners={owners}
+          isTasksLoading={isTasksLoading}
+          isTaskSaving={isTaskSaving}
+          onTaskSave={onTaskSave}
+          onTaskEdit={onTaskEdit}
+          onTaskToggle={onTaskToggle}
+          onTaskCancel={onTaskCancel}
+        />
 
         <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
@@ -811,6 +1152,7 @@ export default function ProjectsPage() {
   const { user } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("kanban");
   const [cards, setCards] = useState<ProjectCard[]>([]);
+  const [projectTasksByProjectId, setProjectTasksByProjectId] = useState<Record<string, ProjectTask[]>>({});
   const [stageOptions, setStageOptions] = useState<StageOption[]>(STAGES);
   const [form, setForm] = useState<ProjectFormState | null>(null);
   const [dragState, setDragState] = useState<{ cardId: string; fromStage: StageId } | null>(null);
@@ -823,6 +1165,8 @@ export default function ProjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTasksLoading, setIsTasksLoading] = useState(false);
+  const [isTaskSaving, setIsTaskSaving] = useState(false);
   const [handledQueryProjectId, setHandledQueryProjectId] = useState<string | null>(null);
 
   const owners = useMemo<Owner[]>(() => {
@@ -982,18 +1326,28 @@ export default function ProjectsPage() {
   };
 
   const isEditing = Boolean(form?.id);
+  const defaultTaskOwnerId = user?.id ?? owners[0]?.id ?? "";
+  const activeProjectTasks = form?.id ? projectTasksByProjectId[form.id] ?? [] : [];
+  const [taskDraft, setTaskDraft] = useState<ProjectTaskDraft>(createEmptyTaskDraft());
 
   const openNewProject = (stage: StageId = "lead") => {
     setForm(createEmptyForm(cards, owners, { stage }));
+    setTaskDraft(createEmptyTaskDraft(defaultTaskOwnerId));
   };
 
   const openExistingProject = (card: ProjectCard) => {
     setForm(toFormState(card));
+    setTaskDraft(createEmptyTaskDraft(card.ownerId || defaultTaskOwnerId));
   };
 
   const openSourceConversation = () => {
     if (!form?.sourceConversationId) return;
     router.push(`/?conversationId=${form.sourceConversationId}`);
+  };
+
+  const closeProjectModal = () => {
+    setForm(null);
+    setTaskDraft(createEmptyTaskDraft(defaultTaskOwnerId));
   };
 
   useEffect(() => {
@@ -1006,13 +1360,45 @@ export default function ProjectsPage() {
     startTransition(() => {
       setActiveView("kanban");
       setForm(toFormState(targetProject));
+      setTaskDraft(createEmptyTaskDraft(targetProject.ownerId || defaultTaskOwnerId));
       setHandledQueryProjectId(queryProjectId);
     });
 
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete("projectId");
     router.replace(nextParams.toString() ? `/projects?${nextParams.toString()}` : "/projects", { scroll: false });
-  }, [cards, handledQueryProjectId, isLoading, router, searchParams]);
+  }, [cards, defaultTaskOwnerId, handledQueryProjectId, isLoading, router, searchParams]);
+
+  useEffect(() => {
+    const projectId = form?.id;
+    if (!projectId) return;
+    const currentProjectId = projectId;
+
+    let isMounted = true;
+
+    async function loadProjectTasks() {
+      try {
+        setIsTasksLoading(true);
+        const tasks = await projectsApi.listProjectTasks(currentProjectId);
+        if (!isMounted) return;
+        setProjectTasksByProjectId((current) => ({
+          ...current,
+          [currentProjectId]: tasks.map(adaptProjectTask),
+        }));
+      } catch (error) {
+        if (!isMounted) return;
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load project tasks.");
+      } finally {
+        if (isMounted) setIsTasksLoading(false);
+      }
+    }
+
+    void loadProjectTasks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [form?.id]);
 
   const handleSave = async () => {
     if (!form) return;
@@ -1068,17 +1454,95 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = async () => {
-    if (!form?.id) return;
+    const projectId = form?.id;
+    if (!projectId) return;
     try {
       setIsSaving(true);
       setErrorMessage(null);
-      await projectsApi.deleteProject(form.id);
-      setCards((current) => current.filter((card) => card.id !== form.id));
+      await projectsApi.deleteProject(projectId);
+      setCards((current) => current.filter((card) => card.id !== projectId));
+      setProjectTasksByProjectId((current) => {
+        const next = { ...current };
+        delete next[projectId];
+        return next;
+      });
       setForm(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to delete project.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTaskSave = async () => {
+    const projectId = form?.id;
+    if (!projectId) return;
+    if (!taskDraft.title.trim()) return;
+
+    const payload: ProjectTaskCreateRequest = {
+      title: taskDraft.title.trim(),
+      description: taskDraft.description.trim() || null,
+      status: taskDraft.status,
+      priority: taskDraft.priority,
+      owner_user_id: taskDraft.ownerId || null,
+      due_date: toApiDateTime(taskDraft.dueDate),
+    };
+
+    try {
+      setIsTaskSaving(true);
+      setErrorMessage(null);
+
+      if (taskDraft.id) {
+        const updated = await projectsApi.updateProjectTask(projectId, taskDraft.id, payload as ProjectTaskUpdateRequest);
+        setProjectTasksByProjectId((current) => ({
+          ...current,
+          [projectId]: (current[projectId] ?? []).map((task: ProjectTask) => (task.id === taskDraft.id ? adaptProjectTask(updated) : task)),
+        }));
+      } else {
+        const created = await projectsApi.createProjectTask(projectId, payload);
+        setProjectTasksByProjectId((current) => ({
+          ...current,
+          [projectId]: [adaptProjectTask(created), ...(current[projectId] ?? [])],
+        }));
+      }
+
+      setTaskDraft(createEmptyTaskDraft(form.ownerId || defaultTaskOwnerId));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save project task.");
+    } finally {
+      setIsTaskSaving(false);
+    }
+  };
+
+  const handleTaskEdit = (task: ProjectTask) => {
+    setTaskDraft(toTaskDraft(task));
+  };
+
+  const handleTaskCancel = () => {
+    setTaskDraft(createEmptyTaskDraft(form?.ownerId || defaultTaskOwnerId));
+  };
+
+  const handleTaskToggle = async (task: ProjectTask) => {
+    const projectId = form?.id;
+    if (!projectId) return;
+    const nextStatus: TaskStatusId = task.status === "done" ? "open" : "done";
+
+    try {
+      setIsTaskSaving(true);
+      setErrorMessage(null);
+      const updated = await projectsApi.updateProjectTask(projectId, task.id, { status: nextStatus });
+      setProjectTasksByProjectId((current) => ({
+        ...current,
+        [projectId]: (current[projectId] ?? []).map((item: ProjectTask) => (item.id === task.id ? adaptProjectTask(updated) : item)),
+      }));
+
+      if (taskDraft.id === task.id) {
+        setTaskDraft(toTaskDraft(adaptProjectTask(updated)));
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to update task status.");
+    } finally {
+      setIsTaskSaving(false);
     }
   };
 
@@ -1496,15 +1960,24 @@ export default function ProjectsPage() {
       {form ? (
         <ProjectModal
           form={form}
+          taskDraft={taskDraft}
+          setTaskDraft={setTaskDraft}
+          tasks={activeProjectTasks}
           owners={owners}
           setForm={setForm}
-          onClose={() => setForm(null)}
+          onClose={closeProjectModal}
           onSave={handleSave}
+          onTaskSave={handleTaskSave}
+          onTaskEdit={handleTaskEdit}
+          onTaskToggle={handleTaskToggle}
+          onTaskCancel={handleTaskCancel}
           onOpenConversation={openSourceConversation}
           onDelete={isEditing ? handleDelete : undefined}
           isEditing={isEditing}
           stages={stageOptions}
           isSaving={isSaving}
+          isTasksLoading={isTasksLoading}
+          isTaskSaving={isTaskSaving}
         />
       ) : null}
     </main>

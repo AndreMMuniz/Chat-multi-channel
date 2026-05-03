@@ -321,6 +321,48 @@ This document outlines the epics and user stories derived from the Product Requi
 **Estimation:** 5 story points  
 **Covers FR:** FR34
 
+## Epic 14: Project Tasks Execution Layer
+**Derived from product direction:** Post-Epic-13 decision on `Tasks` as subitems of `Projects`  
+**Description:** Introduce project-linked tasks as execution units inside each project, including task creation from messages and scheduled automation behaviors.
+
+### Story 14.1: Project Task Model and Detail Surface
+**As an agent,** I want to manage tasks inside a project so that I can break a project into actionable execution items.  
+**Acceptance Criteria:**
+- Project detail surface exposes a dedicated task area.
+- Tasks belong to exactly one project.
+- Task fields include title, status, assignee, priority, due date, and notes.
+- Tasks can be created, edited, completed, and reopened from the project context.  
+**Estimation:** 5 story points
+
+### Story 14.2: Create Task from Message with Project Routing
+**As an agent,** I want to create a task from a message so that I can convert a concrete request into executable work without losing provenance.  
+**Acceptance Criteria:**
+- Message contextual actions include `Create Task`.
+- If the conversation already belongs to a project, the task is created under that project.
+- If the conversation does not belong to a project, the user can pick an existing project or create a new one first.
+- The task stores source conversation and source message references.  
+**Estimation:** 8 story points
+
+### Story 14.3: Task Automation and Scheduled Actions
+**As an agent,** I want to automate selected tasks so that follow-ups and operational actions can happen at the right time.  
+**Acceptance Criteria:**
+- A task can optionally define a scheduled automation.
+- Initial automation types support sending a message later or triggering a scheduled internal action.
+- Scheduled tasks show their automation status clearly.
+- Failed scheduled actions surface operational feedback for the agent.  
+**Estimation:** 8 story points
+
+### Story 14.4: Task Visibility and Productivity Views
+**As an agent,** I want to see open and overdue project tasks clearly so that I can focus on next actions without losing project context.  
+**Acceptance Criteria:**
+- Project detail shows open/completed task counts.
+- Projects workspace exposes lightweight task visibility such as overdue/open summaries.
+- Agents can filter or sort tasks inside the project context.
+- Task states support a simple execution model distinct from pipeline stages.  
+**Estimation:** 5 story points
+**Estimation:** 5 story points  
+**Covers FR:** FR34
+
 ### Story 5.6: Audit Log Viewing
 **As an admin,** I want to view audit records for governance so that I review actions.  
 **Acceptance Criteria:**
