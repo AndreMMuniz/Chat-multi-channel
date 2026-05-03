@@ -7,7 +7,7 @@ import { FaGlobe, FaTelegram } from "react-icons/fa6";
 import { MdOutlineEmail, MdSms } from "react-icons/md";
 import Modal from "@/components/shared/Modal";
 import { useAuth } from "@/hooks/useAuth";
-import { projectsApi } from "@/lib/api";
+import { projectsApi } from "@/lib/api/index";
 import type { ProjectCreateRequest, ProjectDto, ProjectUpdateRequest } from "@/types/project";
 
 type ViewId = "kanban" | "list" | "timeline";
