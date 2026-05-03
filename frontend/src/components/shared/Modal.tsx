@@ -1,54 +1,82 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 interface ModalProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
-  maxWidth?: string;
+  /** One of: max-w-sm | max-w-md | max-w-lg | max-w-xl | max-w-2xl | max-w-3xl */
+  maxWidth?: "max-w-sm" | "max-w-md" | "max-w-lg" | "max-w-xl" | "max-w-2xl" | "max-w-3xl";
 }
 
-export default function Modal({ title, onClose, children, maxWidth = "max-w-md" }: ModalProps) {
-  const [mounted, setMounted] = useState(false);
+const MAX_WIDTH_MAP: Record<NonNullable<ModalProps["maxWidth"]>, number> = {
+  "max-w-sm":  384,
+  "max-w-md":  448,
+  "max-w-lg":  512,
+  "max-w-xl":  576,
+  "max-w-2xl": 672,
+  "max-w-3xl": 768,
+};
 
+export default function Modal({
+  title,
+  onClose,
+  children,
+  maxWidth = "max-w-md",
+}: ModalProps) {
   useEffect(() => {
-    setMounted(true);
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, []);
-
-  // Also close on Escape key
-  useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", handler);
+    };
   }, [onClose]);
 
-  if (!mounted) return null;
+  const maxPx = MAX_WIDTH_MAP[maxWidth];
 
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+  // createPortal renders directly to <body>, escaping any overflow/stacking-context
+  // constraints in the component tree. Inline styles on the modal box guarantee
+  // correct dimensions regardless of which Tailwind classes the JIT includes.
+  const content = (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16,
+      }}
+    >
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+        style={{ position: "absolute", inset: 0 }}
+        className="bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
+      {/* Panel */}
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
         transition={{ type: "spring", duration: 0.4, bounce: 0.25 }}
-        className={`relative bg-white rounded-2xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] overflow-hidden`}
+        style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: maxPx,
+          display: "flex",
+          flexDirection: "column",
+          maxHeight: "90vh",
+          overflow: "hidden",
+        }}
+        className="bg-white rounded-2xl shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#E9ECEF] shrink-0">
@@ -61,12 +89,15 @@ export default function Modal({ title, onClose, children, maxWidth = "max-w-md" 
           </button>
         </div>
 
-        {/* Content */}
+        {/* Body */}
         <div className="overflow-y-auto p-6 flex-1">
           {children}
         </div>
       </motion.div>
-    </div>,
-    document.body
+    </div>
   );
+
+  // On the server (SSR) document is not available — render inline so hydration matches
+  if (typeof document === "undefined") return content;
+  return createPortal(content, document.body);
 }

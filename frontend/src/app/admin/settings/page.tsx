@@ -222,13 +222,13 @@ export default function SettingsPage() {
 
   return (
     <ConfigAreaShell activeSection={activeTab} onSectionChange={(section) => setActiveTab(section as TabId)}>
-      <div className="flex flex-1 flex-col overflow-hidden bg-slate-50">
+      <div className="flex flex-1 flex-col bg-slate-50" style={{ minHeight: 0 }}>
         <header className="h-16 shrink-0 border-b border-[#E9ECEF] bg-white px-6 flex items-center">
           <h1 className="text-[18px] font-semibold text-slate-900">Platform Configuration</h1>
         </header>
 
         {activeTab === "quick-replies" && (
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
             <QuickRepliesPage />
           </div>
         )}
