@@ -869,17 +869,6 @@ export default function ProjectsPage() {
     setForm(createEmptyForm(cards, { stage }));
   };
 
-  const openNewDemandProject = () => {
-    setForm(
-      createEmptyForm(cards, {
-        stage: "lead",
-        origin: "message",
-        workType: "Demand task",
-        sourceMessage: "Customer sent a demand that now needs structured follow-up in Projects.",
-      })
-    );
-  };
-
   const openExistingProject = (card: ProjectCard) => {
     setForm(toFormState(card));
   };
@@ -931,175 +920,147 @@ export default function ProjectsPage() {
   };
 
   return (
-    <main className="flex-1 overflow-y-auto bg-[var(--color-background)]">
-      <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 p-4 sm:p-6">
-        <header className="overflow-hidden rounded-[22px] border border-[var(--color-outline-variant)] bg-white shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-[var(--color-outline-variant)] px-4 py-4 sm:px-5 lg:flex-row lg:items-start lg:justify-between">
+    <main className="flex-1 overflow-y-auto bg-[#F6F8FC]">
+      <div className="flex min-h-full flex-col">
+        <header className="border-b border-[#E6EBF3] bg-white">
+          <div className="flex flex-col gap-4 px-6 py-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                 <span
-                  className="material-symbols-outlined text-[22px]"
+                  className="material-symbols-outlined text-[18px]"
                   style={{ fontVariationSettings: "'FILL' 1" }}
                 >
                   view_kanban
                 </span>
               </div>
               <div className="min-w-0">
-                <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-slate-900">Projects</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  Project pipeline integrated with Messages, owners, and operational follow-up.
+                <h1 className="text-[18px] font-semibold leading-5 text-slate-900">Projects pipeline</h1>
+                <p className="mt-0.5 text-[13px] text-slate-500">
+                  Integrated project tracking for demands created from Messages and manual follow-up.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 lg:items-end">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
-                  {VIEW_OPTIONS.map((view) => {
-                    const active = activeView === view.id;
-                    return (
-                      <button
-                        key={view.id}
-                        type="button"
-                        onClick={() => setActiveView(view.id)}
-                        className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
-                          active
-                            ? "bg-white text-indigo-700 shadow-sm"
-                            : "text-slate-500 hover:bg-white hover:text-slate-700"
-                        }`}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1 shadow-sm">
+                {VIEW_OPTIONS.map((view) => {
+                  const active = activeView === view.id;
+                  return (
+                    <button
+                      key={view.id}
+                      type="button"
+                      onClick={() => setActiveView(view.id)}
+                      className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
+                        active
+                          ? "bg-white text-indigo-700 shadow-sm"
+                          : "text-slate-500 hover:bg-white hover:text-slate-700"
+                      }`}
+                    >
+                      <span
+                        className="material-symbols-outlined text-[16px]"
+                        style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}
                       >
-                        <span
-                          className="material-symbols-outlined text-[16px]"
-                          style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}
-                        >
-                          {view.icon}
-                        </span>
-                        {view.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={openNewDemandProject}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
-                >
-                  <span className="material-symbols-outlined text-[16px]">forum</span>
-                  New From Demand
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openNewProject()}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  <span className="material-symbols-outlined text-[16px]">add</span>
-                  New Project
-                </button>
+                        {view.icon}
+                      </span>
+                      {view.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 font-semibold text-sky-700">
-                  <span className="material-symbols-outlined text-[14px]">forum</span>
-                  Messages can generate project cards
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={openNewProject}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+              >
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                New Project
+              </button>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-              <div className="flex min-w-0 flex-1 flex-col gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-[minmax(240px,1.2fr)_repeat(4,minmax(160px,0.8fr))]">
-                <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
-                  <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
-                  <input
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search projects, contacts, or demands"
-                    className="h-full w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                  />
-                </div>
-
-                <FieldSelect value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-10 rounded-xl">
-                  <option value="ALL">All owners</option>
-                  {OWNERS.map((owner) => (
-                    <option key={owner.id} value={owner.id}>
-                      {owner.name}
-                    </option>
-                  ))}
-                </FieldSelect>
-
-                <FieldSelect
-                  value={priorityFilter}
-                  onChange={(event) => setPriorityFilter(event.target.value as PriorityId | "ALL")}
-                  className="h-10 rounded-xl"
-                >
-                  <option value="ALL">All priorities</option>
-                  {Object.entries(PRIORITY_META).map(([id, meta]) => (
-                    <option key={id} value={id}>
-                      {meta.label}
-                    </option>
-                  ))}
-                </FieldSelect>
-
-                <FieldSelect
-                  value={channelFilter}
-                  onChange={(event) => setChannelFilter(event.target.value as ChannelId | "ALL")}
-                  className="h-10 rounded-xl"
-                >
-                  <option value="ALL">All channels</option>
-                  {Object.entries(CHANNEL_META).map(([id, meta]) => (
-                    <option key={id} value={id}>
-                      {meta.label}
-                    </option>
-                  ))}
-                </FieldSelect>
-
-                <FieldSelect
-                  value={originFilter}
-                  onChange={(event) => setOriginFilter(event.target.value as OriginId | "ALL")}
-                  className="h-10 rounded-xl"
-                >
-                  <option value="ALL">Manual and Messages</option>
-                  <option value="manual">Manual</option>
-                  <option value="message">From Messages</option>
-                </FieldSelect>
+          <div className="flex flex-col gap-3 border-t border-[#EEF2F7] px-6 py-3 xl:flex-row xl:items-center">
+            <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <div className="flex h-11 min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 shadow-sm focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
+                <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by client..."
+                  className="h-full w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                />
               </div>
 
-              <div className="flex items-center gap-2 xl:pl-3">
-                {OWNERS.map((owner, index) => (
-                  <span
-                    key={owner.id}
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold ${owner.tint} ${owner.text} ${index > 0 ? "-ml-1.5" : ""}`}
-                    title={owner.name}
-                  >
-                    {owner.initials}
-                  </span>
+              <FieldSelect value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-11 min-w-[160px] rounded-xl shadow-sm">
+                <option value="ALL">All owners</option>
+                {OWNERS.map((owner) => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.name}
+                  </option>
                 ))}
-                <span className="ml-1 text-xs text-slate-500">{OWNERS.length} owners</span>
-              </div>
+              </FieldSelect>
+
+              <FieldSelect
+                value={priorityFilter}
+                onChange={(event) => setPriorityFilter(event.target.value as PriorityId | "ALL")}
+                className="h-11 min-w-[150px] rounded-xl shadow-sm"
+              >
+                <option value="ALL">All priorities</option>
+                {Object.entries(PRIORITY_META).map(([id, meta]) => (
+                  <option key={id} value={id}>
+                    {meta.label}
+                  </option>
+                ))}
+              </FieldSelect>
+
+              <FieldSelect
+                value={channelFilter}
+                onChange={(event) => setChannelFilter(event.target.value as ChannelId | "ALL")}
+                className="h-11 min-w-[150px] rounded-xl shadow-sm"
+              >
+                <option value="ALL">All channels</option>
+                {Object.entries(CHANNEL_META).map(([id, meta]) => (
+                  <option key={id} value={id}>
+                    {meta.label}
+                  </option>
+                ))}
+              </FieldSelect>
             </div>
 
-            {hasActiveFilters ? (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+            <div className="flex items-center gap-2 xl:ml-auto">
+              {OWNERS.map((owner, index) => (
+                <span
+                  key={owner.id}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold ring-2 ring-white ${owner.tint} ${owner.text} ${index > 0 ? "-ml-1.5" : ""}`}
+                  title={owner.name}
                 >
-                  <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-                  Clear filters
-                </button>
-              </div>
-            ) : null}
+                  {owner.initials}
+                </span>
+              ))}
+              <span className="ml-1 text-xs text-slate-500">{OWNERS.length} owners</span>
+            </div>
           </div>
+
+          {hasActiveFilters ? (
+            <div className="border-t border-[#EEF2F7] px-6 py-2">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+              >
+                <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+                Clear filters
+              </button>
+            </div>
+          ) : null}
         </header>
 
-        <section className="grid gap-3 xl:grid-cols-4">
+        <section className="border-b border-[#E6EBF3] px-6 py-4">
+          <div className="grid gap-3 xl:grid-cols-4">
           {kpis.map((item) => (
             <article
               key={item.label}
-              className="rounded-[18px] border border-[var(--color-outline-variant)] bg-white px-4 py-3 shadow-sm"
+              className="rounded-[18px] border border-[#E2E8F2] bg-white px-4 py-3 shadow-sm"
             >
               <div className="flex items-center gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${item.tint}`}>
@@ -1118,9 +1079,10 @@ export default function ProjectsPage() {
               <p className="mt-2 text-xs leading-5 text-slate-500">{item.hint}</p>
             </article>
           ))}
+          </div>
         </section>
 
-        <section className="rounded-[22px] border border-[var(--color-outline-variant)] bg-white p-3 shadow-sm sm:p-4">
+        <section className="flex-1 px-6 py-4">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">Project Pipeline</h2>
@@ -1172,20 +1134,23 @@ export default function ProjectsPage() {
                     }}
                     onDragLeave={() => setDragOverStage((current) => (current === stage.id ? null : current))}
                     onDrop={() => handleDrop(stage.id)}
-                    className={`min-h-[520px] min-w-[272px] flex-1 rounded-[18px] border p-2.5 transition ${
+                    className={`min-h-[520px] min-w-[270px] flex-1 rounded-[20px] border border-[#DCE4EF] p-0 transition ${
                       draggingOver
-                        ? "border-indigo-300 bg-indigo-50/70 ring-2 ring-indigo-100"
-                        : "border-slate-200 bg-slate-50/80"
+                        ? "border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-100"
+                        : "bg-[#EFF4FB]"
                     }`}
                   >
-                    <div className="rounded-[14px] border border-slate-200 bg-white/75 p-3">
+                    <div className="rounded-t-[20px] border-b border-[#DCE4EF] bg-white px-3 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <span className={`h-2.5 w-2.5 rounded-full ${stage.accent}`} />
                             <h3 className="text-sm font-semibold text-slate-900">{stage.label}</h3>
+                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                              {stageCards.length}
+                            </span>
                           </div>
-                          <p className="text-xs text-slate-500">{stageCards.length} cards in this stage</p>
+                          <p className="text-xs text-slate-500">{formatCurrency(stageValue)}</p>
                         </div>
                         <button
                           type="button"
@@ -1196,22 +1161,10 @@ export default function ProjectsPage() {
                           <span className="material-symbols-outlined text-[18px]">add</span>
                         </button>
                       </div>
-
-                      <div className="mt-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                            Stage Value
-                          </p>
-                          <p className="text-sm font-semibold text-slate-900">{formatCurrency(stageValue)}</p>
-                        </div>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                          {stageCards.filter((card) => card.origin === "message").length} from Messages
-                        </span>
-                      </div>
                     </div>
 
                     {stageCards.length > 0 ? (
-                      <div className="mt-3 space-y-2.5">
+                      <div className="space-y-2.5 px-2.5 py-2.5">
                         {stageCards.map((card) => (
                           <ProjectCardView
                             key={card.id}
@@ -1222,7 +1175,7 @@ export default function ProjectsPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-[14px] border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-slate-500">
+                      <div className="m-2.5 rounded-[14px] border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-slate-500">
                         No projects in this stage for the current filters.
                       </div>
                     )}
@@ -1231,7 +1184,7 @@ export default function ProjectsPage() {
               })}
             </div>
           ) : activeView === "list" ? (
-            <div className="overflow-hidden rounded-[24px] border border-slate-200">
+            <div className="overflow-hidden rounded-[20px] border border-[#DCE4EF] bg-white shadow-sm">
               <div className="grid grid-cols-[1.4fr_1fr_0.9fr_0.8fr_0.8fr_0.9fr] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 <span>Project</span>
                 <span>Owner</span>
@@ -1335,7 +1288,7 @@ export default function ProjectsPage() {
             </div>
           )}
         </section>
-      </section>
+      </div>
 
       {form ? (
         <ProjectModal
