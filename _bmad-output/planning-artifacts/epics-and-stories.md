@@ -591,6 +591,50 @@ This document outlines the epics and user stories derived from the Product Requi
 **Estimation:** 5 story points  
 **Priority:** Medium
 
+## Epic 12: Projects Backend Foundation
+**Derived from:** Epic 11 frontend implementation + party mode backend roundtable 2026-05-02  
+**Description:** Create the first persisted backend domain for `Projects`, with official stage support, CRUD APIs, and explicit message-to-project provenance.
+
+### Story 12.1: Project Domain Model and Stage Persistence
+**As the system,** I want persisted `Project` and `ProjectStage` entities so that the pipeline has a real backend foundation.  
+**Acceptance Criteria:**
+- `Project` model exists with title, description/demand summary, stage, priority, source linkage, owner, due date, progress, and timestamps.
+- `ProjectStage` model or persisted stage definition exists.
+- Official first-release stages are seeded as `Lead`, `Qualification`, `Proposal`, `Negotiation`, `Closed`.
+- Migration is reversible and consistent with existing backend patterns.  
+**Estimation:** 5 story points  
+**Priority:** High
+
+### Story 12.2: Projects CRUD API and Filters
+**As an operator,** I want the `Projects` workspace to load and update real project data so that the kanban no longer depends on local state.  
+**Acceptance Criteria:**
+- API supports list, create, detail, update, delete, and stage movement.
+- `GET /api/projects` supports filters for search, stage, owner, priority, channel, and source type.
+- Stage movement is handled by an explicit backend mutation.
+- API responses are shaped for the existing card-oriented frontend.  
+**Estimation:** 8 story points  
+**Priority:** High
+
+### Story 12.3: Message-to-Project Conversion Flow
+**As an operator,** I want to turn a real message demand into a project so that project cards can originate from live omnichannel work.  
+**Acceptance Criteria:**
+- Backend supports explicit creation from message.
+- Created project persists `source_type`, `source_message_id`, and `source_conversation_id`.
+- Channel and contact context are derived from the real source records when possible.
+- Invalid or orphaned source references are rejected explicitly.  
+**Estimation:** 5 story points  
+**Priority:** High
+
+### Story 12.4: Projects Backend Test Coverage and Frontend Wiring
+**As a developer,** I want test coverage and frontend integration for the new Projects backend so that the page can be validated with real persisted data safely.  
+**Acceptance Criteria:**
+- Service and API tests cover CRUD, filters, stage movement, and message conversion.
+- The Projects frontend reads from the backend instead of local seeded state.
+- The UI preserves the official commercial stages from backend data.
+- Error and empty states remain usable when no real projects exist.  
+**Estimation:** 5 story points  
+**Priority:** High
+
 ## FR to Epic/Story Mapping
 
 | FR  | Epic | Story |

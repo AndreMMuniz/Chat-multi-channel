@@ -105,13 +105,13 @@ const CHANNEL_META: Record<ChannelType, {
   },
 };
 
-const TAG_META: Record<ConversationTag, { label: string; className: string }> = {
-  SUPPORT: { label: 'Support', className: 'bg-blue-50 text-blue-700 border-blue-100' },
-  BILLING: { label: 'Billing', className: 'bg-amber-50 text-amber-700 border-amber-100' },
-  FEEDBACK: { label: 'Feedback', className: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100' },
-  SALES: { label: 'Sales', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
-  GENERAL: { label: 'General', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-  SPAM: { label: 'Spam', className: 'bg-rose-50 text-rose-700 border-rose-100' },
+const TAG_META: Record<ConversationTag, { label: string; className: string; activeBg: string; activeText: string; activeBorder: string }> = {
+  SUPPORT:  { label: 'Suporte',  className: 'bg-blue-50 text-blue-700 border-blue-100',      activeBg: '#eff6ff', activeText: '#1d4ed8', activeBorder: '#bfdbfe' },
+  BILLING:  { label: 'Cobrança', className: 'bg-amber-50 text-amber-700 border-amber-100',   activeBg: '#fffbeb', activeText: '#92400e', activeBorder: '#fde68a' },
+  FEEDBACK: { label: 'Feedback', className: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100', activeBg: '#fdf4ff', activeText: '#7e22ce', activeBorder: '#e9d5ff' },
+  SALES:    { label: 'Vendas',   className: 'bg-emerald-50 text-emerald-700 border-emerald-100', activeBg: '#f0fdf4', activeText: '#15803d', activeBorder: '#bbf7d0' },
+  GENERAL:  { label: 'Geral',    className: 'bg-slate-100 text-slate-700 border-slate-200',   activeBg: '#f8fafc', activeText: '#475569', activeBorder: '#e2e8f0' },
+  SPAM:     { label: 'Spam',     className: 'bg-rose-50 text-rose-700 border-rose-100',       activeBg: '#fff1f2', activeText: '#be123c', activeBorder: '#fecdd3' },
 };
 
 function waitingTime(lastMessageDate: string | undefined, isUnread: boolean): { label: string; color: string; slaBreached: boolean } | null {
@@ -158,7 +158,7 @@ function ChannelBadge({ channel, compact = false }: { channel: ChannelType; comp
   );
 }
 
-function TagSelect({
+function TagPills({
   value,
   onChange,
 }: {
@@ -166,18 +166,25 @@ function TagSelect({
   onChange: (value: ConversationTag | null) => void;
 }) {
   return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange((e.target.value || null) as ConversationTag | null)}
-      className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white"
-    >
-      <option value="">No tag</option>
-      {TAG_OPTIONS.map((tag) => (
-        <option key={tag} value={tag}>
-          {TAG_META[tag].label}
-        </option>
-      ))}
-    </select>
+    <div className="flex flex-wrap gap-1.5">
+      {TAG_OPTIONS.map((tag) => {
+        const m = TAG_META[tag];
+        const active = value === tag;
+        return (
+          <button
+            key={tag}
+            onClick={() => onChange(active ? null : tag)}
+            className="rounded-full px-3 py-1 text-[11px] font-semibold border transition-all cursor-pointer"
+            style={active
+              ? { background: m.activeBg, color: m.activeText, borderColor: m.activeBorder }
+              : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }
+            }
+          >
+            {m.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -249,12 +256,12 @@ export default function ChatPage() {
   const hasActiveFilters = Boolean(searchQuery.trim()) || selectedChannel !== 'ALL' || selectedTag !== 'ALL';
   const selectedTagLabel = selectedTag === 'ALL' ? null : TAG_META[selectedTag].label;
   const emptyStateMessage = !hasActiveFilters
-    ? 'No conversations yet'
+    ? 'Nenhuma conversa ainda'
     : selectedTag !== 'ALL'
-      ? `No conversations match the ${selectedTagLabel} tag with the current filters`
+      ? `Nenhuma conversa com a tag ${selectedTagLabel} nos filtros atuais`
       : selectedChannel !== 'ALL'
-        ? `No conversations match the ${getChannelMeta(selectedChannel).label} channel with the current filters`
-        : 'No conversations match the current filters';
+        ? `Nenhuma conversa no canal ${getChannelMeta(selectedChannel).label} com os filtros atuais`
+        : 'Nenhuma conversa corresponde aos filtros atuais';
 
   const filteredConversations = sortedConversations.filter((c) => {
     const q = searchQuery.trim().toLowerCase();
@@ -415,8 +422,14 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="h-16 border-b border-[#E9ECEF] bg-white shrink-0 flex items-center px-6">
-        <span className="text-[18px] font-semibold text-slate-900">Messages</span>
+      <header className="h-14 border-b border-[#E9ECEF] bg-white shrink-0 flex items-center px-5 gap-2.5">
+        <span className="material-symbols-outlined text-[20px] text-[#7C4DFF]" style={{ fontVariationSettings: "'FILL' 1" }}>chat_bubble</span>
+        <span className="text-[16px] font-bold text-slate-900">Mensagens</span>
+        {conversations.filter(c => c.is_unread).length > 0 && (
+          <div className="ml-2 bg-[#eef2ff] text-[#4338ca] border border-[#c7d2fe] rounded-full px-2.5 py-0.5 text-[11px] font-bold">
+            {conversations.filter(c => c.is_unread).length} não lidas
+          </div>
+        )}
       </header>
 
       {/* Connection state banner — P0-2 */}
@@ -476,7 +489,7 @@ export default function ChatPage() {
               <span className="material-symbols-outlined ml-sm text-outline">search</span>
               <input
                 className="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm outline-none"
-                placeholder="Search conversations..."
+                placeholder="Buscar conversas…"
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -493,7 +506,7 @@ export default function ChatPage() {
                       : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
                   )}
                 >
-                  All Channels
+                  Todos
                 </button>
                 {availableChannels.map((channel) => (
                   <button
@@ -520,7 +533,7 @@ export default function ChatPage() {
                       : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
                   )}
                 >
-                  All Tags
+                  Todas tags
                 </button>
                 {TAG_OPTIONS.map((tag) => (
                   <button
@@ -566,7 +579,7 @@ export default function ChatPage() {
                     }}
                     className="mt-3 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-800"
                   >
-                    Clear filters
+                    Limpar filtros
                   </button>
                 )}
               </div>
@@ -714,8 +727,8 @@ export default function ChatPage() {
                           <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
                           <span className="text-[10px] font-semibold text-orange-700">
                             {activeViewers.length === 1
-                              ? `${activeViewers[0]} is viewing`
-                              : `${activeViewers.length} viewing`}
+                              ? `${activeViewers[0]} visualizando`
+                              : `${activeViewers.length} visualizando`}
                           </span>
                         </span>
                       )}
@@ -729,14 +742,14 @@ export default function ChatPage() {
                     onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
                     className={cn(
                       "text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-100",
-                      activeConversation.status === 'OPEN' && "bg-orange-50 text-orange-700 border-orange-200",
+                      activeConversation.status === 'OPEN' && "bg-[#fdf4ff] text-[#7C4DFF] border-[#e9d5ff]",
                       activeConversation.status === 'PENDING' && "bg-yellow-50 text-yellow-700 border-yellow-200",
-                      activeConversation.status === 'CLOSED' && "bg-slate-100 text-slate-500 border-slate-200"
+                      activeConversation.status === 'CLOSED' && "bg-emerald-50 text-emerald-700 border-emerald-200"
                     )}
                   >
-                    <option value="OPEN">Open</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="CLOSED">Closed</option>
+                    <option value="OPEN">Aberto</option>
+                    <option value="PENDING">Pendente</option>
+                    <option value="CLOSED">Fechado</option>
                   </select>
                   {/* AI toggle — desktop */}
                   <button
@@ -792,12 +805,13 @@ export default function ChatPage() {
                       </div>
                       
                       <div className={cn(
-                        "p-md rounded-xl text-body-md shadow-sm",
+                        "px-3.5 py-2.5 text-body-md shadow-sm",
                         !msg.inbound
-                          ? "bg-indigo-600 rounded-tr-sm text-white"
-                          : "bg-surface-container-lowest border border-outline-variant rounded-tl-sm text-on-surface",
+                          ? "bg-[#4f46e5] text-white"
+                          : "bg-white border border-[#E9ECEF] text-on-surface",
                         sendStatus[msg.id] === 'failed' && "opacity-60 border-red-300"
-                      )}>
+                      )}
+                      style={{ borderRadius: msg.inbound ? '4px 14px 14px 14px' : '14px 4px 14px 14px' }}>
                         <p>{msg.content}</p>
                         {msg.image && <img src={msg.image} alt="Attachment" className="mt-2 rounded-lg max-w-xs cursor-zoom-in" />}
                         {msg.message_type === 'audio' && msg.file && (
@@ -837,6 +851,17 @@ export default function ChatPage() {
                           </div>
                         )}
                       </div>
+                      {!msg.inbound && sendStatus[msg.id] !== 'failed' && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="material-symbols-outlined text-[13px]"
+                            style={{ fontVariationSettings: "'FILL' 1", color: msg.delivery_status === 'read' ? '#7C4DFF' : '#94a3b8' }}>
+                            {msg.delivery_status === 'read' ? 'done_all' : 'done'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {msg.delivery_status === 'read' ? 'Lido' : 'Entregue'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1250,14 +1275,14 @@ export default function ChatPage() {
                     {/* Tag */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Conversation Tag</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tag da conversa</p>
                         {activeConversation.tag && <TagBadge tag={activeConversation.tag} />}
                       </div>
-                      <TagSelect
+                      <TagPills
                         value={activeConversation.tag}
-                        onChange={(tag) => updateConversation(activeConversation.id, { tag })}
+                        onChange={(tag: ConversationTag | null) => updateConversation(activeConversation.id, { tag })}
                       />
-                      <p className="mt-1.5 text-[10px] text-slate-400">One tag per conversation in this release.</p>
+                      <p className="mt-1.5 text-[10px] text-slate-400">Uma tag por conversa nesta versão.</p>
                     </div>
                   </div>
                 )}

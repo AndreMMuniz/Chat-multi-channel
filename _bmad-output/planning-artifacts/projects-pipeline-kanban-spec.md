@@ -102,7 +102,7 @@ This epic should treat these as **pipeline card fields**, even if backend persis
 
 ## Initial Pipeline Stages
 
-The mock suggests a sales-oriented funnel. The first release may use these initial columns:
+The mock suggests a sales-oriented funnel. The first release should use these official columns:
 
 - `Lead`
 - `Qualification`
@@ -110,7 +110,11 @@ The mock suggests a sales-oriented funnel. The first release may use these initi
 - `Negotiation`
 - `Closed`
 
-These should be treated as configurable in the future, but they can be fixed for the first implementation.
+These stages are the official first-release vocabulary for both frontend and backend.
+
+- They should remain fixed in the first backend release.
+- They may become configurable in the future.
+- Message-originated projects still use this same commercial pipeline vocabulary for now.
 
 ---
 
