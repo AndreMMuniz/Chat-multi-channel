@@ -72,6 +72,25 @@ class ProjectStageUpdate(BaseModel):
     stage: str = Field(..., min_length=1, max_length=50)
 
 
+class ProjectFromMessageCreate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    stage: str = Field(default="lead", min_length=1, max_length=50)
+    priority: ProjectPriority = ProjectPriority.MEDIUM
+    owner_user_id: Optional[UUID] = None
+    due_date: Optional[datetime] = None
+    value: Optional[int] = None
+    progress: int = 0
+    tag: Optional[str] = None
+
+    @field_validator("progress")
+    @classmethod
+    def validate_progress(cls, value: int) -> int:
+        if value < 0 or value > 100:
+            raise ValueError("Progress must be between 0 and 100")
+        return value
+
+
 class ProjectStageResponse(BaseModel):
     key: str
     label: str

@@ -10,6 +10,8 @@ from app.models.models import (
     Conversation,
     ConversationStatus,
     DefaultRole,
+    Message,
+    MessageType,
     OFFICIAL_PROJECT_STAGES,
     Project,
     ProjectPriority,
@@ -224,3 +226,61 @@ def test_reject_invalid_progress_and_missing_message_source(db):
     )
     assert source_response.status_code == 422
     assert source_response.json()["detail"]["error"]["code"] == "SOURCE_MESSAGE_REQUIRED"
+
+
+def test_create_project_from_message_hydrates_real_context(db):
+    user = _seed_user_and_stages(db)
+    contact = Contact(name="TechCorp")
+    db.add(contact)
+    db.flush()
+
+    conversation = Conversation(
+        contact_id=contact.id,
+        assigned_user_id=user.id,
+        channel=ChannelType.WHATSAPP,
+        status=ConversationStatus.OPEN,
+    )
+    db.add(conversation)
+    db.flush()
+
+    message = Message(
+        conversation_id=conversation.id,
+        owner_id=user.id,
+        content="Customer needs onboarding help this week",
+        inbound=True,
+        message_type=MessageType.TEXT,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    client = _make_client(db, user)
+    response = client.post(
+        f"/api/v1/admin/projects/from-message/{message.id}",
+        json={
+            "stage": "lead",
+            "priority": "high",
+            "progress": 15,
+            "tag": "onboarding",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["source_type"] == "message"
+    assert data["source_message_id"] == str(message.id)
+    assert data["conversation_id"] == str(conversation.id)
+    assert data["contact_name"] == "TechCorp"
+    assert data["channel"] == "whatsapp"
+    assert data["description"] == "Customer needs onboarding help this week"
+
+
+def test_create_project_from_message_rejects_unknown_message(db):
+    user = _seed_user_and_stages(db)
+    client = _make_client(db, user)
+
+    response = client.post(
+        "/api/v1/admin/projects/from-message/6c4bcdd5-9b92-4470-931c-c1d9d0d4c8a0",
+        json={"stage": "lead", "priority": "medium", "progress": 10},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"]["code"] == "MESSAGE_NOT_FOUND"

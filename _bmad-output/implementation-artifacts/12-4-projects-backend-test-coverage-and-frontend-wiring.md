@@ -1,6 +1,6 @@
 # Story 12.4: Projects Backend Test Coverage and Frontend Wiring
 
-**Status:** ready-for-dev  
+**Status:** done  
 **Epic:** 12 — Projects Backend Foundation  
 **Story Points:** 5  
 **Priority:** High  

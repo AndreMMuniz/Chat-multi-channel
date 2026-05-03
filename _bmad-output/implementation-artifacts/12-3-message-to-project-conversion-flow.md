@@ -1,6 +1,6 @@
 # Story 12.3: Message-to-Project Conversion Flow
 
-**Status:** ready-for-dev  
+**Status:** done  
 **Epic:** 12 — Projects Backend Foundation  
 **Story Points:** 5  
 **Priority:** High  

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-02  # story 12.2 implemented; projects CRUD API and filters available
+last_updated: 2026-05-02  # story 12.3 implemented; message-to-project backend flow available
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -213,11 +213,11 @@ development_status:
   # Source: party mode backend roundtable 2026-05-02 + Epic 11 frontend implementation
   # Scope: persisted project domain, official stages, CRUD/filter APIs,
   #        message-to-project conversion, tests, frontend wiring
-  epic-12: in-progress
+  epic-12: done
 
   12-1-project-domain-model-and-stage-persistence: done
   12-2-projects-crud-api-and-filters: done
-  12-3-message-to-project-conversion-flow: ready-for-dev
-  12-4-projects-backend-test-coverage-and-frontend-wiring: ready-for-dev
+  12-3-message-to-project-conversion-flow: done
+  12-4-projects-backend-test-coverage-and-frontend-wiring: done
 
   epic-12-retrospective: optional

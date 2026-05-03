@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaCommentDots, FaWhatsapp } from "react-icons/fa";
 import { FaGlobe, FaTelegram } from "react-icons/fa6";
 import { MdOutlineEmail, MdSms } from "react-icons/md";
 import Modal from "@/components/shared/Modal";
 import { useAuth } from "@/hooks/useAuth";
+import { projectsApi } from "@/lib/api";
+import type { ProjectCreateRequest, ProjectDto, ProjectUpdateRequest } from "@/types/project";
 
 type ViewId = "kanban" | "list" | "timeline";
 type StageId = "lead" | "qualification" | "proposal" | "negotiation" | "closed";
@@ -36,8 +38,11 @@ type ProjectCard = {
   dueDate: string;
   progress: number;
   ownerId: string;
+  ownerName?: string;
   value: number;
   sourceMessage?: string;
+  sourceMessageId?: string;
+  sourceConversationId?: string;
 };
 
 type ProjectFormState = {
@@ -56,7 +61,11 @@ type ProjectFormState = {
   ownerId: string;
   value: string;
   sourceMessage: string;
+  sourceMessageId: string;
+  sourceConversationId: string;
 };
+
+type StageOption = { id: StageId; label: string; accent: string; surface: string };
 
 const VIEW_OPTIONS: Array<{ id: ViewId; label: string; icon: string }> = [
   { id: "kanban", label: "Kanban", icon: "view_kanban" },
@@ -64,7 +73,7 @@ const VIEW_OPTIONS: Array<{ id: ViewId; label: string; icon: string }> = [
   { id: "timeline", label: "Timeline", icon: "timeline" },
 ];
 
-const STAGES: Array<{ id: StageId; label: string; accent: string; surface: string }> = [
+const STAGES: StageOption[] = [
   { id: "lead", label: "Lead", accent: "bg-slate-400", surface: "from-slate-100 to-slate-50" },
   { id: "qualification", label: "Qualification", accent: "bg-indigo-500", surface: "from-indigo-100 to-indigo-50" },
   { id: "proposal", label: "Proposal", accent: "bg-amber-500", surface: "from-amber-100 to-amber-50" },
@@ -124,11 +133,9 @@ const ORIGIN_META: Record<OriginId, { label: string; className: string; icon: Ic
   manual: { label: "Manual", className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200", icon: FaGlobe },
 };
 
-const INITIAL_PROJECT_CARDS: ProjectCard[] = [];
-
 const TAG_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   upsell:    { bg: "bg-fuchsia-50",  text: "text-fuchsia-700", border: "border-fuchsia-100" },
-  renovação: { bg: "bg-blue-50",     text: "text-blue-700",    border: "border-blue-100"    },
+  renewal:   { bg: "bg-blue-50",     text: "text-blue-700",    border: "border-blue-100"    },
   novo:      { bg: "bg-emerald-50",  text: "text-emerald-700", border: "border-emerald-100" },
   enterprise:{ bg: "bg-orange-50",   text: "text-orange-700",  border: "border-orange-100"  },
   onboarding:{ bg: "bg-indigo-50",   text: "text-indigo-700",  border: "border-indigo-100"  },
@@ -159,6 +166,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(date: string) {
+  if (!date) return "No due date";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -166,6 +174,7 @@ function formatDate(date: string) {
 }
 
 function isOverdue(date: string) {
+  if (!date) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return new Date(`${date}T00:00:00`) < today;
@@ -191,6 +200,73 @@ function getInitials(fullName: string) {
   );
 }
 
+function normalizeTagLabel(value: string) {
+  return value
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeTagValue(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+}
+
+function toApiChannel(channel: ChannelId): "whatsapp" | "telegram" | "email" | "sms" | "web" {
+  return channel.toLowerCase() as "whatsapp" | "telegram" | "email" | "sms" | "web";
+}
+
+function fromApiChannel(channel?: string | null): ChannelId {
+  const normalized = channel?.toUpperCase();
+  if (normalized && normalized in CHANNEL_META) {
+    return normalized as ChannelId;
+  }
+  return "WEB";
+}
+
+function toApiDateTime(date: string) {
+  return date ? `${date}T00:00:00Z` : null;
+}
+
+function mapStageOptions(stages: Array<{ key: string; label: string }>): StageOption[] {
+  const visuals = new Map(STAGES.map((stage) => [stage.id, stage]));
+  return stages
+    .map((stage) => {
+      const visual = visuals.get(stage.key as StageId);
+      return visual
+        ? { ...visual, label: stage.label }
+        : null;
+    })
+    .filter((stage): stage is StageOption => Boolean(stage));
+}
+
+function adaptProject(project: ProjectDto): ProjectCard {
+  const normalizedTag = project.tag ? normalizeTagValue(project.tag) : "";
+
+  return {
+    id: project.id,
+    reference: project.reference,
+    title: project.title,
+    contact: project.contact_name?.trim() || "No contact",
+    workType: project.tag ? normalizeTagLabel(project.tag) : project.source_type === "message" ? "Demand" : "Project",
+    stage: project.stage,
+    channel: fromApiChannel(project.channel),
+    priority: project.priority,
+    origin: project.source_type,
+    tags: normalizedTag ? [normalizedTag] : [],
+    dueDate: project.due_date ? project.due_date.slice(0, 10) : "",
+    progress: project.progress,
+    ownerId: project.owner_id ?? "",
+    ownerName: project.owner_name ?? undefined,
+    value: project.value ?? 0,
+    sourceMessage: project.source_type === "message" ? project.description ?? "" : "",
+    sourceMessageId: project.source_message_id ?? undefined,
+    sourceConversationId: project.conversation_id ?? undefined,
+  };
+}
+
 function toFormState(card: ProjectCard): ProjectFormState {
   return {
     id: card.id,
@@ -208,6 +284,8 @@ function toFormState(card: ProjectCard): ProjectFormState {
     ownerId: card.ownerId,
     value: String(card.value),
     sourceMessage: card.sourceMessage ?? "",
+    sourceMessageId: card.sourceMessageId ?? "",
+    sourceConversationId: card.sourceConversationId ?? "",
   };
 }
 
@@ -228,6 +306,8 @@ function createEmptyForm(cards: ProjectCard[], owners: Owner[], overrides?: Part
     ownerId: owners[0]?.id ?? "",
     value: "",
     sourceMessage: "",
+    sourceMessageId: "",
+    sourceConversationId: "",
     ...overrides,
   };
 }
@@ -252,6 +332,8 @@ function fromFormState(form: ProjectFormState): ProjectCard {
     ownerId: form.ownerId,
     value: Number(form.value || 0),
     sourceMessage: form.origin === "message" ? form.sourceMessage.trim() : "",
+    sourceMessageId: form.sourceMessageId || undefined,
+    sourceConversationId: form.sourceConversationId || undefined,
   };
 }
 
@@ -408,6 +490,8 @@ function ProjectModal({
   onDelete,
   owners,
   isEditing,
+  stages,
+  isSaving,
 }: {
   form: ProjectFormState;
   setForm: React.Dispatch<React.SetStateAction<ProjectFormState | null>>;
@@ -416,6 +500,8 @@ function ProjectModal({
   onDelete?: () => void;
   owners: Owner[];
   isEditing: boolean;
+  stages: StageOption[];
+  isSaving: boolean;
 }) {
   return (
     <Modal title={isEditing ? "Edit Project" : "New Project"} onClose={onClose} maxWidth="max-w-3xl">
@@ -429,7 +515,7 @@ function ProjectModal({
           <label className="flex flex-col gap-2">
             <FieldLabel label="Stage" />
             <FieldSelect value={form.stage} onChange={(e) => setForm((current) => current ? { ...current, stage: e.target.value as StageId } : current)}>
-              {STAGES.map((stage) => (
+              {stages.map((stage) => (
                 <option key={stage.id} value={stage.id}>
                   {stage.label}
                 </option>
@@ -552,12 +638,17 @@ function ProjectModal({
 
           {form.origin === "message" ? (
             <label className="flex flex-col gap-2 md:col-span-2">
-              <FieldLabel label="Source message summary" />
+              <FieldLabel label="Demand summary" />
               <FieldTextArea
                 value={form.sourceMessage}
                 onChange={(e) => setForm((current) => current ? { ...current, sourceMessage: e.target.value } : current)}
-                placeholder="Describe the demand that came from the conversation..."
+                placeholder="Use the Messages workspace to create real message-origin projects with preserved provenance."
               />
+              {!isEditing ? (
+                <p className="text-xs leading-5 text-slate-500">
+                  Message-origin projects must be created from Messages so the source message and conversation stay linked.
+                </p>
+              ) : null}
             </label>
           ) : null}
         </div>
@@ -567,11 +658,14 @@ function ProjectModal({
             {isEditing && onDelete && (
               <button
                 type="button"
-                onClick={() => { if (window.confirm("Excluir este projeto? Esta ação não pode ser desfeita.")) onDelete(); }}
+                disabled={isSaving}
+                onClick={() => {
+                  if (window.confirm("Delete this project? This action cannot be undone.")) onDelete();
+                }}
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
-                Excluir
+                Delete
               </button>
             )}
           </div>
@@ -579,16 +673,18 @@ function ProjectModal({
             <button
               type="button"
               onClick={onClose}
+              disabled={isSaving}
               className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"
               onClick={onSave}
+              disabled={isSaving}
               className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
             >
-              {isEditing ? "Salvar alterações" : "Criar projeto"}
+              {isSaving ? "Saving..." : isEditing ? "Save changes" : "Create project"}
             </button>
           </div>
         </div>
@@ -600,7 +696,15 @@ function ProjectModal({
 const DAY_PX = 30;
 const GANTT_WEEKS = 8;
 
-function GanttView({ cards, onCardClick }: { cards: ProjectCard[]; onCardClick: (c: ProjectCard) => void }) {
+function GanttView({
+  cards,
+  onCardClick,
+  stages,
+}: {
+  cards: ProjectCard[];
+  onCardClick: (c: ProjectCard) => void;
+  stages: StageOption[];
+}) {
   const today = new Date();
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() - 7);
@@ -623,20 +727,20 @@ function GanttView({ cards, onCardClick }: { cards: ProjectCard[]; onCardClick: 
     return { left: Math.max(0, leftDays * DAY_PX), width: Math.max(80, spanDays * DAY_PX) };
   }
 
-  const stage = (card: ProjectCard) => STAGES.find((s) => s.id === card.stage);
+  const stage = (card: ProjectCard) => stages.find((s) => s.id === card.stage);
 
   return (
     <div className="overflow-hidden rounded-[20px] border border-[#DCE4EF] bg-white shadow-sm">
       {/* Header */}
       <div className="flex border-b border-[#DCE4EF]">
         <div className="w-52 shrink-0 border-r border-[#DCE4EF] px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-          Projeto
+          Project
         </div>
         <div className="overflow-x-auto flex-1">
           <div className="flex" style={{ minWidth: totalDays * DAY_PX }}>
             {weeks.map((w, i) => (
               <div key={i} className="border-r border-slate-100 px-2 py-2 text-[10px] font-semibold text-slate-400" style={{ width: 7 * DAY_PX }}>
-                {w.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                {w.toLocaleDateString("en-US", { day: "2-digit", month: "short" })}
               </div>
             ))}
           </div>
@@ -690,7 +794,8 @@ function GanttView({ cards, onCardClick }: { cards: ProjectCard[]; onCardClick: 
 export default function ProjectsPage() {
   const { user } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("kanban");
-  const [cards, setCards] = useState<ProjectCard[]>(INITIAL_PROJECT_CARDS);
+  const [cards, setCards] = useState<ProjectCard[]>([]);
+  const [stageOptions, setStageOptions] = useState<StageOption[]>(STAGES);
   const [form, setForm] = useState<ProjectFormState | null>(null);
   const [dragState, setDragState] = useState<{ cardId: string; fromStage: StageId } | null>(null);
   const [dragOverStage, setDragOverStage] = useState<StageId | null>(null);
@@ -699,20 +804,68 @@ export default function ProjectsPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityId | "ALL">("ALL");
   const [channelFilter, setChannelFilter] = useState<ChannelId | "ALL">("ALL");
   const [originFilter, setOriginFilter] = useState<OriginId | "ALL">("ALL");
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const owners = useMemo<Owner[]>(() => {
-    if (!user) return [];
+    const ownerMap = new Map<string, Owner>();
 
-    return [
-      {
+    for (const card of cards) {
+      if (!card.ownerId || !card.ownerName) continue;
+      ownerMap.set(card.ownerId, {
+        id: card.ownerId,
+        name: card.ownerName,
+        initials: getInitials(card.ownerName),
+        tint: "bg-indigo-100",
+        text: "text-indigo-700",
+      });
+    }
+
+    if (user && !ownerMap.has(user.id)) {
+      ownerMap.set(user.id, {
         id: user.id,
         name: user.full_name,
         initials: getInitials(user.full_name),
         tint: "bg-indigo-100",
         text: "text-indigo-700",
-      },
-    ];
-  }, [user]);
+      });
+    }
+
+    return [...ownerMap.values()];
+  }, [cards, user]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProjectsWorkspace() {
+      try {
+        setIsLoading(true);
+        setErrorMessage(null);
+
+        const [stagesResponse, projectsResponse] = await Promise.all([
+          projectsApi.getProjectStages(),
+          projectsApi.listProjects(),
+        ]);
+
+        if (!isMounted) return;
+
+        setStageOptions(mapStageOptions(stagesResponse));
+        setCards(projectsResponse.data.map(adaptProject));
+      } catch (error) {
+        if (!isMounted) return;
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load projects workspace.");
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    void loadProjectsWorkspace();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
@@ -749,11 +902,11 @@ export default function ProjectsPage() {
   }, [cards, channelFilter, originFilter, ownerFilter, priorityFilter, searchQuery]);
 
   const cardsByStage = useMemo(() => {
-    return STAGES.reduce<Record<StageId, ProjectCard[]>>((acc, stage) => {
+    return stageOptions.reduce<Record<StageId, ProjectCard[]>>((acc, stage) => {
       acc[stage.id] = filteredCards.filter((card) => card.stage === stage.id);
       return acc;
     }, {} as Record<StageId, ProjectCard[]>);
-  }, [filteredCards]);
+  }, [filteredCards, stageOptions]);
 
   const kpis = useMemo(() => {
     const activeProjects = filteredCards.filter((card) => card.progress < 100).length;
@@ -795,7 +948,12 @@ export default function ProjectsPage() {
   }, [filteredCards]);
 
   const timelineCards = useMemo(() => {
-    return [...filteredCards].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    return [...filteredCards].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
   }, [filteredCards]);
 
   const clearFilters = () => {
@@ -816,42 +974,87 @@ export default function ProjectsPage() {
     setForm(toFormState(card));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form) return;
 
     const normalized = fromFormState(form);
+    const primaryTag = normalized.tags[0] ?? normalizeTagValue(form.workType || "");
 
     if (!normalized.title || !normalized.contact || !normalized.workType) {
       return;
     }
 
-    setCards((current) => {
+    if (!form.id && normalized.origin === "message" && !normalized.sourceMessageId) {
+      setErrorMessage("Create message-origin projects from the Messages workspace so provenance is preserved.");
+      return;
+    }
+
+    const payload: ProjectCreateRequest = {
+      title: normalized.title,
+      description: normalized.origin === "message" ? normalized.sourceMessage || normalized.workType : normalized.workType,
+      stage: normalized.stage,
+      status: normalized.stage === "closed" ? "done" : "open",
+      priority: normalized.priority,
+      source_type: normalized.origin,
+      source_message_id: normalized.sourceMessageId ?? null,
+      source_conversation_id: normalized.sourceConversationId ?? null,
+      contact_name: normalized.contact,
+      channel: toApiChannel(normalized.channel),
+      tag: primaryTag || null,
+      owner_user_id: normalized.ownerId || null,
+      due_date: toApiDateTime(normalized.dueDate),
+      value: normalized.value,
+      progress: normalized.progress,
+    };
+
+    try {
+      setIsSaving(true);
+      setErrorMessage(null);
+
       if (form.id) {
-        return current.map((card) => (card.id === form.id ? normalized : card));
+        const updated = await projectsApi.updateProject(form.id, payload as ProjectUpdateRequest);
+        setCards((current) => current.map((card) => (card.id === form.id ? adaptProject(updated) : card)));
+      } else {
+        const created = await projectsApi.createProject(payload);
+        setCards((current) => [adaptProject(created), ...current]);
       }
 
-      return [normalized, ...current];
-    });
-
-    setForm(null);
+      setForm(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save project.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!form?.id) return;
-    setCards((current) => current.filter((card) => card.id !== form.id));
-    setForm(null);
+    try {
+      setIsSaving(true);
+      setErrorMessage(null);
+      await projectsApi.deleteProject(form.id);
+      setCards((current) => current.filter((card) => card.id !== form.id));
+      setForm(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete project.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDragStart = (cardId: string, stageId: StageId) => {
     setDragState({ cardId, fromStage: stageId });
   };
 
-  const handleDrop = (targetStage: StageId) => {
+  const handleDrop = async (targetStage: StageId) => {
     if (!dragState) return;
+
+    const cardId = dragState.cardId;
+    const previousCards = cards;
 
     setCards((current) =>
       current.map((card) =>
-        card.id === dragState.cardId
+        card.id === cardId
           ? {
               ...card,
               stage: targetStage,
@@ -860,12 +1063,20 @@ export default function ProjectsPage() {
       )
     );
 
-    if (form?.id === dragState.cardId) {
+    if (form?.id === cardId) {
       setForm((current) => (current ? { ...current, stage: targetStage } : current));
     }
 
     setDragState(null);
     setDragOverStage(null);
+
+    try {
+      const updated = await projectsApi.moveProjectStage(cardId, targetStage);
+      setCards((current) => current.map((card) => (card.id === cardId ? adaptProject(updated) : card)));
+    } catch (error) {
+      setCards(previousCards);
+      setErrorMessage(error instanceof Error ? error.message : "Failed to move project.");
+    }
   };
 
   return (
@@ -1051,7 +1262,32 @@ export default function ProjectsPage() {
             </div>
           </div>
 
-          {filteredCards.length === 0 ? (
+          {errorMessage ? (
+            <div className="mb-4 rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">Projects workspace error</p>
+                  <p className="mt-1 text-sm text-rose-600">{errorMessage}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setErrorMessage(null)}
+                  className="text-xs font-semibold text-rose-700 transition hover:text-rose-900"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isLoading ? (
+            <div className="rounded-[24px] border border-[#DCE4EF] bg-white p-8 shadow-sm">
+              <div className="flex items-center gap-3 text-sm text-slate-600">
+                <span className="material-symbols-outlined animate-spin text-[20px] text-indigo-600">progress_activity</span>
+                Loading projects workspace...
+              </div>
+            </div>
+          ) : filteredCards.length === 0 ? (
             <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-indigo-700 shadow-sm">
                 <span
@@ -1069,6 +1305,15 @@ export default function ProjectsPage() {
                   ? "The Projects workspace is now clean and ready to be tested with real data."
                   : "Try widening the current filters or clear them to bring back the full pipeline workspace."}
               </p>
+              {cards.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => openNewProject()}
+                  className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  Create the first project
+                </button>
+              ) : null}
               {cards.length > 0 && hasActiveFilters ? (
                 <button
                   type="button"
@@ -1081,7 +1326,7 @@ export default function ProjectsPage() {
             </div>
           ) : activeView === "kanban" ? (
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {STAGES.map((stage) => {
+              {stageOptions.map((stage) => {
                 const stageCards = cardsByStage[stage.id];
                 const stageValue = stageCards.reduce((sum, card) => sum + card.value, 0);
                 const draggingOver = dragOverStage === stage.id;
@@ -1158,7 +1403,7 @@ export default function ProjectsPage() {
               <div className="divide-y divide-slate-200 bg-white">
                 {filteredCards.map((card) => {
                   const owner = owners.find((item) => item.id === card.ownerId);
-                  const stage = STAGES.find((item) => item.id === card.stage);
+                  const stage = stageOptions.find((item) => item.id === card.stage);
                   const origin = ORIGIN_META[card.origin];
                   const OriginIcon = origin.icon;
 
@@ -1203,7 +1448,7 @@ export default function ProjectsPage() {
               </div>
             </div>
           ) : (
-            <GanttView cards={timelineCards} onCardClick={openExistingProject} />
+            <GanttView cards={timelineCards} onCardClick={openExistingProject} stages={stageOptions} />
           )}
         </section>
       </div>
@@ -1217,6 +1462,8 @@ export default function ProjectsPage() {
           onSave={handleSave}
           onDelete={isEditing ? handleDelete : undefined}
           isEditing={isEditing}
+          stages={stageOptions}
+          isSaving={isSaving}
         />
       ) : null}
     </main>

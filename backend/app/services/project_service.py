@@ -2,12 +2,12 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from app.models.models import Project, ProjectSourceType, User
+from app.models.models import Conversation, Message, Project, ProjectSourceType, User
 from app.repositories.project_repo import ProjectRepository, ProjectStageRepository
 from app.schemas.common import create_error_response
-from app.schemas.project import ProjectCreate, ProjectUpdate
+from app.schemas.project import ProjectCreate, ProjectFromMessageCreate, ProjectUpdate
 
 
 class ProjectService:
@@ -70,6 +70,71 @@ class ProjectService:
         await self.ensure_stage_exists(stage_key)
         updated = await self.projects.update(project.id, {"stage": stage_key})
         return await self.projects.find_project(updated.id)
+
+    async def create_project_from_message(
+        self,
+        message_id: UUID,
+        payload: ProjectFromMessageCreate,
+        current_user: User,
+    ) -> Project:
+        await self.ensure_stage_exists(payload.stage)
+        if payload.owner_user_id:
+            await self.ensure_owner_exists(payload.owner_user_id)
+
+        message = (
+            self.db.query(Message)
+            .options(
+                joinedload(Message.conversation)
+                .joinedload(Conversation.contact)
+            )
+            .filter(Message.id == message_id)
+            .first()
+        )
+        if not message:
+            error_response, status = create_error_response(
+                code="MESSAGE_NOT_FOUND",
+                message="Message not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        conversation = message.conversation
+        if not conversation:
+            error_response, status = create_error_response(
+                code="CONVERSATION_REQUIRED",
+                message="Message is not linked to a valid conversation",
+                status_code=422,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        contact_name = None
+        if conversation.contact:
+            contact_name = conversation.contact.name or conversation.contact.email or conversation.contact.phone
+
+        title = payload.title or (contact_name and f"{contact_name} demand") or "Message demand"
+        description = payload.description or message.content
+
+        project = await self.projects.create(
+            {
+                "title": title,
+                "description": description,
+                "stage": payload.stage,
+                "status": "open",
+                "priority": payload.priority,
+                "source_type": ProjectSourceType.MESSAGE,
+                "source_message_id": message.id,
+                "source_conversation_id": conversation.id,
+                "contact_name": contact_name,
+                "channel": conversation.channel,
+                "tag": payload.tag,
+                "owner_user_id": payload.owner_user_id,
+                "created_by_user_id": current_user.id,
+                "due_date": payload.due_date,
+                "value": payload.value,
+                "progress": payload.progress,
+            }
+        )
+        return await self.projects.find_project(project.id)
 
 
 def serialize_project(project: Project) -> dict:

@@ -11,6 +11,7 @@ from app.models.models import Project, User
 from app.schemas.common import create_error_response, create_paginated_response, create_response
 from app.schemas.project import (
     ProjectCreate,
+    ProjectFromMessageCreate,
     ProjectResponse,
     ProjectStageResponse,
     ProjectStageUpdate,
@@ -84,6 +85,19 @@ async def create_project(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     project = await ProjectService(db).create_project(payload, current_user)
+    return create_response(ProjectResponse.model_validate(serialize_project(project)))
+
+
+@router.post("/projects/from-message/{message_id}")
+@limiter.limit("60/minute")
+async def create_project_from_message(
+    request: Request,
+    message_id: UUID,
+    payload: ProjectFromMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    project = await ProjectService(db).create_project_from_message(message_id, payload, current_user)
     return create_response(ProjectResponse.model_validate(serialize_project(project)))
 
 
