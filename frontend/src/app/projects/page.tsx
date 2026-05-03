@@ -488,6 +488,7 @@ function ProjectModal({
   setForm,
   onClose,
   onSave,
+  onOpenConversation,
   onDelete,
   owners,
   isEditing,
@@ -498,6 +499,7 @@ function ProjectModal({
   setForm: React.Dispatch<React.SetStateAction<ProjectFormState | null>>;
   onClose: () => void;
   onSave: () => void;
+  onOpenConversation?: () => void;
   onDelete?: () => void;
   owners: Owner[];
   isEditing: boolean;
@@ -656,6 +658,17 @@ function ProjectModal({
 
         <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
+            {form.origin === "message" && form.sourceConversationId && onOpenConversation ? (
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={onOpenConversation}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
+              >
+                <span className="material-symbols-outlined text-[16px]">forum</span>
+                Open source conversation
+              </button>
+            ) : null}
             {isEditing && onDelete && (
               <button
                 type="button"
@@ -976,6 +989,11 @@ export default function ProjectsPage() {
 
   const openExistingProject = (card: ProjectCard) => {
     setForm(toFormState(card));
+  };
+
+  const openSourceConversation = () => {
+    if (!form?.sourceConversationId) return;
+    router.push(`/?conversationId=${form.sourceConversationId}`);
   };
 
   useEffect(() => {
@@ -1482,6 +1500,7 @@ export default function ProjectsPage() {
           setForm={setForm}
           onClose={() => setForm(null)}
           onSave={handleSave}
+          onOpenConversation={openSourceConversation}
           onDelete={isEditing ? handleDelete : undefined}
           isEditing={isEditing}
           stages={stageOptions}

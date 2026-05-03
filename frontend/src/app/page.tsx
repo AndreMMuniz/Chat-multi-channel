@@ -1,8 +1,8 @@
 "use client";
 
 import Image from 'next/image';
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { startTransition, useState, useRef, useCallback, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { ChevronLeft } from 'lucide-react';
@@ -629,6 +629,7 @@ function DeleteMessageModal({
 
 export default function ChatPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -659,6 +660,7 @@ export default function ChatPage() {
   const [creatingQuickReply, setCreatingQuickReply] = useState(false);
   const [deleteMessageModal, setDeleteMessageModal] = useState<DeleteMessageState | null>(null);
   const [deletingMessage, setDeletingMessage] = useState(false);
+  const [handledQueryConversationId, setHandledQueryConversationId] = useState<string | null>(null);
 
   useEffect(() => {
     quickRepliesApi.listQuickReplies().then(r => setAllQuickReplies(r.data ?? [])).catch(() => {});
@@ -988,6 +990,26 @@ export default function ChatPage() {
     fetchAICached(conv.id);
     setMobileView('chat');
   }, [selectConversation, fetchMessages, subscribe, unsubscribe, activeConversationRef, fetchAICached, clearAI]);
+
+  useEffect(() => {
+    const queryConversationId = searchParams.get('conversationId');
+    if (!queryConversationId || handledQueryConversationId === queryConversationId || conversations.length === 0) return;
+
+    const targetConversation = conversations.find((conversation) => conversation.id === queryConversationId);
+    if (!targetConversation) return;
+
+    const timeout = window.setTimeout(() => {
+      startTransition(() => {
+        setHandledQueryConversationId(queryConversationId);
+      });
+      void handleSelectConversation(targetConversation);
+    }, 0);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('conversationId');
+    router.replace(nextParams.toString() ? `/?${nextParams.toString()}` : '/', { scroll: false });
+    return () => window.clearTimeout(timeout);
+  }, [conversations, handleSelectConversation, handledQueryConversationId, router, searchParams]);
 
   const handleMobileBack = useCallback(() => {
     if (isRecording) {
