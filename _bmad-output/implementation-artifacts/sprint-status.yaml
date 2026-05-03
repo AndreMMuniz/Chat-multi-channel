@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-02  # epic 12 backend planning added; official project stages confirmed
+last_updated: 2026-05-02  # story 12.1 implemented; projects backend foundation started
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -215,7 +215,7 @@ development_status:
   #        message-to-project conversion, tests, frontend wiring
   epic-12: in-progress
 
-  12-1-project-domain-model-and-stage-persistence: ready-for-dev
+  12-1-project-domain-model-and-stage-persistence: done
   12-2-projects-crud-api-and-filters: ready-for-dev
   12-3-message-to-project-conversion-flow: ready-for-dev
   12-4-projects-backend-test-coverage-and-frontend-wiring: ready-for-dev

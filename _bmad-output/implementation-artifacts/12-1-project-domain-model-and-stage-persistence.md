@@ -1,6 +1,6 @@
 # Story 12.1: Project Domain Model and Stage Persistence
 
-**Status:** ready-for-dev  
+**Status:** done  
 **Epic:** 12 — Projects Backend Foundation  
 **Story Points:** 5  
 **Priority:** High  

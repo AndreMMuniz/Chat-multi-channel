@@ -7,6 +7,10 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.core.encryption import EncryptedString
 
+
+def generate_project_reference() -> str:
+    return f"PRJ-{uuid.uuid4().hex[:8].upper()}"
+
 # Enums
 class ChannelType(enum.Enum):
     WHATSAPP = "whatsapp"
@@ -44,6 +48,32 @@ class DefaultRole(enum.Enum):
     ADMIN = "admin"
     MANAGER = "manager"
     USER = "user"
+
+
+class ProjectStatus(enum.Enum):
+    OPEN = "open"
+    DONE = "done"
+    ARCHIVED = "archived"
+
+
+class ProjectPriority(enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class ProjectSourceType(enum.Enum):
+    MANUAL = "manual"
+    MESSAGE = "message"
+
+
+OFFICIAL_PROJECT_STAGES = [
+    ("lead", "Lead", 1),
+    ("qualification", "Qualification", 2),
+    ("proposal", "Proposal", 3),
+    ("negotiation", "Negotiation", 4),
+    ("closed", "Closed", 5),
+]
 
 
 # --- RBAC Models ---
@@ -164,6 +194,7 @@ class Conversation(Base):
     assigned_user = relationship("User", foreign_keys=[assigned_user_id])
     messages = relationship("Message", back_populates="conversation")
     ai_suggestions = relationship("AISuggestion", back_populates="conversation")
+    source_projects = relationship("Project", back_populates="source_conversation")
 
 class Message(Base):
     __tablename__ = "messages"
@@ -198,6 +229,7 @@ class Message(Base):
 
     conversation = relationship("Conversation", back_populates="messages")
     owner = relationship("User", foreign_keys=[owner_id])
+    source_projects = relationship("Project", back_populates="source_message")
 
 class AISuggestion(Base):
     __tablename__ = "ai_suggestions"
@@ -259,3 +291,62 @@ class GeneralSettings(Base):
     twilio_phone_number = Column(String, nullable=True)
 
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class ProjectStage(Base):
+    __tablename__ = "project_stages"
+
+    key = Column(String(50), primary_key=True)
+    label = Column(String(100), nullable=False)
+    position = Column(Integer, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    projects = relationship("Project", back_populates="stage_definition")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reference_code = Column(String(32), nullable=False, unique=True, default=generate_project_reference)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    stage = Column(String(50), ForeignKey("project_stages.key"), nullable=False, default="lead")
+    status = Column(
+        Enum(ProjectStatus, values_callable=lambda obj: [e.value for e in obj], name="projectstatus"),
+        nullable=False,
+        default=ProjectStatus.OPEN,
+    )
+    priority = Column(
+        Enum(ProjectPriority, values_callable=lambda obj: [e.value for e in obj], name="projectpriority"),
+        nullable=False,
+        default=ProjectPriority.MEDIUM,
+    )
+    source_type = Column(
+        Enum(ProjectSourceType, values_callable=lambda obj: [e.value for e in obj], name="projectsourcetype"),
+        nullable=False,
+        default=ProjectSourceType.MANUAL,
+    )
+    source_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
+    source_conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=True)
+    contact_name = Column(String(255), nullable=True)
+    channel = Column(
+        Enum(ChannelType, values_callable=lambda obj: [e.value for e in obj], name="projectchanneltype"),
+        nullable=True,
+    )
+    tag = Column(String(100), nullable=True)
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    value = Column(Integer, nullable=True)
+    progress = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    stage_definition = relationship("ProjectStage", back_populates="projects")
+    owner = relationship("User", foreign_keys=[owner_user_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    source_conversation = relationship("Conversation", back_populates="source_projects")
+    source_message = relationship("Message", back_populates="source_projects")

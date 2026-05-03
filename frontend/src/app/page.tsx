@@ -389,7 +389,7 @@ export default function ChatPage() {
       setRecordingDuration(0);
       timerRef.current = setInterval(() => setRecordingDuration(p => p + 1), 1000);
     } catch {
-      alert('Microphone access denied or not available.');
+      alert('Acesso ao microfone negado ou indisponível.');
     }
   };
 
@@ -439,7 +439,7 @@ export default function ChatPage() {
           connectionState === 'reconnecting' ? "bg-yellow-50 text-yellow-700 border-b border-yellow-200" : "bg-red-50 text-red-700 border-b border-red-200"
         )}>
           <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-          {connectionState === 'connecting' ? 'Connecting to server…' : 'Connection lost — reconnecting…'}
+          {connectionState === 'connecting' ? 'Conectando ao servidor…' : 'Conexão perdida — reconectando…'}
         </div>
       )}
 
@@ -448,7 +448,7 @@ export default function ChatPage() {
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-amber-50 text-amber-800 border-b border-amber-200">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]">schedule</span>
-            <span><strong>{slaAlert.count}</strong> conversation{slaAlert.count !== 1 ? 's' : ''} unanswered for more than {slaAlert.threshold} min</span>
+            <span><strong>{slaAlert.count}</strong> conversa{slaAlert.count !== 1 ? 's' : ''} sem resposta há mais de {slaAlert.threshold} min</span>
           </div>
           <button onClick={() => setSlaAlert(null)} className="ml-2 text-amber-600 hover:text-amber-900">
             <span className="material-symbols-outlined text-[16px]">close</span>
@@ -461,7 +461,7 @@ export default function ChatPage() {
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 text-xs font-medium bg-red-50 text-red-800 border-b border-red-200">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[14px]">error</span>
-            <span><strong>{deliveryAlert.count}</strong> delivery failures on <strong className="uppercase">{deliveryAlert.channel}</strong> in the last few minutes</span>
+            <span><strong>{deliveryAlert.count}</strong> falha{deliveryAlert.count !== 1 ? 's' : ''} de entrega em <strong className="uppercase">{deliveryAlert.channel}</strong> nos últimos minutos</span>
           </div>
           <button onClick={() => setDeliveryAlert(null)} className="ml-2 text-red-600 hover:text-red-900">
             <span className="material-symbols-outlined text-[16px]">close</span>
@@ -654,7 +654,7 @@ export default function ChatPage() {
                       "font-body-sm text-body-sm truncate flex-1",
                       conv.is_unread ? "font-medium text-on-surface" : "text-outline"
                     )}>
-                      {conv.last_message || 'No messages'}
+                      {conv.last_message || 'Sem mensagens'}
                     </p>
                     {/* SLA risk indicator — Stories 3.2/3.3 */}
                     {(() => {
@@ -697,7 +697,7 @@ export default function ChatPage() {
                     data-testid="back-button"
                     onClick={handleMobileBack}
                     className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
-                    aria-label="Back to conversations"
+                    aria-label="Voltar às conversas"
                   >
                     <ChevronLeft size={22} />
                   </button>
@@ -753,7 +753,7 @@ export default function ChatPage() {
                   </select>
                   {/* AI toggle — desktop */}
                   <button
-                    title="AI Suggestions"
+                    title="Sugestões de IA"
                     onClick={() => setShowAIDesktop(v => !v)}
                     className={cn(
                       "hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors",
@@ -765,22 +765,22 @@ export default function ChatPage() {
                     <TbSparkles size={17} />
                   </button>
                   <button
-                    title="Mark as unread"
+                    title="Marcar como não lida"
                     onClick={() => updateConversation(activeConversation.id, { is_unread: true })}
                     className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[20px]">mark_email_unread</span>
                   </button>
                   <button
-                    title="Delete conversation"
+                    title="Excluir conversa"
                     onClick={async () => {
-                      if (!window.confirm('Delete this conversation and all its messages? This cannot be undone.')) return;
+                      if (!window.confirm('Excluir esta conversa e todas as mensagens? Esta ação não pode ser desfeita.')) return;
                       try {
                         await conversationsApi.deleteConversation(activeConversation.id);
                         handleMobileBack();
                         await fetchConversations();
                       } catch {
-                        alert('Failed to delete conversation. Check your permissions.');
+                        alert('Falha ao excluir conversa. Verifique suas permissões.');
                       }
                     }}
                     className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -797,7 +797,7 @@ export default function ChatPage() {
                     <div className={cn("flex flex-col gap-xs", !msg.inbound ? "items-end" : "")}>
                       <div className={cn("flex items-baseline gap-sm", !msg.inbound ? "flex-row-reverse" : "")}>
                         <span className="font-body-sm text-body-sm font-medium text-on-surface">
-                          {msg.inbound ? activeConversation.contact.name || 'User' : 'You'}
+                          {msg.inbound ? activeConversation.contact.name || 'Usuário' : 'Você'}
                         </span>
                         <span className="font-label-caps text-label-caps text-on-surface-variant font-normal">
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -828,8 +828,8 @@ export default function ChatPage() {
                         {(sendStatus[msg.id] === 'failed' || msg.delivery_status === 'failed') && (
                           <div className="mt-1.5 flex items-center gap-2 text-red-500 text-xs">
                             <span className="material-symbols-outlined text-[14px]">error</span>
-                            <span title={msg.delivery_error || 'Unknown error'}>
-                              Send failed
+                            <span title={msg.delivery_error || 'Erro desconhecido'}>
+                              Falha no envio
                               {msg.delivery_error && <span className="ml-1 opacity-60 font-mono">({msg.delivery_error.split(':').pop()})</span>}
                             </span>
                             {(msg.retry_count ?? 0) < 3 && (
@@ -837,11 +837,11 @@ export default function ChatPage() {
                                 onClick={() => retryMessage(msg.conversation_id, msg.id)}
                                 className="underline hover:text-red-700 transition-colors"
                               >
-                                Retry {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
+                                Tentar novamente {msg.retry_count ? `(${msg.retry_count}/3)` : ''}
                               </button>
                             )}
                             {(msg.retry_count ?? 0) >= 3 && (
-                              <span className="opacity-60">Retry limit reached</span>
+                              <span className="opacity-60">Limite de tentativas atingido</span>
                             )}
                           </div>
                         )}
@@ -854,11 +854,11 @@ export default function ChatPage() {
                       {!msg.inbound && sendStatus[msg.id] !== 'failed' && (
                         <div className="flex items-center gap-1 mt-0.5">
                           <span className="material-symbols-outlined text-[13px]"
-                            style={{ fontVariationSettings: "'FILL' 1", color: msg.delivery_status === 'read' ? '#7C4DFF' : '#94a3b8' }}>
-                            {msg.delivery_status === 'read' ? 'done_all' : 'done'}
+                            style={{ fontVariationSettings: "'FILL' 1", color: msg.delivery_status === 'delivered' ? '#7C4DFF' : '#94a3b8' }}>
+                            {msg.delivery_status === 'delivered' ? 'done_all' : 'done'}
                           </span>
                           <span className="text-[10px] text-slate-400">
-                            {msg.delivery_status === 'read' ? 'Lido' : 'Entregue'}
+                            {msg.delivery_status === 'delivered' ? 'Entregue' : 'Enviado'}
                           </span>
                         </div>
                       )}
@@ -884,7 +884,7 @@ export default function ChatPage() {
                   {allQuickReplies.length > 4 && (
                     <button className="shrink-0 flex items-center gap-1 h-7 px-3 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
                       <span className="material-symbols-outlined text-[14px]">more_horiz</span>
-                      More
+                      Mais
                     </button>
                   )}
                 </div>
@@ -933,8 +933,8 @@ export default function ChatPage() {
                   {isRecording ? (
                     <div className="flex-1 flex items-center gap-3 px-3 py-2 text-indigo-600">
                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                      <span className="text-sm font-semibold tabular-nums">Recording: {formatDuration(recordingDuration)}</span>
-                      <button onClick={() => { setIsRecording(false); if(timerRef.current) clearInterval(timerRef.current); }} className="ml-auto text-xs font-medium hover:underline">Cancel</button>
+                      <span className="text-sm font-semibold tabular-nums">Gravando: {formatDuration(recordingDuration)}</span>
+                      <button onClick={() => { setIsRecording(false); if(timerRef.current) clearInterval(timerRef.current); }} className="ml-auto text-xs font-medium hover:underline">Cancelar</button>
                     </div>
                   ) : (
                     <>
@@ -968,7 +968,7 @@ export default function ChatPage() {
                       <textarea
                         data-testid="message-input"
                         className="flex-1 bg-transparent border-none text-body-md text-on-surface focus:ring-0 outline-none resize-none py-sm pl-sm min-h-[40px] max-h-[120px] overflow-y-auto"
-                        placeholder="Type a message or / for quick replies…"
+                        placeholder="Digite uma mensagem ou / para respostas rápidas…"
                         rows={1}
                         value={input}
                         onFocus={() => setShowEmojiPicker(false)}
@@ -1007,7 +1007,7 @@ export default function ChatPage() {
                           ? "text-indigo-600 opacity-100"
                           : "text-indigo-600 opacity-40 hover:opacity-100"
                       )}
-                      aria-label="Get AI suggestion"
+                      aria-label="Sugestões de IA"
                     >
                       {aiGenerating || aiLoading
                         ? <span className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
@@ -1049,25 +1049,25 @@ export default function ChatPage() {
                       <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#7C3AED] to-indigo-600 flex items-center justify-center">
                         <span className="material-symbols-outlined text-[11px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
                       </div>
-                      <span className="text-[11px] font-bold text-[#7C3AED] uppercase tracking-wider">AI Suggestions</span>
+                      <span className="text-[11px] font-bold text-[#7C4DFF] uppercase tracking-wider">Sugestões de IA</span>
                       {(aiGenerating || aiLoading) && (
-                        <span className="w-3 h-3 border-2 border-[#7C3AED]/30 border-t-[#7C3AED] rounded-full animate-spin" />
+                        <span className="w-3 h-3 border-2 border-[#7C4DFF]/30 border-t-[#7C4DFF] rounded-full animate-spin" />
                       )}
                       {aiSource && aiGeneratedAt && (
                         <span className="text-[10px] text-slate-400">
-                          {aiSource === 'generated' ? 'Generated' : 'Cached'} · {aiGeneratedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {aiSource === 'generated' ? 'Gerado' : 'Cache'} · {aiGeneratedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
                     </div>
                     <button
                       onClick={() => generateAI(activeConversation!.id)}
                       disabled={aiGenerating || aiLoading}
-                      className="flex items-center gap-1.5 h-6 px-2.5 rounded-lg border border-[#e9d5ff] bg-white text-[11px] font-semibold text-[#7C3AED] hover:bg-[#f5f3ff] disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 h-6 px-2.5 rounded-lg border border-[#e9d5ff] bg-white text-[11px] font-semibold text-[#7C4DFF] hover:bg-[#f5f3ff] disabled:opacity-50 transition-colors"
                     >
                       <span className={cn("material-symbols-outlined text-[13px]", (aiGenerating || aiLoading) && "animate-spin")}>
                         {(aiGenerating || aiLoading) ? "progress_activity" : "refresh"}
                       </span>
-                      {(aiGenerating || aiLoading) ? 'Generating…' : 'Generate'}
+                      {(aiGenerating || aiLoading) ? 'Gerando…' : 'Gerar'}
                     </button>
                   </div>
                   <div className="px-3 pb-3 flex flex-col gap-2">
@@ -1077,10 +1077,10 @@ export default function ChatPage() {
                     {!aiGenerating && !aiLoading && suggestions.length === 0 && (
                       <button
                         onClick={() => generateAI(activeConversation!.id)}
-                        className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-xs text-slate-400 hover:border-[#7C3AED] hover:text-[#7C3AED] transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-xs text-slate-400 hover:border-[#7C4DFF] hover:text-[#7C4DFF] transition-colors flex items-center justify-center gap-2"
                       >
                         <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                        Generate AI suggestions
+                        Gerar sugestões de IA
                       </button>
                     )}
                     {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
@@ -1118,7 +1118,7 @@ export default function ChatPage() {
                       {/* Header */}
                       <div className="flex items-center gap-2 py-3 border-b border-slate-100 mb-3">
                         <TbSparkles size={16} className="text-indigo-600" />
-                        <span className="text-sm font-semibold text-indigo-600">AI Suggestions</span>
+                        <span className="text-sm font-semibold text-indigo-600">Sugestões de IA</span>
                         <button
                           onClick={() => setAiSheetOpen(false)}
                           className="ml-auto w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
@@ -1136,7 +1136,7 @@ export default function ChatPage() {
                           </div>
                         )}
                         {!aiGenerating && !aiLoading && suggestions.length === 0 && (
-                          <p className="text-sm text-slate-400 text-center py-4">No suggestions available</p>
+                          <p className="text-sm text-slate-400 text-center py-4">Nenhuma sugestão disponível</p>
                         )}
                         {!aiGenerating && !aiLoading && suggestions.map((s, i) => (
                           <button
@@ -1157,8 +1157,8 @@ export default function ChatPage() {
           ) : (
             <div className="flex-1 flex items-center justify-center text-slate-400">
               <div className="text-center">
-                <span className="material-symbols-outlined text-6xl mb-4 opacity-50">forum</span>
-                <p>Select a conversation to start messaging</p>
+                <span className="material-symbols-outlined text-6xl mb-4 opacity-50" style={{ color: '#c7d2fe' }}>chat_bubble_outline</span>
+                <p className="text-sm mt-2">Selecione uma conversa</p>
               </div>
             </div>
           )}
@@ -1171,9 +1171,9 @@ export default function ChatPage() {
               {/* Tab bar */}
               <div className="flex border-b border-outline-variant shrink-0">
                 {([
-                  ['contact', 'person', 'Contact'],
-                  ['details', 'info', 'Details'],
-                  ['history', 'history', 'History'],
+                  ['contact', 'person', 'Contato'],
+                  ['details', 'info', 'Detalhes'],
+                  ['history', 'history', 'Histórico'],
                 ] as const).map(([t, icon, label]) => (
                   <button
                     key={t}
@@ -1209,9 +1209,9 @@ export default function ChatPage() {
                     </div>
                     <div className="space-y-2.5 text-xs">
                       {[
-                        { label: 'Name', value: activeConversation.contact.name || '-' },
-                        { label: 'Identifier', value: activeConversation.contact.channel_identifier },
-                        { label: 'Channel', value: getChannelMeta(activeConversation.channel).label },
+                        { label: 'Nome', value: activeConversation.contact.name || '-' },
+                        { label: 'Identificador', value: activeConversation.contact.channel_identifier },
+                        { label: 'Canal', value: getChannelMeta(activeConversation.channel).label },
                       ].map(({ label, value }) => (
                         <div key={label} className="flex justify-between">
                           <span className="text-slate-500">{label}</span>
@@ -1220,7 +1220,7 @@ export default function ChatPage() {
                       ))}
                       {activeConversation.first_response_at && (
                         <div className="flex justify-between">
-                          <span className="text-slate-500">First Response</span>
+                          <span className="text-slate-500">Primeira resposta</span>
                           <span className="font-medium text-slate-900">
                             {Math.round((new Date(activeConversation.first_response_at).getTime() - new Date(activeConversation.created_at).getTime()) / 60000)}m
                           </span>
@@ -1235,13 +1235,13 @@ export default function ChatPage() {
                   <div className="p-4 space-y-5">
                     {/* Status */}
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Status</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Status da conversa</p>
                       <div className="flex gap-1.5">
                         {(['OPEN', 'PENDING', 'CLOSED'] as const).map(s => {
                           const styles = {
-                            OPEN: { active: 'bg-orange-50 text-orange-700 border-orange-200', label: 'Open' },
-                            PENDING: { active: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Pending' },
-                            CLOSED: { active: 'bg-slate-100 text-slate-600 border-slate-300', label: 'Closed' },
+                            OPEN:    { active: 'bg-[#fdf4ff] text-[#7C4DFF] border-[#e9d5ff]',   label: 'Aberto' },
+                            PENDING: { active: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Pendente' },
+                            CLOSED:  { active: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Fechado' },
                           };
                           const isActive = activeConversation.status === s;
                           return (
@@ -1262,7 +1262,7 @@ export default function ChatPage() {
 
                     {/* Assigned Agent */}
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Agent</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Agente responsável</p>
                       <AssignmentPanel
                         conversation={activeConversation}
                         onAssign={async (userId) => {
@@ -1290,13 +1290,13 @@ export default function ChatPage() {
                 {/* ── History tab ── */}
                 {rightPanelTab === 'history' && (
                   <div className="p-4">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Other Conversations</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Conversas anteriores</p>
                     {(() => {
                       const otherConvs = conversations.filter(
                         c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
                       );
                       if (otherConvs.length === 0) return (
-                        <p className="text-xs text-slate-400 text-center py-6">No previous conversations</p>
+                        <p className="text-xs text-slate-400 text-center py-6">Nenhuma conversa anterior</p>
                       );
                       return (
                         <div className="flex flex-col divide-y divide-slate-100">
@@ -1312,12 +1312,12 @@ export default function ChatPage() {
                                   {c.last_message_date ? new Date(c.last_message_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-600 truncate">{c.last_message || 'No messages'}</p>
+                              <p className="text-xs text-slate-600 truncate">{c.last_message || 'Sem mensagens'}</p>
                               <span className={cn(
                                 "text-[10px] font-semibold",
                                 c.status === 'CLOSED' ? "text-emerald-600" : "text-slate-400"
                               )}>
-                                {c.status === 'CLOSED' ? '✓ Resolved' : c.status}
+                                {c.status === 'CLOSED' ? '✓ Resolvido' : c.status === 'OPEN' ? 'Aberto' : 'Pendente'}
                               </span>
                             </button>
                           ))}
@@ -1330,7 +1330,7 @@ export default function ChatPage() {
             </>
           ) : (
             <div className="p-5 opacity-50">
-              <p className="text-sm text-slate-400">No contact selected.</p>
+              <p className="text-sm text-slate-400">Nenhum contato selecionado.</p>
             </div>
           )}
         </aside>
