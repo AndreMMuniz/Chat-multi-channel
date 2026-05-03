@@ -117,3 +117,9 @@ $RECYCLE.BIN/
 
 # ─── Docker (local overrides only) ────────────────────────────────────────────
 docker-compose.override.yml
+
+#-----------------graphfyignore-----------------
+/graphify-out
+graphify_detect.json
+.graphify_detect.json
+.graphify_python

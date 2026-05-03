@@ -1435,20 +1435,38 @@ export default function ChatPage() {
                       </span>
                     </span>
                   )}
-                  <select
-                    value={activeConversation.status}
-                    onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
-                    className={cn(
-                      "h-[30px] px-2.5 rounded-full text-[11px] font-semibold border cursor-pointer focus:outline-none",
-                      activeConversation.status === 'OPEN' && "bg-[#fff7ed] text-[#f97316] border-[#fed7aa]",
-                      activeConversation.status === 'PENDING' && "bg-[#fffbeb] text-[#f59e0b] border-[#fde68a]",
-                      activeConversation.status === 'CLOSED' && "bg-[#f0fdf4] text-[#10b981] border-[#bbf7d0]"
-                    )}
-                  >
-                    <option value="OPEN">Open</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="CLOSED">Closed</option>
-                  </select>
+                  {/* Status select — uses inline styles + appearance-none so browser can't override bg/color */}
+                  {(() => {
+                    const statusStyles: Record<string, { bg: string; color: string; border: string }> = {
+                      OPEN:    { bg: '#fff7ed', color: '#f97316', border: '#fed7aa' },
+                      PENDING: { bg: '#fffbeb', color: '#f59e0b', border: '#fde68a' },
+                      CLOSED:  { bg: '#f0fdf4', color: '#10b981', border: '#bbf7d0' },
+                    };
+                    const s = statusStyles[activeConversation.status] ?? statusStyles.OPEN;
+                    return (
+                      <div className="relative flex items-center">
+                        <select
+                          value={activeConversation.status}
+                          onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
+                          style={{
+                            height: 30, paddingLeft: 10, paddingRight: 26,
+                            borderRadius: 999, fontSize: 11, fontWeight: 600,
+                            border: `1px solid ${s.border}`,
+                            background: s.bg, color: s.color,
+                            cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+                            appearance: 'none', WebkitAppearance: 'none',
+                          }}
+                        >
+                          <option value="OPEN">Open</option>
+                          <option value="PENDING">Pending</option>
+                          <option value="CLOSED">Closed</option>
+                        </select>
+                        <span className="material-symbols-outlined pointer-events-none absolute right-1.5 text-[14px]" style={{ color: s.color }}>
+                          expand_more
+                        </span>
+                      </div>
+                    );
+                  })()}
                   {/* AI toggle — desktop */}
                   <button
                     title="Sugestões de IA"
@@ -1977,7 +1995,7 @@ export default function ChatPage() {
           {activeConversation ? (
             <>
               {/* Tab bar */}
-              <div className="flex border-b border-outline-variant shrink-0">
+              <div className="flex border-b border-[#E9ECEF] shrink-0 pt-2">
                 {([
                   ['contact', 'person', 'Contact'],
                   ['details', 'info', 'Details'],
@@ -1988,11 +2006,9 @@ export default function ChatPage() {
                     onClick={() => setRightPanelTab(t)}
                     className={cn(
                       "flex-1 h-11 flex flex-col items-center justify-center gap-0.5 border-none bg-transparent cursor-pointer transition-all",
-                      rightPanelTab === t
-                        ? "border-b-2 border-[#7C3AED] text-[#7C3AED]"
-                        : "text-slate-400 hover:text-slate-600"
+                      rightPanelTab === t ? "text-[#7C4DFF]" : "text-[#94a3b8] hover:text-slate-600"
                     )}
-                    style={{ borderBottom: rightPanelTab === t ? '2px solid #7C3AED' : '2px solid transparent' }}
+                    style={{ borderBottom: rightPanelTab === t ? '2px solid #7C4DFF' : '2px solid transparent' }}
                   >
                     <span className="material-symbols-outlined text-[16px]" style={rightPanelTab === t ? { fontVariationSettings: "'FILL' 1" } : {}}>{icon}</span>
                     <span className="text-[10px] font-semibold">{label}</span>
