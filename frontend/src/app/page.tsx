@@ -651,6 +651,10 @@ export default function ChatPage() {
   const [showAIDesktop, setShowAIDesktop] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'contact' | 'details' | 'history'>('contact');
   const [allQuickReplies, setAllQuickReplies] = useState<import('@/types/quickReply').QuickReply[]>([]);
+  const [newQRModal, setNewQRModal] = useState(false);
+  const [newQRShortcut, setNewQRShortcut] = useState('');
+  const [newQRContent, setNewQRContent] = useState('');
+  const [savingNewQR, setSavingNewQR] = useState(false);
   const [openMessageMenuId, setOpenMessageMenuId] = useState<string | null>(null);
   const [contextActionHint, setContextActionHint] = useState<ContextActionHintState | null>(null);
   const [projectStages, setProjectStages] = useState<ProjectStage[]>([]);
@@ -1107,7 +1111,7 @@ export default function ChatPage() {
       setRecordingDuration(0);
       timerRef.current = setInterval(() => setRecordingDuration(p => p + 1), 1000);
     } catch {
-      alert('Acesso ao microfone negado ou indisponível.');
+      alert('Microphone access denied or not available.');
     }
   };
 
@@ -1346,7 +1350,7 @@ export default function ChatPage() {
                     </div>
                     <p className="text-[12px] truncate"
                       style={{ color: conv.is_unread ? '#374151' : '#94a3b8', fontWeight: conv.is_unread ? 500 : 400 }}>
-                      {conv.last_message || 'Sem mensagens'}
+                      {conv.last_message || 'No messages'}
                     </p>
                   </div>
                 </div>
@@ -1378,7 +1382,7 @@ export default function ChatPage() {
                     data-testid="back-button"
                     onClick={handleMobileBack}
                     className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
-                    aria-label="Voltar às conversas"
+                    aria-label="Back to conversations"
                   >
                     <ChevronLeft size={22} />
                   </button>
@@ -1427,7 +1431,7 @@ export default function ChatPage() {
                       style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '3px 9px' }}>
                       <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
                       <span className="text-[11px] font-semibold text-[#c2410c]">
-                        {activeViewers.length === 1 ? `${activeViewers[0]} visualizando` : `${activeViewers.length} visualizando`}
+                        {activeViewers.length === 1 ? `${activeViewers[0]} is viewing` : `${activeViewers.length} viewing`}
                       </span>
                     </span>
                   )}
@@ -1468,13 +1472,13 @@ export default function ChatPage() {
                   <button
                     title="Excluir conversa"
                     onClick={async () => {
-                      if (!window.confirm('Excluir esta conversa e todas as mensagens? Esta ação não pode ser desfeita.')) return;
+                      if (!window.confirm('Delete this conversation and all its messages? This cannot be undone.')) return;
                       try {
                         await conversationsApi.deleteConversation(activeConversation.id);
                         handleMobileBack();
                         await fetchConversations();
                       } catch {
-                        alert('Falha ao excluir conversa. Verifique suas permissões.');
+                        alert('Failed to delete conversation. Check your permissions.');
                       }
                     }}
                     className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E9ECEF] text-[#94a3b8] hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -1638,26 +1642,32 @@ export default function ChatPage() {
               </div>
 
               {/* Quick Reply chip strip — desktop */}
-              {allQuickReplies.length > 0 && (
-                <div className="hidden md:flex items-center gap-1.5 pt-1.5 px-3.5 bg-white border-t border-[#E9ECEF] overflow-x-auto [&::-webkit-scrollbar]:hidden">
-                  {allQuickReplies.slice(0, 4).map(qr => (
-                    <button
-                      key={qr.id}
-                      onClick={() => setInput(qr.content)}
-                      className="shrink-0 flex items-center gap-1 h-[26px] px-2.5 rounded-full border border-[#e2e8f0] bg-white text-[11px] font-semibold text-[#575f67] hover:border-[#a5b4fc] hover:bg-[#eef2ff] hover:text-[#4338ca] transition-colors whitespace-nowrap"
-                    >
-                      <span style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', borderRadius: 4, padding: '0 4px', fontSize: 9, fontWeight: 700 }}>{qr.shortcut}</span>
-                      {qr.shortcut.replace('/', '').charAt(0).toUpperCase() + qr.shortcut.replace('/', '').slice(1)}
-                    </button>
-                  ))}
-                  {allQuickReplies.length > 4 && (
-                    <button className="shrink-0 flex items-center gap-1 h-[26px] px-2.5 rounded-full border border-[#e2e8f0] bg-white text-[11px] font-semibold text-[#575f67] hover:bg-slate-50 transition-colors">
-                      <span className="material-symbols-outlined text-[14px]">more_horiz</span>
-                      More
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="hidden md:flex items-center gap-1.5 pt-1.5 px-3.5 bg-white border-t border-[#E9ECEF] overflow-x-auto [&::-webkit-scrollbar]:hidden">
+                {allQuickReplies.slice(0, 4).map(qr => (
+                  <button
+                    key={qr.id}
+                    onClick={() => setInput(qr.content)}
+                    className="shrink-0 flex items-center gap-1 h-[26px] px-2.5 rounded-full border border-[#e2e8f0] bg-white text-[11px] font-semibold text-[#575f67] hover:border-[#a5b4fc] hover:bg-[#eef2ff] hover:text-[#4338ca] transition-colors whitespace-nowrap"
+                  >
+                    <span style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', borderRadius: 4, padding: '0 4px', fontSize: 9, fontWeight: 700 }}>{qr.shortcut}</span>
+                    {qr.shortcut.replace('/', '').charAt(0).toUpperCase() + qr.shortcut.replace('/', '').slice(1)}
+                  </button>
+                ))}
+                {allQuickReplies.length > 4 && (
+                  <button className="shrink-0 flex items-center gap-1 h-[26px] px-2.5 rounded-full border border-[#e2e8f0] bg-white text-[11px] font-semibold text-[#575f67] hover:bg-slate-50 transition-colors">
+                    <span className="material-symbols-outlined text-[14px]">more_horiz</span>
+                    More
+                  </button>
+                )}
+                {/* Add new quick reply */}
+                <button
+                  onClick={() => { setNewQRShortcut(''); setNewQRContent(''); setNewQRModal(true); }}
+                  title="Add quick reply"
+                  className="shrink-0 ml-auto flex items-center justify-center w-[26px] h-[26px] rounded-full border border-[#e2e8f0] bg-white text-[#94a3b8] hover:border-[#c7d2fe] hover:bg-[#eef2ff] hover:text-[#4338ca] transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[15px]">add</span>
+                </button>
+              </div>
 
               {/* Input Area */}
               <div
@@ -2094,13 +2104,13 @@ export default function ChatPage() {
                 {/* ── History tab ── */}
                 {rightPanelTab === 'history' && (
                   <div className="p-4">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Conversas anteriores</p>
+                    <p className="text-[10px] font-bold text-[#575f67] uppercase mb-3" style={{ letterSpacing: '0.06em' }}>Other Conversations</p>
                     {(() => {
                       const otherConvs = conversations.filter(
                         c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
                       );
                       if (otherConvs.length === 0) return (
-                        <p className="text-xs text-slate-400 text-center py-6">Nenhuma conversa anterior</p>
+                        <p className="text-xs text-slate-400 text-center py-6">No previous conversations</p>
                       );
                       return (
                         <div className="flex flex-col divide-y divide-slate-100">
@@ -2116,12 +2126,12 @@ export default function ChatPage() {
                                   {c.last_message_date ? new Date(c.last_message_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-600 truncate">{c.last_message || 'Sem mensagens'}</p>
+                              <p className="text-xs text-slate-600 truncate">{c.last_message || 'No messages'}</p>
                               <span className={cn(
                                 "text-[10px] font-semibold",
                                 c.status === 'CLOSED' ? "text-emerald-600" : "text-slate-400"
                               )}>
-                                {c.status === 'CLOSED' ? '✓ Resolvido' : c.status === 'OPEN' ? 'Aberto' : 'Pendente'}
+                                {c.status === 'CLOSED' ? '✓ Resolved' : c.status === 'OPEN' ? 'Open' : 'Pending'}
                               </span>
                             </button>
                           ))}
@@ -2134,7 +2144,7 @@ export default function ChatPage() {
             </>
           ) : (
             <div className="p-5 opacity-50">
-              <p className="text-sm text-slate-400">Nenhum contato selecionado.</p>
+              <p className="text-sm text-slate-400">No contact selected.</p>
             </div>
           )}
         </aside>
@@ -2179,6 +2189,67 @@ export default function ChatPage() {
           onDelete={handleDeleteMessage}
           onClose={() => setDeleteMessageModal(null)}
         />
+      )}
+
+      {/* New Quick Reply modal */}
+      {newQRModal && (
+        <Modal title="New Quick Reply" onClose={() => setNewQRModal(false)} maxWidth="max-w-lg">
+          <div className="space-y-5">
+            <label className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Shortcut</span>
+              <input
+                autoFocus
+                value={newQRShortcut}
+                onChange={e => {
+                  let v = e.target.value;
+                  if (v && !v.startsWith('/')) v = '/' + v;
+                  setNewQRShortcut(v);
+                }}
+                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                placeholder="/greeting"
+              />
+            </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Content</span>
+              <textarea
+                value={newQRContent}
+                onChange={e => setNewQRContent(e.target.value)}
+                className="min-h-[120px] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 resize-none"
+                placeholder="Quick reply text…"
+              />
+            </label>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
+              <button
+                type="button"
+                onClick={() => setNewQRModal(false)}
+                disabled={savingNewQR}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingNewQR || !newQRShortcut.trim() || !newQRContent.trim()}
+                onClick={async () => {
+                  setSavingNewQR(true);
+                  try {
+                    await quickRepliesApi.createQuickReply({ shortcut: newQRShortcut.trim(), content: newQRContent.trim() });
+                    const fresh = await quickRepliesApi.listQuickReplies();
+                    setAllQuickReplies(fresh.data ?? []);
+                    setNewQRModal(false);
+                  } catch {
+                    alert('Failed to create quick reply.');
+                  } finally {
+                    setSavingNewQR(false);
+                  }
+                }}
+                className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#4f46e5] px-4 text-sm font-semibold text-white transition hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingNewQR ? 'Creating…' : 'Create Quick Reply'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
