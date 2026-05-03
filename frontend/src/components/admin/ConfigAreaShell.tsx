@@ -1,11 +1,12 @@
 "use client";
 
 const CONFIG_ITEMS = [
-  { id: "general", label: "General", description: "Platform defaults", icon: "tune" },
-  { id: "visual", label: "Visual Identity", description: "Logo and color system", icon: "palette" },
-  { id: "channels", label: "Channels", description: "Telegram, WhatsApp, Email, SMS", icon: "hub" },
-  { id: "ai", label: "AI Configuration", description: "Providers and global model", icon: "smart_toy" },
-  { id: "api", label: "API Settings", description: "Webhooks and integration details", icon: "api" },
+  { id: "general",       label: "General",         description: "Platform defaults",               icon: "tune" },
+  { id: "visual",        label: "Visual Identity",  description: "Logo and color system",           icon: "palette" },
+  { id: "channels",      label: "Channels",         description: "Telegram, WhatsApp, Email, SMS",  icon: "hub" },
+  { id: "ai",            label: "AI Configuration", description: "Providers and global model",      icon: "smart_toy" },
+  { id: "api",           label: "API Settings",     description: "Webhooks and integration details", icon: "api" },
+  { id: "quick-replies", label: "Quick Replies",    description: "Manage canned responses",         icon: "quick_phrases" },
 ];
 
 export default function ConfigAreaShell({

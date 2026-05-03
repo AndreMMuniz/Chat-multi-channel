@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import ConfigAreaShell from "@/components/admin/ConfigAreaShell";
 import { settingsApi } from "@/lib/api/index";
 import type { Settings } from "@/types/settings";
+import QuickRepliesPage from "@/app/admin/quick-replies/page";
 
-type TabId = "general" | "visual" | "channels" | "ai" | "api";
+type TabId = "general" | "visual" | "channels" | "ai" | "api" | "quick-replies";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -226,7 +227,13 @@ export default function SettingsPage() {
           <h1 className="text-[18px] font-semibold text-slate-900">Platform Configuration</h1>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        {activeTab === "quick-replies" && (
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <QuickRepliesPage />
+          </div>
+        )}
+
+        <div className={activeTab === "quick-replies" ? "hidden" : "flex-1 overflow-y-auto"}>
           <form onSubmit={handleSave}>
             <div className="mx-auto max-w-3xl space-y-6 p-6">
               {error && (
