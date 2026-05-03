@@ -250,6 +250,96 @@ def test_create_list_and_update_project_tasks(db):
     assert task.status == ProjectTaskStatus.DONE
 
 
+def test_list_tasks_workspace_supports_project_owner_creator_and_status_filters(db):
+    user = _seed_user_and_stages(db)
+    other_user = User(
+        auth_id="auth-project-api-2",
+        email="project-api-2@example.com",
+        full_name="Second Project User",
+        user_type_id=user.user_type_id,
+    )
+    db.add(other_user)
+    db.flush()
+
+    project_one = Project(
+        title="Customer rollout",
+        description="Parent project one",
+        stage="lead",
+        priority=ProjectPriority.MEDIUM,
+        status=ProjectStatus.OPEN,
+        source_type=ProjectSourceType.MANUAL,
+        created_by_user_id=user.id,
+        owner_user_id=user.id,
+    )
+    project_two = Project(
+        title="Renewal plan",
+        description="Parent project two",
+        stage="proposal",
+        priority=ProjectPriority.HIGH,
+        status=ProjectStatus.OPEN,
+        source_type=ProjectSourceType.MANUAL,
+        created_by_user_id=other_user.id,
+        owner_user_id=other_user.id,
+    )
+    db.add_all([project_one, project_two])
+    db.flush()
+
+    db.add_all(
+        [
+            ProjectTask(
+                project_id=project_one.id,
+                title="Send rollout checklist",
+                description="Assigned to primary user",
+                status=ProjectTaskStatus.OPEN,
+                priority=ProjectPriority.MEDIUM,
+                owner_user_id=user.id,
+                created_by_user_id=other_user.id,
+            ),
+            ProjectTask(
+                project_id=project_two.id,
+                title="Review renewal proposal",
+                description="Assigned to second user",
+                status=ProjectTaskStatus.DONE,
+                priority=ProjectPriority.HIGH,
+                owner_user_id=other_user.id,
+                created_by_user_id=user.id,
+            ),
+        ]
+    )
+    db.commit()
+
+    client = _make_client(db, user)
+
+    all_response = client.get("/api/v1/admin/tasks")
+    assert all_response.status_code == 200
+    assert all_response.json()["meta"]["total"] == 2
+    first_row = all_response.json()["data"][0]
+    assert "project_reference" in first_row
+    assert "project_title" in first_row
+    assert "created_by_id" in first_row
+    assert "created_by_name" in first_row
+
+    project_response = client.get("/api/v1/admin/tasks", params={"project_id": str(project_one.id)})
+    assert project_response.status_code == 200
+    assert len(project_response.json()["data"]) == 1
+    assert project_response.json()["data"][0]["project_id"] == str(project_one.id)
+
+    owner_response = client.get("/api/v1/admin/tasks", params={"owner_id": str(user.id)})
+    assert owner_response.status_code == 200
+    assert len(owner_response.json()["data"]) == 1
+    assert owner_response.json()["data"][0]["owner_id"] == str(user.id)
+
+    creator_response = client.get("/api/v1/admin/tasks", params={"created_by_id": str(user.id)})
+    assert creator_response.status_code == 200
+    assert len(creator_response.json()["data"]) == 1
+    assert creator_response.json()["data"][0]["created_by_id"] == str(user.id)
+
+    status_response = client.get("/api/v1/admin/tasks", params={"status": "done"})
+    assert status_response.status_code == 200
+    assert len(status_response.json()["data"]) == 1
+    assert status_response.json()["data"][0]["status"] == "done"
+
+
 def test_create_project_task_from_message_can_attach_to_existing_project_context(db):
     user = _seed_user_and_stages(db)
     contact = Contact(name="Task Contact")

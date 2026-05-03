@@ -180,6 +180,35 @@ class ProjectService:
     async def list_project_tasks(self, project: Project) -> list[ProjectTask]:
         return await self.tasks.list_for_project(project.id)
 
+    async def list_tasks_workspace(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        project_id: Optional[UUID] = None,
+        owner_user_id: Optional[UUID] = None,
+        created_by_user_id: Optional[UUID] = None,
+        status: Optional[str] = None,
+    ) -> tuple[list[ProjectTask], int]:
+        tasks = await self.tasks.list_with_filters(
+            skip=skip,
+            limit=limit,
+            search=search,
+            project_id=project_id,
+            owner_user_id=owner_user_id,
+            created_by_user_id=created_by_user_id,
+            status=status,
+        )
+        total = await self.tasks.count_with_filters(
+            search=search,
+            project_id=project_id,
+            owner_user_id=owner_user_id,
+            created_by_user_id=created_by_user_id,
+            status=status,
+        )
+        return tasks, total
+
     async def create_project_task(
         self,
         project: Project,
@@ -340,12 +369,15 @@ def serialize_project_task(task: ProjectTask) -> dict:
         "id": task.id,
         "project_id": task.project_id,
         "project_reference": task.project.reference_code if task.project else None,
+        "project_title": task.project.title if task.project else None,
         "title": task.title,
         "description": task.description,
         "status": task.status,
         "priority": task.priority,
         "owner_id": task.owner_user_id,
         "owner_name": task.owner.full_name if task.owner else None,
+        "created_by_id": task.created_by_user_id,
+        "created_by_name": task.created_by.full_name if task.created_by else None,
         "source_message_id": task.source_message_id,
         "source_conversation_id": task.source_conversation_id,
         "due_date": task.due_date,

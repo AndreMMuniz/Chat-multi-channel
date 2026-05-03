@@ -208,6 +208,37 @@ async def list_project_tasks(
     return create_response([ProjectTaskResponse.model_validate(serialize_project_task(task)) for task in tasks])
 
 
+@router.get("/tasks")
+@limiter.limit("60/minute")
+async def list_tasks_workspace(
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    project_id: Optional[UUID] = None,
+    owner_id: Optional[UUID] = None,
+    created_by_id: Optional[UUID] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    tasks, total = await ProjectService(db).list_tasks_workspace(
+        skip=skip,
+        limit=limit,
+        search=search,
+        project_id=project_id,
+        owner_user_id=owner_id,
+        created_by_user_id=created_by_id,
+        status=status,
+    )
+    return create_paginated_response(
+        data=[ProjectTaskResponse.model_validate(serialize_project_task(task)) for task in tasks],
+        total=total,
+        page=(skip // limit) + 1,
+        page_size=limit,
+    )
+
+
 @router.post("/projects/{project_id}/tasks")
 @limiter.limit("60/minute")
 async def create_project_task(

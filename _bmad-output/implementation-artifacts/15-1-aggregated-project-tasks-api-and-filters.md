@@ -1,7 +1,7 @@
 # Story 15.1: Aggregated Project Tasks API and Filters
 
 ## Status
-ready-for-dev
+done
 
 ## Story
 **As an agent,** I want an aggregated tasks API across projects so that the `Tasks` workspace can load my operational queue efficiently.

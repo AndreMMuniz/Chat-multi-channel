@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import UUID
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -123,10 +124,92 @@ class ProjectTaskRepository(BaseRepository[ProjectTask]):
     def __init__(self, session: Session):
         super().__init__(ProjectTask, session)
 
+    async def list_with_filters(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        project_id: Optional[UUID] = None,
+        owner_user_id: Optional[UUID] = None,
+        created_by_user_id: Optional[UUID] = None,
+        status: Optional[str] = None,
+    ) -> List[ProjectTask]:
+        stmt = (
+            select(ProjectTask)
+            .join(Project, Project.id == ProjectTask.project_id)
+            .options(
+                joinedload(ProjectTask.owner),
+                joinedload(ProjectTask.created_by),
+                joinedload(ProjectTask.project),
+            )
+            .order_by(ProjectTask.created_at.desc())
+        )
+
+        if search:
+            pattern = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    ProjectTask.title.ilike(pattern),
+                    ProjectTask.description.ilike(pattern),
+                    Project.reference_code.ilike(pattern),
+                    Project.title.ilike(pattern),
+                )
+            )
+        if project_id:
+            stmt = stmt.where(ProjectTask.project_id == project_id)
+        if owner_user_id:
+            stmt = stmt.where(ProjectTask.owner_user_id == owner_user_id)
+        if created_by_user_id:
+            stmt = stmt.where(ProjectTask.created_by_user_id == created_by_user_id)
+        if status:
+            stmt = stmt.where(ProjectTask.status == status)
+
+        stmt = stmt.offset(skip).limit(limit)
+        result = self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def count_with_filters(
+        self,
+        *,
+        search: Optional[str] = None,
+        project_id: Optional[UUID] = None,
+        owner_user_id: Optional[UUID] = None,
+        created_by_user_id: Optional[UUID] = None,
+        status: Optional[str] = None,
+    ) -> int:
+        stmt = select(ProjectTask).join(Project, Project.id == ProjectTask.project_id)
+
+        if search:
+            pattern = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    ProjectTask.title.ilike(pattern),
+                    ProjectTask.description.ilike(pattern),
+                    Project.reference_code.ilike(pattern),
+                    Project.title.ilike(pattern),
+                )
+            )
+        if project_id:
+            stmt = stmt.where(ProjectTask.project_id == project_id)
+        if owner_user_id:
+            stmt = stmt.where(ProjectTask.owner_user_id == owner_user_id)
+        if created_by_user_id:
+            stmt = stmt.where(ProjectTask.created_by_user_id == created_by_user_id)
+        if status:
+            stmt = stmt.where(ProjectTask.status == status)
+
+        result = self.session.execute(stmt)
+        return len(result.scalars().all())
+
     async def list_for_project(self, project_id: str) -> List[ProjectTask]:
         stmt = (
             select(ProjectTask)
-            .options(joinedload(ProjectTask.owner), joinedload(ProjectTask.project))
+            .options(
+                joinedload(ProjectTask.owner),
+                joinedload(ProjectTask.created_by),
+                joinedload(ProjectTask.project),
+            )
             .where(ProjectTask.project_id == project_id)
             .order_by(ProjectTask.created_at.desc())
         )
@@ -136,7 +219,11 @@ class ProjectTaskRepository(BaseRepository[ProjectTask]):
     async def find_task(self, project_id: str, task_id: str) -> Optional[ProjectTask]:
         stmt = (
             select(ProjectTask)
-            .options(joinedload(ProjectTask.owner), joinedload(ProjectTask.project))
+            .options(
+                joinedload(ProjectTask.owner),
+                joinedload(ProjectTask.created_by),
+                joinedload(ProjectTask.project),
+            )
             .where(ProjectTask.project_id == project_id, ProjectTask.id == task_id)
         )
         result = self.session.execute(stmt)

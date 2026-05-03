@@ -180,12 +180,15 @@ class ProjectTaskResponse(BaseModel):
     id: UUID
     project_id: UUID
     project_reference: Optional[str] = None
+    project_title: Optional[str] = None
     title: str
     description: Optional[str] = None
     status: ProjectTaskStatus
     priority: ProjectPriority
     owner_id: Optional[UUID] = None
     owner_name: Optional[str] = None
+    created_by_id: Optional[UUID] = None
+    created_by_name: Optional[str] = None
     source_message_id: Optional[UUID] = None
     source_conversation_id: Optional[UUID] = None
     due_date: Optional[datetime] = None
