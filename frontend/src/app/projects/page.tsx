@@ -970,7 +970,7 @@ export default function ProjectsPage() {
 
               <button
                 type="button"
-                onClick={openNewProject}
+                onClick={() => openNewProject()}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
               >
                 <span className="material-symbols-outlined text-[16px]">add</span>
