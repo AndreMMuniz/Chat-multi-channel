@@ -12,6 +12,8 @@ import { projectsApi } from "@/lib/api/index";
 import type {
   ProjectCreateRequest,
   ProjectDto,
+  ProjectTaskAutomationStatus,
+  ProjectTaskAutomationType,
   ProjectTaskCreateRequest,
   ProjectTaskDto,
   ProjectTaskStatus,
@@ -68,6 +70,13 @@ type ProjectTask = {
   dueDate: string;
   sourceMessageId?: string;
   sourceConversationId?: string;
+  automationType?: ProjectTaskAutomationType | null;
+  automationStatus?: ProjectTaskAutomationStatus | null;
+  automationRunAt: string;
+  automationMessageContent: string;
+  automationActionLabel: string;
+  automationLastError?: string;
+  automationExecutedAt?: string;
 };
 
 type ProjectTaskDraft = {
@@ -78,7 +87,14 @@ type ProjectTaskDraft = {
   priority: PriorityId;
   ownerId: string;
   dueDate: string;
+  automationType: ProjectTaskAutomationType | "";
+  automationRunAt: string;
+  automationMessageContent: string;
+  automationActionLabel: string;
 };
+
+type TaskFilterId = "ALL" | TaskStatusId | "OVERDUE";
+type TaskSortId = "newest" | "due-date" | "priority";
 
 type ProjectFormState = {
   id: string | null;
@@ -173,6 +189,14 @@ const TASK_STATUS_META: Record<TaskStatusId, { label: string; className: string 
   in_progress: { label: "In Progress", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
   done: { label: "Done", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
   cancelled: { label: "Cancelled", className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
+};
+
+const TASK_AUTOMATION_STATUS_META: Record<ProjectTaskAutomationStatus, { label: string; className: string }> = {
+  scheduled: { label: "Scheduled", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-100" },
+  processing: { label: "Processing", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
+  completed: { label: "Completed", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
+  failed: { label: "Failed", className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
+  cancelled: { label: "Cancelled", className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200" },
 };
 
 const TAG_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -272,6 +296,10 @@ function toApiDateTime(date: string) {
   return date ? `${date}T00:00:00Z` : null;
 }
 
+function toApiDateTimeLocal(dateTime: string) {
+  return dateTime ? `${dateTime}:00Z` : null;
+}
+
 function mapStageOptions(stages: Array<{ key: string; label: string }>): StageOption[] {
   const visuals = new Map(STAGES.map((stage) => [stage.id, stage]));
   return stages
@@ -322,6 +350,13 @@ function adaptProjectTask(task: ProjectTaskDto): ProjectTask {
     dueDate: task.due_date ? task.due_date.slice(0, 10) : "",
     sourceMessageId: task.source_message_id ?? undefined,
     sourceConversationId: task.source_conversation_id ?? undefined,
+    automationType: task.automation_type ?? null,
+    automationStatus: task.automation_status ?? null,
+    automationRunAt: task.automation_run_at ? task.automation_run_at.slice(0, 16) : "",
+    automationMessageContent: task.automation_message_content ?? "",
+    automationActionLabel: task.automation_action_label ?? "",
+    automationLastError: task.automation_last_error ?? undefined,
+    automationExecutedAt: task.automation_executed_at ?? undefined,
   };
 }
 
@@ -379,6 +414,10 @@ function createEmptyTaskDraft(defaultOwnerId = "", overrides?: Partial<ProjectTa
     priority: "medium",
     ownerId: defaultOwnerId,
     dueDate: "",
+    automationType: "",
+    automationRunAt: "",
+    automationMessageContent: "",
+    automationActionLabel: "",
     ...overrides,
   };
 }
@@ -392,6 +431,10 @@ function toTaskDraft(task: ProjectTask): ProjectTaskDraft {
     priority: task.priority,
     ownerId: task.ownerId,
     dueDate: task.dueDate,
+    automationType: task.automationType ?? "",
+    automationRunAt: task.automationRunAt,
+    automationMessageContent: task.automationMessageContent,
+    automationActionLabel: task.automationActionLabel,
   };
 }
 
@@ -501,6 +544,9 @@ function ProjectTaskSection({
   onTaskToggle: (task: ProjectTask) => void;
   onTaskCancel: () => void;
 }) {
+  const [taskFilter, setTaskFilter] = useState<TaskFilterId>("ALL");
+  const [taskSort, setTaskSort] = useState<TaskSortId>("newest");
+
   if (!projectId) {
     return (
       <section className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-5 py-4">
@@ -520,7 +566,32 @@ function ProjectTaskSection({
   }
 
   const openCount = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").length;
+  const inProgressCount = tasks.filter((task) => task.status === "in_progress").length;
   const completedCount = tasks.filter((task) => task.status === "done").length;
+  const overdueCount = tasks.filter((task) => isOverdue(task.dueDate) && task.status !== "done" && task.status !== "cancelled").length;
+  const visibleTasks = useMemo(() => {
+    const filtered = tasks.filter((task) => {
+      if (taskFilter === "ALL") return true;
+      if (taskFilter === "OVERDUE") {
+        return isOverdue(task.dueDate) && task.status !== "done" && task.status !== "cancelled";
+      }
+      return task.status === taskFilter;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (taskSort === "priority") {
+        const rank: Record<PriorityId, number> = { high: 0, medium: 1, low: 2 };
+        return rank[a.priority] - rank[b.priority];
+      }
+      if (taskSort === "due-date") {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      }
+      return b.id.localeCompare(a.id);
+    });
+  }, [taskFilter, taskSort, tasks]);
 
   return (
     <section className="space-y-4 rounded-[22px] border border-slate-200 bg-slate-50/70 p-5">
@@ -535,10 +606,38 @@ function ProjectTaskSection({
           <span className="rounded-full bg-white px-3 py-1 text-slate-600 ring-1 ring-slate-200">
             {openCount} open
           </span>
+          <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700 ring-1 ring-sky-100">
+            {inProgressCount} in progress
+          </span>
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-100">
             {completedCount} done
           </span>
+          <span className="rounded-full bg-rose-50 px-3 py-1 text-rose-700 ring-1 ring-rose-100">
+            {overdueCount} overdue
+          </span>
         </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="flex flex-col gap-2">
+          <FieldLabel label="Filter tasks" />
+          <FieldSelect value={taskFilter} onChange={(e) => setTaskFilter(e.target.value as TaskFilterId)}>
+            <option value="ALL">All tasks</option>
+            <option value="OVERDUE">Overdue</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="done">Done</option>
+            <option value="cancelled">Cancelled</option>
+          </FieldSelect>
+        </label>
+        <label className="flex flex-col gap-2">
+          <FieldLabel label="Sort tasks" />
+          <FieldSelect value={taskSort} onChange={(e) => setTaskSort(e.target.value as TaskSortId)}>
+            <option value="newest">Newest first</option>
+            <option value="due-date">Due date</option>
+            <option value="priority">Priority</option>
+          </FieldSelect>
+        </label>
       </div>
 
       <div className="space-y-3">
@@ -550,10 +649,15 @@ function ProjectTaskSection({
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
             No tasks yet. Add the first execution item for this project.
           </div>
+        ) : visibleTasks.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+            No tasks match the current task filter.
+          </div>
         ) : (
-          tasks.map((task) => {
+          visibleTasks.map((task) => {
             const priority = PRIORITY_META[task.priority];
             const status = TASK_STATUS_META[task.status];
+            const automationStatus = task.automationStatus ? TASK_AUTOMATION_STATUS_META[task.automationStatus] : null;
             const overdue = isOverdue(task.dueDate) && task.status !== "done" && task.status !== "cancelled";
             return (
               <article
@@ -570,8 +674,24 @@ function ProjectTaskSection({
                       <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${status.className}`}>
                         {status.label}
                       </span>
+                      {automationStatus ? (
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${automationStatus.className}`}>
+                          {automationStatus.label}
+                        </span>
+                      ) : null}
                     </div>
                     {task.description ? <p className="text-sm leading-6 text-slate-600">{task.description}</p> : null}
+                    {task.automationType ? (
+                      <div className="space-y-1 text-xs text-slate-500">
+                        <p>
+                          Automation: {task.automationType === "send_message" ? "Send message later" : "Scheduled action"}
+                          {task.automationRunAt ? ` at ${task.automationRunAt.replace("T", " ")}` : ""}
+                        </p>
+                        {task.automationLastError ? (
+                          <p className="font-medium text-rose-600">Last error: {task.automationLastError}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                       <span>{task.ownerName ?? "Unassigned"}</span>
                       <span>•</span>
@@ -677,6 +797,52 @@ function ProjectTaskSection({
             onChange={(e) => setTaskDraft((current) => ({ ...current, dueDate: e.target.value }))}
           />
         </label>
+
+        <label className="flex flex-col gap-2 md:col-span-2">
+          <FieldLabel label="Automation" />
+          <FieldSelect
+            value={taskDraft.automationType}
+            onChange={(e) => setTaskDraft((current) => ({ ...current, automationType: e.target.value as ProjectTaskAutomationType | "" }))}
+          >
+            <option value="">No automation</option>
+            <option value="send_message">Send message later</option>
+            <option value="scheduled_action">Scheduled internal action</option>
+          </FieldSelect>
+        </label>
+
+        {taskDraft.automationType ? (
+          <>
+            <label className="flex flex-col gap-2">
+              <FieldLabel label="Run at" />
+              <FieldInput
+                type="datetime-local"
+                value={taskDraft.automationRunAt}
+                onChange={(e) => setTaskDraft((current) => ({ ...current, automationRunAt: e.target.value }))}
+              />
+            </label>
+
+            {taskDraft.automationType === "send_message" ? (
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <FieldLabel label="Automation message" />
+                <FieldTextArea
+                  value={taskDraft.automationMessageContent}
+                  onChange={(e) => setTaskDraft((current) => ({ ...current, automationMessageContent: e.target.value }))}
+                  placeholder="Message content to send automatically later"
+                  className="min-h-[84px]"
+                />
+              </label>
+            ) : (
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <FieldLabel label="Action label" />
+                <FieldInput
+                  value={taskDraft.automationActionLabel}
+                  onChange={(e) => setTaskDraft((current) => ({ ...current, automationActionLabel: e.target.value }))}
+                  placeholder="Describe the scheduled internal action"
+                />
+              </label>
+            )}
+          </>
+        ) : null}
 
         <div className="flex gap-3 md:col-span-2 md:justify-end">
           {taskDraft.id ? (
@@ -1486,6 +1652,11 @@ export default function ProjectsPage() {
       priority: taskDraft.priority,
       owner_user_id: taskDraft.ownerId || null,
       due_date: toApiDateTime(taskDraft.dueDate),
+      automation_type: taskDraft.automationType || null,
+      automation_status: taskDraft.automationType ? "scheduled" : null,
+      automation_run_at: toApiDateTimeLocal(taskDraft.automationRunAt),
+      automation_message_content: taskDraft.automationType === "send_message" ? taskDraft.automationMessageContent.trim() || null : null,
+      automation_action_label: taskDraft.automationType === "scheduled_action" ? taskDraft.automationActionLabel.trim() || null : null,
     };
 
     try {

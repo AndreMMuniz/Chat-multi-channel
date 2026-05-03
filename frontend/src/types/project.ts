@@ -4,6 +4,8 @@ export type ProjectStatus = "open" | "done" | "archived";
 export type ProjectSourceType = "manual" | "message";
 export type ProjectChannel = "whatsapp" | "telegram" | "email" | "sms" | "web";
 export type ProjectTaskStatus = "open" | "in_progress" | "done" | "cancelled";
+export type ProjectTaskAutomationType = "send_message" | "scheduled_action";
+export type ProjectTaskAutomationStatus = "scheduled" | "processing" | "completed" | "failed" | "cancelled";
 
 export interface ProjectStage {
   key: ProjectStageKey;
@@ -74,6 +76,7 @@ export interface ProjectFromMessageRequest {
 export interface ProjectTaskDto {
   id: string;
   project_id: string;
+  project_reference?: string | null;
   title: string;
   description?: string | null;
   status: ProjectTaskStatus;
@@ -83,6 +86,13 @@ export interface ProjectTaskDto {
   source_message_id?: string | null;
   source_conversation_id?: string | null;
   due_date?: string | null;
+  automation_type?: ProjectTaskAutomationType | null;
+  automation_status?: ProjectTaskAutomationStatus | null;
+  automation_run_at?: string | null;
+  automation_message_content?: string | null;
+  automation_action_label?: string | null;
+  automation_last_error?: string | null;
+  automation_executed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -96,6 +106,24 @@ export interface ProjectTaskCreateRequest {
   source_message_id?: string | null;
   source_conversation_id?: string | null;
   due_date?: string | null;
+  automation_type?: ProjectTaskAutomationType | null;
+  automation_status?: ProjectTaskAutomationStatus | null;
+  automation_run_at?: string | null;
+  automation_message_content?: string | null;
+  automation_action_label?: string | null;
 }
 
 export type ProjectTaskUpdateRequest = Partial<ProjectTaskCreateRequest>;
+
+export interface ProjectTaskFromMessageRequest {
+  title?: string | null;
+  description?: string | null;
+  priority: ProjectPriority;
+  status: ProjectTaskStatus;
+  owner_user_id?: string | null;
+  project_context_id?: string | null;
+  attach_conversation_to_project?: boolean;
+  create_project_context?: boolean;
+  new_project_title?: string | null;
+  due_date?: string | null;
+}

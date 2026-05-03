@@ -4,7 +4,18 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.models import Conversation, Message, Project, ProjectSourceType, ProjectTask, User
+from datetime import datetime, timezone
+
+from app.models.models import (
+    Conversation,
+    Message,
+    Project,
+    ProjectSourceType,
+    ProjectTask,
+    ProjectTaskAutomationStatus,
+    ProjectTaskAutomationType,
+    User,
+)
 from app.repositories.project_repo import ProjectRepository, ProjectStageRepository, ProjectTaskRepository
 from app.schemas.common import create_error_response
 from app.schemas.project import (
@@ -338,6 +349,67 @@ def serialize_project_task(task: ProjectTask) -> dict:
         "source_message_id": task.source_message_id,
         "source_conversation_id": task.source_conversation_id,
         "due_date": task.due_date,
+        "automation_type": task.automation_type,
+        "automation_status": task.automation_status,
+        "automation_run_at": task.automation_run_at,
+        "automation_message_content": task.automation_message_content,
+        "automation_action_label": task.automation_action_label,
+        "automation_last_error": task.automation_last_error,
+        "automation_executed_at": task.automation_executed_at,
         "created_at": task.created_at,
         "updated_at": task.updated_at,
     }
+
+
+async def run_due_task_automations_once(db: Session) -> None:
+    due_tasks = (
+        db.query(ProjectTask)
+        .filter(
+            ProjectTask.automation_type.is_not(None),
+            ProjectTask.automation_status == ProjectTaskAutomationStatus.SCHEDULED,
+            ProjectTask.automation_run_at.is_not(None),
+            ProjectTask.automation_run_at <= datetime.now(timezone.utc),
+        )
+        .all()
+    )
+
+    if not due_tasks:
+        return
+
+    from app.services.message_service import MessageService
+
+    for task in due_tasks:
+        try:
+            task.automation_status = ProjectTaskAutomationStatus.PROCESSING
+            task.automation_last_error = None
+            db.commit()
+
+            if task.automation_type == ProjectTaskAutomationType.SEND_MESSAGE:
+                if not task.source_conversation_id:
+                    raise ValueError("Task automation requires a source conversation")
+                conversation = db.query(Conversation).filter(Conversation.id == task.source_conversation_id).first()
+                if not conversation:
+                    raise ValueError("Source conversation not found")
+                if not task.automation_message_content:
+                    raise ValueError("Automation message content is empty")
+
+                await MessageService(db).send_from_dashboard(
+                    conversation=conversation,
+                    content=task.automation_message_content,
+                    owner_id=task.owner_user_id,
+                    message_type="TEXT",
+                )
+            elif task.automation_type == ProjectTaskAutomationType.SCHEDULED_ACTION:
+                if not task.automation_action_label:
+                    raise ValueError("Automation action label is empty")
+            else:
+                raise ValueError("Unsupported automation type")
+
+            task.automation_status = ProjectTaskAutomationStatus.COMPLETED
+            task.automation_executed_at = datetime.now(timezone.utc)
+            task.automation_last_error = None
+            db.commit()
+        except Exception as exc:
+            task.automation_status = ProjectTaskAutomationStatus.FAILED
+            task.automation_last_error = str(exc)
+            db.commit()

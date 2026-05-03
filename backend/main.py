@@ -60,6 +60,7 @@ _validate_ai_key()
 _EMAIL_POLL_INTERVAL = int(os.getenv("EMAIL_POLL_INTERVAL_SECONDS", "60"))
 _SLA_CHECK_INTERVAL = int(os.getenv("SLA_CHECK_INTERVAL_SECONDS", "120"))
 _SLA_THRESHOLD_MINUTES = int(os.getenv("SLA_THRESHOLD_MINUTES", "60"))
+_TASK_AUTOMATION_INTERVAL = int(os.getenv("TASK_AUTOMATION_INTERVAL_SECONDS", "30"))
 
 
 async def _email_poll_loop() -> None:
@@ -115,6 +116,23 @@ async def _sla_check_loop() -> None:
             print(f"[SLACheck] Error: {e}")
 
 
+async def _task_automation_loop() -> None:
+    """Periodically execute due project task automations."""
+    from app.core.database import SessionLocal
+    from app.services.project_service import run_due_task_automations_once
+
+    while True:
+        await asyncio.sleep(_TASK_AUTOMATION_INTERVAL)
+        try:
+            db = SessionLocal()
+            try:
+                await run_due_task_automations_once(db)
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[TaskAutomation] Error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: register Telegram webhook + start Email IMAP polling + agent workers."""
@@ -127,6 +145,7 @@ async def lifespan(app: FastAPI):
 
     email_task = asyncio.create_task(_email_poll_loop())
     sla_task = asyncio.create_task(_sla_check_loop())
+    task_automation_task = asyncio.create_task(_task_automation_loop())
 
     # Start AI agent workers
     from src.worker.consumer import start_workers, stop_workers
@@ -134,7 +153,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    for task in (email_task, sla_task):
+    for task in (email_task, sla_task, task_automation_task):
         task.cancel()
         try:
             await task

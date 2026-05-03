@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from datetime import datetime, timedelta, timezone
 
 from app.api.api import api_router
 from app.core.auth import get_current_user
@@ -18,10 +19,14 @@ from app.models.models import (
     ProjectSourceType,
     ProjectStage,
     ProjectStatus,
+    ProjectTask,
+    ProjectTaskAutomationStatus,
+    ProjectTaskAutomationType,
     ProjectTaskStatus,
     User,
     UserType,
 )
+from app.services.project_service import run_due_task_automations_once
 
 
 def _seed_user_and_stages(db):
@@ -243,6 +248,186 @@ def test_create_list_and_update_project_tasks(db):
     db.refresh(project)
     task = project.tasks[0]
     assert task.status == ProjectTaskStatus.DONE
+
+
+def test_create_project_task_from_message_can_attach_to_existing_project_context(db):
+    user = _seed_user_and_stages(db)
+    contact = Contact(name="Task Contact")
+    db.add(contact)
+    db.flush()
+
+    conversation = Conversation(
+        contact_id=contact.id,
+        assigned_user_id=user.id,
+        channel=ChannelType.WHATSAPP,
+        status=ConversationStatus.OPEN,
+    )
+    db.add(conversation)
+    db.flush()
+
+    project = Project(
+        title="Execution Project",
+        description="Parent project",
+        stage="lead",
+        priority=ProjectPriority.MEDIUM,
+        status=ProjectStatus.OPEN,
+        source_type=ProjectSourceType.MANUAL,
+        created_by_user_id=user.id,
+    )
+    db.add(project)
+    db.flush()
+
+    message = Message(
+        conversation_id=conversation.id,
+        owner_id=user.id,
+        content="Please send the contract tomorrow",
+        inbound=True,
+        message_type=MessageType.TEXT,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    client = _make_client(db, user)
+    response = client.post(
+        f"/api/v1/admin/projects/tasks/from-message/{message.id}",
+        json={
+            "title": "Send contract",
+            "description": "Customer requested contract follow-up",
+            "priority": "high",
+            "project_context_id": str(project.id),
+            "attach_conversation_to_project": True,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["project_id"] == str(project.id)
+    assert data["source_message_id"] == str(message.id)
+    assert data["source_conversation_id"] == str(conversation.id)
+
+    db.refresh(conversation)
+    assert str(conversation.project_context_id) == str(project.id)
+
+
+def test_create_project_task_from_message_can_create_new_project_context(db):
+    user = _seed_user_and_stages(db)
+    contact = Contact(name="Fresh Task")
+    db.add(contact)
+    db.flush()
+
+    conversation = Conversation(
+        contact_id=contact.id,
+        assigned_user_id=user.id,
+        channel=ChannelType.TELEGRAM,
+        status=ConversationStatus.OPEN,
+    )
+    db.add(conversation)
+    db.flush()
+
+    message = Message(
+        conversation_id=conversation.id,
+        owner_id=user.id,
+        content="Need a checklist item from this demand",
+        inbound=True,
+        message_type=MessageType.TEXT,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    client = _make_client(db, user)
+    response = client.post(
+        f"/api/v1/admin/projects/tasks/from-message/{message.id}",
+        json={
+          "title": "Prepare onboarding checklist",
+          "priority": "medium",
+          "create_project_context": True,
+          "attach_conversation_to_project": True,
+          "new_project_title": "Onboarding rollout",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["project_reference"] is not None
+    assert data["source_message_id"] == str(message.id)
+
+    db.refresh(conversation)
+    assert conversation.project_context_id is not None
+
+
+def test_create_project_task_supports_scheduled_automation_fields(db):
+    user = _seed_user_and_stages(db)
+    project = Project(
+        title="Automation Project",
+        description="Project with scheduled task",
+        stage="lead",
+        priority=ProjectPriority.MEDIUM,
+        status=ProjectStatus.OPEN,
+        source_type=ProjectSourceType.MANUAL,
+        created_by_user_id=user.id,
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    client = _make_client(db, user)
+    run_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+    response = client.post(
+        f"/api/v1/admin/projects/{project.id}/tasks",
+        json={
+            "title": "Send follow-up",
+            "status": "open",
+            "priority": "medium",
+            "automation_type": "send_message",
+            "automation_status": "scheduled",
+            "automation_run_at": run_at.isoformat(),
+            "automation_message_content": "Checking in with the customer",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["automation_type"] == "send_message"
+    assert data["automation_status"] == "scheduled"
+    assert data["automation_message_content"] == "Checking in with the customer"
+
+
+def test_due_scheduled_action_task_is_executed(db):
+    user = _seed_user_and_stages(db)
+    project = Project(
+        title="Scheduled Action Project",
+        description="Project with scheduled action",
+        stage="lead",
+        priority=ProjectPriority.MEDIUM,
+        status=ProjectStatus.OPEN,
+        source_type=ProjectSourceType.MANUAL,
+        created_by_user_id=user.id,
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    db.add(
+        ProjectTask(
+            project_id=project.id,
+            title="Run internal reminder",
+            description="Scheduled internal action",
+            status=ProjectTaskStatus.OPEN,
+            priority=ProjectPriority.MEDIUM,
+            automation_type=ProjectTaskAutomationType.SCHEDULED_ACTION,
+            automation_status=ProjectTaskAutomationStatus.SCHEDULED,
+            automation_run_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+            automation_action_label="notify-ops",
+            created_by_user_id=user.id,
+        )
+    )
+    db.commit()
+
+    import asyncio
+    asyncio.run(run_due_task_automations_once(db))
+
+    executed_task = db.query(ProjectTask).first()
+    assert executed_task.automation_status == ProjectTaskAutomationStatus.COMPLETED
+    assert executed_task.automation_executed_at is not None
 
 
 def test_reject_invalid_progress_and_missing_message_source(db):

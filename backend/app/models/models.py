@@ -74,6 +74,19 @@ class ProjectTaskStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
+class ProjectTaskAutomationType(enum.Enum):
+    SEND_MESSAGE = "send_message"
+    SCHEDULED_ACTION = "scheduled_action"
+
+
+class ProjectTaskAutomationStatus(enum.Enum):
+    SCHEDULED = "scheduled"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 OFFICIAL_PROJECT_STAGES = [
     ("lead", "Lead", 1),
     ("qualification", "Qualification", 2),
@@ -398,6 +411,27 @@ class ProjectTask(Base):
     source_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
     source_conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=True)
     due_date = Column(DateTime(timezone=True), nullable=True)
+    automation_type = Column(
+        Enum(
+            ProjectTaskAutomationType,
+            values_callable=lambda obj: [e.value for e in obj],
+            name="projecttaskautomationtype",
+        ),
+        nullable=True,
+    )
+    automation_status = Column(
+        Enum(
+            ProjectTaskAutomationStatus,
+            values_callable=lambda obj: [e.value for e in obj],
+            name="projecttaskautomationstatus",
+        ),
+        nullable=True,
+    )
+    automation_run_at = Column(DateTime(timezone=True), nullable=True)
+    automation_message_content = Column(Text, nullable=True)
+    automation_action_label = Column(String(255), nullable=True)
+    automation_last_error = Column(Text, nullable=True)
+    automation_executed_at = Column(DateTime(timezone=True), nullable=True)
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

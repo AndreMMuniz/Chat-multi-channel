@@ -1,7 +1,7 @@
 # Story 14.3: Task Automation and Scheduled Actions
 
 ## Status
-ready-for-dev
+done
 
 ## Story
 **As an agent,** I want to automate selected tasks so that follow-ups and operational actions can happen at the right time.

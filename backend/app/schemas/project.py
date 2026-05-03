@@ -9,6 +9,8 @@ from app.models.models import (
     ProjectPriority,
     ProjectSourceType,
     ProjectStatus,
+    ProjectTaskAutomationStatus,
+    ProjectTaskAutomationType,
     ProjectTaskStatus,
 )
 
@@ -139,6 +141,11 @@ class ProjectTaskBase(BaseModel):
     source_message_id: Optional[UUID] = None
     source_conversation_id: Optional[UUID] = None
     due_date: Optional[datetime] = None
+    automation_type: Optional[ProjectTaskAutomationType] = None
+    automation_status: Optional[ProjectTaskAutomationStatus] = None
+    automation_run_at: Optional[datetime] = None
+    automation_message_content: Optional[str] = None
+    automation_action_label: Optional[str] = None
 
 
 class ProjectTaskCreate(ProjectTaskBase):
@@ -172,6 +179,7 @@ class ProjectTaskFromMessageCreate(BaseModel):
 class ProjectTaskResponse(BaseModel):
     id: UUID
     project_id: UUID
+    project_reference: Optional[str] = None
     title: str
     description: Optional[str] = None
     status: ProjectTaskStatus
@@ -181,6 +189,13 @@ class ProjectTaskResponse(BaseModel):
     source_message_id: Optional[UUID] = None
     source_conversation_id: Optional[UUID] = None
     due_date: Optional[datetime] = None
+    automation_type: Optional[ProjectTaskAutomationType] = None
+    automation_status: Optional[ProjectTaskAutomationStatus] = None
+    automation_run_at: Optional[datetime] = None
+    automation_message_content: Optional[str] = None
+    automation_action_label: Optional[str] = None
+    automation_last_error: Optional[str] = None
+    automation_executed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

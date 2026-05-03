@@ -1,7 +1,7 @@
 # Story 14.2: Create Task from Message with Project Routing
 
 ## Status
-ready-for-dev
+done
 
 ## Story
 **As an agent,** I want to create a task from a message so that I can convert a concrete request into executable work without losing provenance.

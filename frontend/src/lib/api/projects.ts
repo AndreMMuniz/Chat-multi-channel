@@ -6,6 +6,7 @@ import type {
   ProjectStage,
   ProjectTaskCreateRequest,
   ProjectTaskDto,
+  ProjectTaskFromMessageRequest,
   ProjectTaskUpdateRequest,
   ProjectUpdateRequest,
 } from "@/types/project";
@@ -69,6 +70,17 @@ export async function updateProjectTask(
   return apiMutate<ProjectTaskUpdateRequest, ProjectTaskDto>(
     `/admin/projects/${projectId}/tasks/${taskId}`,
     "PATCH",
+    body,
+  );
+}
+
+export async function createProjectTaskFromMessage(
+  messageId: string,
+  body: ProjectTaskFromMessageRequest,
+): Promise<ProjectTaskDto> {
+  return apiMutate<ProjectTaskFromMessageRequest, ProjectTaskDto>(
+    `/admin/projects/tasks/from-message/${messageId}`,
+    "POST",
     body,
   );
 }

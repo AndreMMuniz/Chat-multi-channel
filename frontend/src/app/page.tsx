@@ -21,7 +21,7 @@ import { useQuickReplySearch } from '@/hooks/useQuickReplies';
 import { conversationsApi, usersApi, quickRepliesApi, projectsApi } from '@/lib/api/index';
 import type { SequencedEvent } from '@/types/api';
 import type { ChannelType, Conversation, ConversationTag, Message } from '@/types/chat';
-import type { ProjectDto, ProjectPriority, ProjectStage, ProjectStageKey } from '@/types/project';
+import type { ProjectDto, ProjectPriority, ProjectStage, ProjectStageKey, ProjectTaskDto, ProjectTaskStatus } from '@/types/project';
 import AudioMessage from '@/components/AudioMessage';
 import { useState as useLocalState, useEffect as useLocalEffect } from 'react';
 
@@ -230,7 +230,7 @@ function TagPills({
   );
 }
 
-type MessageActionId = 'create-card' | 'open-linked-card' | 'add-tag' | 'delete' | 'create-quick-reply';
+type MessageActionId = 'create-card' | 'open-linked-card' | 'create-task' | 'add-tag' | 'delete' | 'create-quick-reply';
 type CreateCardRouteMode = 'current-conversation-project' | 'existing-project' | 'new-project';
 
 type CreateCardModalState = {
@@ -254,6 +254,19 @@ type DeleteMessageState = {
   message: Message;
 };
 
+type CreateTaskModalState = {
+  message: Message;
+  title: string;
+  description: string;
+  priority: ProjectPriority;
+  status: ProjectTaskStatus;
+  dueDate: string;
+  routeMode: CreateCardRouteMode;
+  selectedProjectId: string;
+  relatedProjects: ProjectDto[];
+  newProjectTitle: string;
+};
+
 type ContextActionHintState = {
   message: string;
   projectId?: string;
@@ -275,6 +288,7 @@ function MessageContextMenu({
     linkedProject
       ? { id: 'open-linked-card', label: `Open ${linkedProject.reference}`, icon: 'open_in_new' }
       : { id: 'create-card', label: 'Create Card', icon: 'add_card' },
+    { id: 'create-task', label: 'Create Task', icon: 'checklist' },
     { id: 'add-tag', label: 'Add Tag', icon: 'sell' },
     ...(outbound ? [{ id: 'create-quick-reply' as const, label: 'Create Quick Reply', icon: 'quickreply' }] : []),
     { id: 'delete', label: 'Delete', icon: 'delete', tone: 'danger' },
@@ -313,6 +327,11 @@ function suggestCardTitle(message: Message, conversation: Conversation) {
   if (!source) return `${conversation.contact.name || 'Contact'} demand`;
   const compact = source.replace(/\s+/g, ' ').trim();
   return compact.length <= 72 ? compact : `${compact.slice(0, 69).trimEnd()}...`;
+}
+
+function suggestTaskTitle(message: Message, conversation: Conversation) {
+  const base = suggestCardTitle(message, conversation);
+  return base.length <= 72 ? base : `${base.slice(0, 69).trimEnd()}...`;
 }
 
 function CreateCardFromMessageModal({
@@ -486,6 +505,203 @@ function CreateCardFromMessageModal({
             className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
           >
             {submitting ? 'Creating...' : 'Create Card'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function CreateTaskFromMessageModal({
+  state,
+  projects,
+  loadingProjects,
+  submitting,
+  onClose,
+  onChange,
+  onSubmit,
+}: {
+  state: CreateTaskModalState;
+  projects: ProjectDto[];
+  loadingProjects: boolean;
+  submitting: boolean;
+  onClose: () => void;
+  onChange: (patch: Partial<CreateTaskModalState>) => void;
+  onSubmit: () => void;
+}) {
+  const selectedProject = projects.find(project => project.id === state.selectedProjectId);
+  const hasCurrentConversationProject = state.relatedProjects.length > 0;
+
+  return (
+    <Modal title="Create Task from Message" onClose={onClose} maxWidth="max-w-2xl">
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <span className="material-symbols-outlined text-[16px] text-indigo-600">forum</span>
+            Source message
+          </div>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{state.message.content || 'No message content available.'}</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-2 md:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Task title</span>
+            <input
+              value={state.title}
+              onChange={(event) => onChange({ title: event.target.value })}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+              placeholder="Describe the action to execute"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 md:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Task notes</span>
+            <textarea
+              value={state.description}
+              onChange={(event) => onChange({ description: event.target.value })}
+              className="min-h-[110px] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+              placeholder="Add execution notes that should stay linked to this message"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Priority</span>
+            <select
+              value={state.priority}
+              onChange={(event) => onChange({ priority: event.target.value as ProjectPriority })}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Status</span>
+            <select
+              value={state.status}
+              onChange={(event) => onChange({ status: event.target.value as ProjectTaskStatus })}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            >
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Done</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 md:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Due date</span>
+            <input
+              type="date"
+              value={state.dueDate}
+              onChange={(event) => onChange({ dueDate: event.target.value })}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            />
+          </label>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Project routing</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Tasks must belong to a project. Use the current conversation project, route to an existing one, or create a new project context first.
+            </p>
+          </div>
+
+          {hasCurrentConversationProject ? (
+            <label className="flex items-start gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4">
+              <input
+                type="radio"
+                name="task-project-routing"
+                checked={state.routeMode === 'current-conversation-project'}
+                onChange={() => onChange({ routeMode: 'current-conversation-project' })}
+                className="mt-1 h-4 w-4 accent-indigo-600"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Use current conversation project</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  The task will be attached to {state.relatedProjects[0]?.reference ?? 'the linked project'}.
+                </p>
+              </div>
+            </label>
+          ) : null}
+
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
+            <input
+              type="radio"
+              name="task-project-routing"
+              checked={state.routeMode === 'existing-project'}
+              onChange={() => onChange({ routeMode: 'existing-project' })}
+              className="mt-1 h-4 w-4 accent-indigo-600"
+            />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-slate-900">Use existing project context</p>
+              <p className="mt-1 text-sm text-slate-500">Attach the task to a project that already exists in Projects.</p>
+              {state.routeMode === 'existing-project' ? (
+                <select
+                  value={state.selectedProjectId}
+                  onChange={(event) => onChange({ selectedProjectId: event.target.value })}
+                  disabled={loadingProjects}
+                  className="mt-3 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="">Select a project</option>
+                  {projects.map(project => (
+                    <option key={project.id} value={project.id}>
+                      {project.reference} — {project.title}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
+            <input
+              type="radio"
+              name="task-project-routing"
+              checked={state.routeMode === 'new-project'}
+              onChange={() => onChange({ routeMode: 'new-project' })}
+              className="mt-1 h-4 w-4 accent-indigo-600"
+            />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-slate-900">Create a new project context first</p>
+              <p className="mt-1 text-sm text-slate-500">A new project will be created and this task will be attached to it immediately.</p>
+              {state.routeMode === 'new-project' ? (
+                <input
+                  value={state.newProjectTitle}
+                  onChange={(event) => onChange({ newProjectTitle: event.target.value })}
+                  className="mt-3 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                  placeholder="New project title"
+                />
+              ) : null}
+            </div>
+          </label>
+
+          {state.routeMode === 'existing-project' && selectedProject ? (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Task will be routed to <span className="font-semibold">{selectedProject.reference}</span>.
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={submitting}
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          >
+            {submitting ? 'Creating...' : 'Create Task'}
           </button>
         </div>
       </div>
@@ -674,9 +890,12 @@ export default function ChatPage() {
   const [projectStages, setProjectStages] = useState<ProjectStage[]>([]);
   const [availableProjects, setAvailableProjects] = useState<ProjectDto[]>([]);
   const [linkedProjectsByMessageId, setLinkedProjectsByMessageId] = useState<Record<string, ProjectDto[]>>({});
+  const [linkedTasksByMessageId, setLinkedTasksByMessageId] = useState<Record<string, ProjectTaskDto[]>>({});
   const [loadingProjectRouting, setLoadingProjectRouting] = useState(false);
   const [submittingProjectCard, setSubmittingProjectCard] = useState(false);
+  const [submittingProjectTask, setSubmittingProjectTask] = useState(false);
   const [createCardModal, setCreateCardModal] = useState<CreateCardModalState | null>(null);
+  const [createTaskModal, setCreateTaskModal] = useState<CreateTaskModalState | null>(null);
   const [savingConversationTag, setSavingConversationTag] = useState(false);
   const [tagMessageModal, setTagMessageModal] = useState<Message | null>(null);
   const [quickReplyModal, setQuickReplyModal] = useState<QuickReplyFromMessageState | null>(null);
@@ -841,6 +1060,40 @@ export default function ChatPage() {
     }
   }, [activeConversation]);
 
+  const openCreateTaskModalForMessage = useCallback(async (message: Message) => {
+    if (!activeConversation) return;
+
+    setLoadingProjectRouting(true);
+    try {
+      const projectsResponse = await projectsApi.listProjects({ limit: 200 });
+      const projects = projectsResponse.data;
+      const rootProjects = projects.filter(project => !project.project_context_id);
+      const relatedProjects = activeConversation.project_context_id
+        ? rootProjects.filter(project => project.id === activeConversation.project_context_id)
+        : [];
+      const primaryRelatedProject = relatedProjects[0];
+      const suggestedTitle = suggestTaskTitle(message, activeConversation);
+
+      setAvailableProjects(rootProjects);
+      setCreateTaskModal({
+        message,
+        title: suggestedTitle,
+        description: message.content || suggestedTitle,
+        priority: primaryRelatedProject?.priority ?? 'medium',
+        status: 'open',
+        dueDate: '',
+        routeMode: activeConversation.project_context_id ? 'current-conversation-project' : 'new-project',
+        selectedProjectId: '',
+        relatedProjects,
+        newProjectTitle: primaryRelatedProject?.title ?? suggestedTitle,
+      });
+    } catch (error) {
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to load task routing context.' });
+    } finally {
+      setLoadingProjectRouting(false);
+    }
+  }, [activeConversation]);
+
   const handleCreateCardSubmit = useCallback(async () => {
     if (!createCardModal || !activeConversation) return;
 
@@ -885,6 +1138,50 @@ export default function ChatPage() {
     }
   }, [activeConversation, availableProjects, createCardModal]);
 
+  const handleCreateTaskSubmit = useCallback(async () => {
+    if (!createTaskModal || !activeConversation) return;
+
+    const routingProject =
+      createTaskModal.routeMode === 'current-conversation-project'
+        ? createTaskModal.relatedProjects[0]
+        : createTaskModal.routeMode === 'existing-project'
+          ? availableProjects.find(project => project.id === createTaskModal.selectedProjectId)
+          : undefined;
+
+    try {
+      setSubmittingProjectTask(true);
+      const createdTask = await projectsApi.createProjectTaskFromMessage(createTaskModal.message.id, {
+        title: createTaskModal.title.trim(),
+        description: createTaskModal.description.trim(),
+        priority: createTaskModal.priority,
+        status: createTaskModal.status,
+        project_context_id: routingProject?.id ?? undefined,
+        attach_conversation_to_project: createTaskModal.routeMode !== 'current-conversation-project',
+        create_project_context: createTaskModal.routeMode === 'new-project',
+        new_project_title: createTaskModal.routeMode === 'new-project' ? createTaskModal.newProjectTitle.trim() || createTaskModal.title.trim() : undefined,
+        owner_user_id: routingProject?.owner_id ?? undefined,
+        due_date: createTaskModal.dueDate ? `${createTaskModal.dueDate}T00:00:00Z` : undefined,
+      });
+      setCreateTaskModal(null);
+      setLinkedTasksByMessageId((current) => ({
+        ...current,
+        [createTaskModal.message.id]: [...(current[createTaskModal.message.id] ?? []), createdTask],
+      }));
+      await fetchConversations();
+      setContextActionHint({
+        message: createdTask.project_reference
+          ? `Task created inside ${createdTask.project_reference}.`
+          : 'Task created from message.',
+        projectId: createdTask.project_id,
+        projectReference: createdTask.project_reference ?? undefined,
+      });
+    } catch (error) {
+      setContextActionHint({ message: error instanceof Error ? error.message : 'Failed to create task from message.' });
+    } finally {
+      setSubmittingProjectTask(false);
+    }
+  }, [activeConversation, availableProjects, createTaskModal, fetchConversations]);
+
   const handleConversationTagFromMessage = useCallback(async (tag: ConversationTag | null) => {
     if (!activeConversation) return;
 
@@ -917,6 +1214,11 @@ export default function ChatPage() {
       return;
     }
 
+    if (action === 'create-task') {
+      void openCreateTaskModalForMessage(message);
+      return;
+    }
+
     if (action === 'add-tag') {
       setTagMessageModal(message);
       return;
@@ -935,7 +1237,7 @@ export default function ChatPage() {
     if (action === 'delete') {
       setDeleteMessageModal({ message });
     }
-  }, [linkedProjectsByMessageId, openCreateCardModalForMessage, router]);
+  }, [linkedProjectsByMessageId, openCreateCardModalForMessage, openCreateTaskModalForMessage, router]);
 
   const {
     messages,
@@ -966,15 +1268,19 @@ export default function ChatPage() {
     if (!activeConversation) return;
 
     const conversationId = activeConversation.id;
+    const projectContextId = activeConversation.project_context_id;
 
     let cancelled = false;
 
-    async function loadLinkedProjects() {
+    async function loadLinkedOperationalItems() {
       try {
-        const response = await projectsApi.listProjects({ limit: 200, source_type: 'message' });
+        const [projectsResponse, tasksResponse] = await Promise.all([
+          projectsApi.listProjects({ limit: 200, source_type: 'message' }),
+          projectContextId ? projectsApi.listProjectTasks(projectContextId) : Promise.resolve([]),
+        ]);
         if (cancelled) return;
 
-        const projectMap = response.data
+        const projectMap = projectsResponse.data
           .filter((project) => project.conversation_id === conversationId && project.source_message_id)
           .reduce<Record<string, ProjectDto[]>>((acc, project) => {
             const messageId = project.source_message_id as string;
@@ -982,13 +1288,25 @@ export default function ChatPage() {
             return acc;
           }, {});
 
+        const taskMap = tasksResponse
+          .filter((task) => task.source_conversation_id === conversationId && task.source_message_id)
+          .reduce<Record<string, ProjectTaskDto[]>>((acc, task) => {
+            const messageId = task.source_message_id as string;
+            acc[messageId] = [...(acc[messageId] ?? []), task];
+            return acc;
+          }, {});
+
         setLinkedProjectsByMessageId(projectMap);
+        setLinkedTasksByMessageId(taskMap);
       } catch {
-        if (!cancelled) setLinkedProjectsByMessageId({});
+        if (!cancelled) {
+          setLinkedProjectsByMessageId({});
+          setLinkedTasksByMessageId({});
+        }
       }
     }
 
-    void loadLinkedProjects();
+    void loadLinkedOperationalItems();
     return () => {
       cancelled = true;
     };
@@ -1548,6 +1866,8 @@ export default function ChatPage() {
                   (() => {
                     const linkedProjects = linkedProjectsByMessageId[msg.id] ?? [];
                     const primaryLinkedProject = linkedProjects[0];
+                    const linkedTasks = linkedTasksByMessageId[msg.id] ?? [];
+                    const primaryLinkedTask = linkedTasks[0];
                     return (
                   <div key={msg.id} className={cn("group/message relative flex max-w-[72%]", !msg.inbound ? "self-end" : "self-start")}>
                     <div className={cn("relative flex flex-col gap-1", !msg.inbound ? "items-end" : "items-start")}>
@@ -1654,20 +1974,40 @@ export default function ChatPage() {
                         </div>
                       )}
 
-                      {primaryLinkedProject ? (
+                      {primaryLinkedProject || primaryLinkedTask ? (
                         <div className={cn("flex items-center gap-2", !msg.inbound ? "justify-end" : "justify-start")}>
-                          <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[10px] font-semibold text-indigo-700">
-                            <span className="material-symbols-outlined text-[12px]">add_card</span>
-                            Already a card
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/projects?projectId=${primaryLinkedProject.id}`)}
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-800"
-                          >
-                            <span>Open {primaryLinkedProject.reference}</span>
-                            <span className="material-symbols-outlined text-[12px]">open_in_new</span>
-                          </button>
+                          {primaryLinkedProject ? (
+                            <>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[10px] font-semibold text-indigo-700">
+                                <span className="material-symbols-outlined text-[12px]">add_card</span>
+                                Already a card
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/projects?projectId=${primaryLinkedProject.id}`)}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-800"
+                              >
+                                <span>Open {primaryLinkedProject.reference}</span>
+                                <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                              </button>
+                            </>
+                          ) : null}
+                          {primaryLinkedTask ? (
+                            <>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
+                                <span className="material-symbols-outlined text-[12px]">checklist</span>
+                                Already a task
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/projects?projectId=${primaryLinkedTask.project_id}`)}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 transition hover:text-emerald-900"
+                              >
+                                <span>Open {primaryLinkedTask.project_reference ?? 'project'}</span>
+                                <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -2195,6 +2535,18 @@ export default function ChatPage() {
           onClose={() => setCreateCardModal(null)}
           onChange={(patch) => setCreateCardModal(current => current ? { ...current, ...patch } : current)}
           onSubmit={handleCreateCardSubmit}
+        />
+      )}
+
+      {createTaskModal && (
+        <CreateTaskFromMessageModal
+          state={createTaskModal}
+          projects={availableProjects}
+          loadingProjects={loadingProjectRouting}
+          submitting={submittingProjectTask}
+          onClose={() => setCreateTaskModal(null)}
+          onChange={(patch) => setCreateTaskModal(current => current ? { ...current, ...patch } : current)}
+          onSubmit={handleCreateTaskSubmit}
         />
       )}
 
