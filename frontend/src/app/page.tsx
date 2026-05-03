@@ -1220,16 +1220,21 @@ export default function ChatPage() {
             effectiveMobileView === 'chat' ? "-translate-x-full md:translate-x-0" : "translate-x-0"
           )}
         >
-          <div className="p-md border-surface-variant">
-            <div className="relative flex items-center w-full h-10 rounded-DEFAULT bg-[#F1F3F5] text-on-surface-variant focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-              <span className="material-symbols-outlined ml-sm text-outline">search</span>
+          <div className="px-3 pt-3 pb-2">
+            <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 shadow-sm transition-all focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100">
+              <span className="material-symbols-outlined text-[18px] text-slate-400 shrink-0">search</span>
               <input
-                className="w-full h-full bg-transparent border-none text-body-sm focus:ring-0 pl-sm pr-sm outline-none"
+                className="h-full w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 placeholder="Search conversations…"
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="shrink-0 text-slate-400 hover:text-slate-600">
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              )}
             </div>
             <div className="mt-2 space-y-1.5">
               {/* Channel filter chips */}
