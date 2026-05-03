@@ -179,6 +179,7 @@ Recommended breakdown:
 2. Add message-to-task creation with routing
 3. Add scheduled automation metadata and execution path
 4. Add task summaries and lightweight productivity visibility
+5. Add aggregated `Tasks` workspace for execution queue management
 
 ---
 
@@ -191,3 +192,4 @@ Epic 14 is successful when:
 - a message can become either a project card or a project task with provenance preserved
 - projects gain operational depth without bloating the pipeline model
 - the product is prepared for scheduled follow-up automation inside project work
+- agents can manage execution load through a transversal list without turning `Tasks` into a competing domain

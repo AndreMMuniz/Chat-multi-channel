@@ -691,6 +691,50 @@ Add contextual actions directly to message bubbles so operators can transform co
 **Estimation:** 5 story points  
 **Priority:** High
 
+## Epic 15: Tasks Workspace Aggregation
+
+Expose a dedicated `Tasks` menu workspace as a transversal list over project tasks, focused on personal execution queues, overdue work, and fast navigation back to parent projects.
+
+### Story 15.1: Aggregated Project Tasks API and Filters
+**As an agent,** I want an aggregated tasks API across projects so that the `Tasks` workspace can load my operational queue efficiently.  
+**Acceptance Criteria:**
+- Backend exposes a task-list endpoint across projects.
+- Endpoint supports filters for `project`, `assignee`, `created_by`, and `status`.
+- Response includes parent project summary for each task.
+- The API shape is compatible with a list-first frontend workspace.  
+**Estimation:** 5 story points  
+**Priority:** High
+
+### Story 15.2: Tasks Workspace List and Quick Scopes
+**As an agent,** I want a dedicated `Tasks` workspace with quick scopes so that I can manage my execution queue without opening each project individually.  
+**Acceptance Criteria:**
+- `Tasks` menu opens a list-style workspace.
+- Workspace exposes quick scopes for `Assigned to me`, `Created by me`, `Overdue`, `Scheduled`, and `Done`.
+- The main list shows task title, project, assignee, status, priority, and due date.
+- Empty states remain useful and operationally clear.  
+**Estimation:** 5 story points  
+**Priority:** High
+
+### Story 15.3: Task Row Actions and Project Linking
+**As an agent,** I want quick actions directly from the tasks list so that I can complete work fast and jump back to the parent project when needed.  
+**Acceptance Criteria:**
+- Each task row supports `mark done` / `reopen`.
+- Each task row exposes a clear `Open Project` action.
+- Message-origin tasks preserve provenance visibility in the list or detail surface.
+- Task actions update the list reliably without requiring a full page reload.  
+**Estimation:** 3 story points  
+**Priority:** High
+
+### Story 15.4: Task Detail Drawer and Automation Visibility
+**As an agent,** I want to inspect task details and automation context from the aggregated workspace so that I can understand execution state without losing my place in the queue.  
+**Acceptance Criteria:**
+- Selecting a task opens a compact detail surface.
+- The detail view shows project context, notes, due date, assignee, and provenance.
+- Automation fields and status are visible when the task is scheduled or automated.
+- The detail surface does not break the user’s place in the list workflow.  
+**Estimation:** 3 story points  
+**Priority:** Medium
+
 ### Story 13.2: Create Card from Message with Project Routing
 **As an operator,** I want to create a card directly from a message so that customer demands become tracked work with provenance preserved.  
 **Acceptance Criteria:**
