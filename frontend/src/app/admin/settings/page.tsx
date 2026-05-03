@@ -127,7 +127,7 @@ export default function SettingsPage() {
           twilio_account_sid: "",
           twilio_auth_token: "",
           twilio_phone_number: "",
-          ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v ?? ""])),
+          ...Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, v ?? ""])),
         }),
       )
       .catch((err: Error) => setError(err.message || "Failed to load settings."))
