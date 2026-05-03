@@ -216,7 +216,7 @@ function TagPills({
   );
 }
 
-type MessageActionId = 'create-card' | 'add-tag' | 'delete' | 'create-quick-reply';
+type MessageActionId = 'create-card' | 'open-linked-card' | 'add-tag' | 'delete' | 'create-quick-reply';
 type CreateCardRouteMode = 'current-conversation-project' | 'existing-project' | 'new-project';
 
 type CreateCardModalState = {
@@ -249,14 +249,18 @@ type ContextActionHintState = {
 function MessageContextMenu({
   message,
   outbound,
+  linkedProject,
   onSelect,
 }: {
   message: Message;
   outbound: boolean;
+  linkedProject?: ProjectDto;
   onSelect: (action: MessageActionId, message: Message) => void;
 }) {
   const items: Array<{ id: MessageActionId; label: string; icon: string; tone?: 'default' | 'danger' }> = [
-    { id: 'create-card', label: 'Create Card', icon: 'add_card' },
+    linkedProject
+      ? { id: 'open-linked-card', label: `Open ${linkedProject.reference}`, icon: 'open_in_new' }
+      : { id: 'create-card', label: 'Create Card', icon: 'add_card' },
     { id: 'add-tag', label: 'Add Tag', icon: 'sell' },
     ...(outbound ? [{ id: 'create-quick-reply' as const, label: 'Create Quick Reply', icon: 'quickreply' }] : []),
     { id: 'delete', label: 'Delete', icon: 'delete', tone: 'danger' },
@@ -881,7 +885,14 @@ export default function ChatPage() {
   const handleMessageActionSelect = useCallback((action: MessageActionId, message: Message) => {
     setOpenMessageMenuId(null);
 
+    const linkedProject = linkedProjectsByMessageId[message.id]?.[0];
+
     if (action === 'create-quick-reply' && message.inbound) return;
+
+    if (action === 'open-linked-card' && linkedProject) {
+      router.push(`/projects?projectId=${linkedProject.id}`);
+      return;
+    }
 
     if (action === 'create-card') {
       void openCreateCardModalForMessage(message);
@@ -906,7 +917,7 @@ export default function ChatPage() {
     if (action === 'delete') {
       setDeleteMessageModal({ message });
     }
-  }, [openCreateCardModalForMessage]);
+  }, [linkedProjectsByMessageId, openCreateCardModalForMessage, router]);
 
   const {
     messages,
@@ -1536,6 +1547,7 @@ export default function ChatPage() {
                             <MessageContextMenu
                               message={msg}
                               outbound={!msg.inbound}
+                              linkedProject={primaryLinkedProject}
                               onSelect={handleMessageActionSelect}
                             />
                           </div>
