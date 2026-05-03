@@ -82,7 +82,7 @@ export default function SideNavBar() {
   };
 
   return (
-    <nav className="h-full w-[64px] shrink-0 bg-white border-r border-[#E9ECEF] flex flex-col items-center py-4">
+    <nav className="h-full w-[64px] shrink-0 bg-white border-r border-[#E9ECEF] hidden md:flex flex-col items-center py-4">
       <Link href="/" className="mb-5 w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
         <span
           className="material-symbols-outlined text-white text-[22px]"

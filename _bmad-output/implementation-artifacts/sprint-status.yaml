@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-03  # story 14.3 implemented
+last_updated: 2026-05-03  # story 14.4 implemented
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -238,9 +238,9 @@ development_status:
   # Source: party mode decision 2026-05-03 after Epic 13 retrospective
   # Scope: tasks as subitems of projects, message-to-task creation, scheduled automation,
   #        lightweight productivity visibility inside Projects
-  epic-14: in-progress
+  epic-14: done
 
   14-1-project-task-model-and-detail-surface: done
   14-2-create-task-from-message-with-project-routing: done
   14-3-task-automation-and-scheduled-actions: done
-  14-4-task-visibility-and-productivity-views: ready-for-dev
+  14-4-task-visibility-and-productivity-views: done

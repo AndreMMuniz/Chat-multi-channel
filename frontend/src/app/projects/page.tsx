@@ -77,6 +77,8 @@ type ProjectTask = {
   automationActionLabel: string;
   automationLastError?: string;
   automationExecutedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ProjectTaskDraft = {
@@ -357,6 +359,8 @@ function adaptProjectTask(task: ProjectTaskDto): ProjectTask {
     automationActionLabel: task.automation_action_label ?? "",
     automationLastError: task.automation_last_error ?? undefined,
     automationExecutedAt: task.automation_executed_at ?? undefined,
+    createdAt: task.created_at,
+    updatedAt: task.updated_at,
   };
 }
 
@@ -546,25 +550,6 @@ function ProjectTaskSection({
 }) {
   const [taskFilter, setTaskFilter] = useState<TaskFilterId>("ALL");
   const [taskSort, setTaskSort] = useState<TaskSortId>("newest");
-
-  if (!projectId) {
-    return (
-      <section className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-5 py-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm">
-            <span className="material-symbols-outlined text-[18px]">checklist</span>
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-slate-900">Project tasks</h3>
-            <p className="text-sm leading-6 text-slate-500">
-              Save the project first, then add execution tasks such as follow-ups, document review, and delivery steps.
-            </p>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
   const openCount = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").length;
   const inProgressCount = tasks.filter((task) => task.status === "in_progress").length;
   const completedCount = tasks.filter((task) => task.status === "done").length;
@@ -589,9 +574,27 @@ function ProjectTaskSection({
         if (!b.dueDate) return -1;
         return a.dueDate.localeCompare(b.dueDate);
       }
-      return b.id.localeCompare(a.id);
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
   }, [taskFilter, taskSort, tasks]);
+
+  if (!projectId) {
+    return (
+      <section className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm">
+            <span className="material-symbols-outlined text-[18px]">checklist</span>
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-900">Project tasks</h3>
+            <p className="text-sm leading-6 text-slate-500">
+              Save the project first, then add execution tasks such as follow-ups, document review, and delivery steps.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-4 rounded-[22px] border border-slate-200 bg-slate-50/70 p-5">
@@ -871,11 +874,13 @@ function ProjectTaskSection({
 
 function ProjectCardView({
   card,
+  taskSummary,
   owner,
   onOpen,
   onDragStart,
 }: {
   card: ProjectCard;
+  taskSummary?: { open: number; overdue: number };
   owner?: Owner;
   onOpen: (card: ProjectCard) => void;
   onDragStart: (cardId: string, stageId: StageId) => void;
@@ -934,6 +939,19 @@ function ProjectCardView({
         </span>
         <span className="text-slate-300">•</span>
         <span>{card.progress}% progress</span>
+        {taskSummary && (taskSummary.open > 0 || taskSummary.overdue > 0) ? (
+          <>
+            <span className="text-slate-300">â€¢</span>
+            <span className="font-medium text-slate-500">
+              {taskSummary.open} open task{taskSummary.open === 1 ? "" : "s"}
+            </span>
+            {taskSummary.overdue > 0 ? (
+              <span className="font-semibold text-rose-600">
+                {taskSummary.overdue} overdue
+              </span>
+            ) : null}
+          </>
+        ) : null}
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
@@ -1377,8 +1395,19 @@ export default function ProjectsPage() {
 
         if (!isMounted) return;
 
+        const adaptedProjects = projectsResponse.data.map(adaptProject);
+        const taskEntries = await Promise.all(
+          adaptedProjects.map(async (project) => {
+            const tasks = await projectsApi.listProjectTasks(project.id);
+            return [project.id, tasks.map(adaptProjectTask)] as const;
+          })
+        );
+
+        if (!isMounted) return;
+
         setStageOptions(mapStageOptions(stagesResponse));
-        setCards(projectsResponse.data.map(adaptProject));
+        setCards(adaptedProjects);
+        setProjectTasksByProjectId(Object.fromEntries(taskEntries));
       } catch (error) {
         if (!isMounted) return;
         setErrorMessage(error instanceof Error ? error.message : "Failed to load projects workspace.");
@@ -1435,12 +1464,26 @@ export default function ProjectsPage() {
     }, {} as Record<StageId, ProjectCard[]>);
   }, [filteredCards, stageOptions]);
 
+  const projectTaskSummaries = useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(projectTasksByProjectId).map(([projectId, tasks]) => {
+        const open = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").length;
+        const overdue = tasks.filter(
+          (task) => isOverdue(task.dueDate) && task.status !== "done" && task.status !== "cancelled"
+        ).length;
+        return [projectId, { open, overdue }] as const;
+      })
+    );
+  }, [projectTasksByProjectId]);
+
   const kpis = useMemo(() => {
     const activeProjects = filteredCards.filter((card) => card.progress < 100).length;
     const atRisk = filteredCards.filter((card) => isOverdue(card.dueDate) && card.progress < 100).length;
     const conversationOrigin = filteredCards.filter((card) => card.origin === "message").length;
     const totalOwners = new Set(filteredCards.map((card) => card.ownerId).filter(Boolean)).size;
     const pipelineValue = filteredCards.reduce((sum, card) => sum + card.value, 0);
+    const openTasks = filteredCards.reduce((sum, card) => sum + (projectTaskSummaries[card.id]?.open ?? 0), 0);
+    const overdueTasks = filteredCards.reduce((sum, card) => sum + (projectTaskSummaries[card.id]?.overdue ?? 0), 0);
 
     return [
       {
@@ -1451,11 +1494,11 @@ export default function ProjectsPage() {
         tint: "bg-indigo-50 text-indigo-700",
       },
       {
-        label: "At Risk",
-        value: String(atRisk),
-        hint: "Due soon or overdue across the pipeline",
-        icon: "warning",
-        tint: "bg-rose-50 text-rose-700",
+        label: "Open Tasks",
+        value: String(openTasks),
+        hint: `${overdueTasks} overdue task${overdueTasks === 1 ? "" : "s"} across visible projects`,
+        icon: "checklist",
+        tint: overdueTasks > 0 ? "bg-rose-50 text-rose-700" : "bg-violet-50 text-violet-700",
       },
       {
         label: "Conversation Origin",
@@ -1467,12 +1510,12 @@ export default function ProjectsPage() {
       {
         label: "Pipeline Value",
         value: formatCurrency(pipelineValue),
-        hint: `${totalOwners} owners represented in the current view`,
+        hint: `${totalOwners} owners represented • ${atRisk} project${atRisk === 1 ? "" : "s"} at risk`,
         icon: "monetization_on",
         tint: "bg-emerald-50 text-emerald-700",
       },
     ];
-  }, [filteredCards]);
+  }, [filteredCards, projectTaskSummaries]);
 
   const timelineCards = useMemo(() => {
     return [...filteredCards].sort((a, b) => {
@@ -2050,6 +2093,7 @@ export default function ProjectsPage() {
                           <ProjectCardView
                             key={card.id}
                             card={card}
+                            taskSummary={projectTaskSummaries[card.id]}
                             owner={owners.find((item) => item.id === card.ownerId)}
                             onOpen={openExistingProject}
                             onDragStart={handleDragStart}

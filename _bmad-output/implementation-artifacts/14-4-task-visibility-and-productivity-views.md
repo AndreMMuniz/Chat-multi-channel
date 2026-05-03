@@ -1,7 +1,7 @@
 # Story 14.4: Task Visibility and Productivity Views
 
 ## Status
-ready-for-dev
+done
 
 ## Story
 **As an agent,** I want to see open and overdue project tasks clearly so that I can focus on next actions without losing project context.
