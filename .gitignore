@@ -123,3 +123,7 @@ docker-compose.override.yml
 graphify_detect.json
 .graphify_detect.json
 .graphify_python
+
+#-------------bmad--------------------
+_bmad
+_bmad-output
