@@ -77,12 +77,15 @@ export interface ProjectTaskDto {
   id: string;
   project_id: string;
   project_reference?: string | null;
+  project_title?: string | null;
   title: string;
   description?: string | null;
   status: ProjectTaskStatus;
   priority: ProjectPriority;
   owner_id?: string | null;
   owner_name?: string | null;
+  created_by_id?: string | null;
+  created_by_name?: string | null;
   source_message_id?: string | null;
   source_conversation_id?: string | null;
   due_date?: string | null;

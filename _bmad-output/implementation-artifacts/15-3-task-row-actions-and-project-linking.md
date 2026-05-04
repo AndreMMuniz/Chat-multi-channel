@@ -1,7 +1,7 @@
 # Story 15.3: Task Row Actions and Project Linking
 
 ## Status
-ready-for-dev
+done
 
 ## Story
 **As an agent,** I want quick actions directly from the tasks list so that I can complete work fast and jump back to the parent project when needed.

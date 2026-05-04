@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-05-03  # story 15.1 implemented
+last_updated: 2026-05-04  # story 15.3 implemented
 project: Chat-multi-channel
 project_key: NOKEY
 tracking_system: file-system
@@ -252,6 +252,6 @@ development_status:
   epic-15: in-progress
 
   15-1-aggregated-project-tasks-api-and-filters: done
-  15-2-tasks-workspace-list-and-quick-scopes: ready-for-dev
-  15-3-task-row-actions-and-project-linking: ready-for-dev
+  15-2-tasks-workspace-list-and-quick-scopes: done
+  15-3-task-row-actions-and-project-linking: done
   15-4-task-detail-drawer-and-automation-visibility: ready-for-dev

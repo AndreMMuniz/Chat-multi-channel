@@ -1,7 +1,7 @@
 # Story 15.2: Tasks Workspace List and Quick Scopes
 
 ## Status
-ready-for-dev
+done
 
 ## Story
 **As an agent,** I want a dedicated `Tasks` workspace with quick scopes so that I can manage my execution queue without opening each project individually.

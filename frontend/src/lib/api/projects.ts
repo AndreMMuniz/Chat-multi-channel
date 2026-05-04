@@ -55,6 +55,15 @@ export async function listProjectTasks(projectId: string): Promise<ProjectTaskDt
   return apiGet<ProjectTaskDto[]>(`/admin/projects/${projectId}/tasks`);
 }
 
+export async function listTasksWorkspace(params?: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiGetList<ProjectTaskDto>(`/admin/tasks${suffix}`);
+}
+
 export async function createProjectTask(
   projectId: string,
   body: ProjectTaskCreateRequest,
