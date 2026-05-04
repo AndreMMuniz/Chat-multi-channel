@@ -1,7 +1,7 @@
 # Story 15.4: Task Detail Drawer and Automation Visibility
 
 ## Status
-ready-for-dev
+done
 
 ## Story
 **As an agent,** I want to inspect task details and automation context from the aggregated workspace so that I can understand execution state without losing my place in the queue.
