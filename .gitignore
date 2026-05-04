@@ -129,3 +129,8 @@ _bmad
 _bmad-output
 _bmad/
 _bmad-output/
+
+#-------------exemples--------------------
+makefile
+Makefile
+CLAUDE.md
