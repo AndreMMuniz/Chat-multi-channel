@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Omnichat White-Label CRM",
+  description:
+    "Launch a branded omnichannel CRM platform with white-label source code, custom branding, and production deployment for internal business operations.",
+};
 
 const packageItems = [
   {
@@ -96,7 +103,21 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-5">
+              <nav className="hidden items-center gap-5 text-sm text-slate-300 lg:flex">
+                <a href="#package" className="transition hover:text-white">
+                  Package
+                </a>
+                <a href="#rollout" className="transition hover:text-white">
+                  Rollout
+                </a>
+                <a href="#demo" className="transition hover:text-white">
+                  Demo
+                </a>
+                <a href="#faq" className="transition hover:text-white">
+                  FAQ
+                </a>
+              </nav>
               <Link
                 href="/login"
                 className="inline-flex h-11 items-center justify-center rounded-full border border-white/15 px-5 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -107,7 +128,7 @@ export default function LandingPage() {
                 href="/signup"
                 className="inline-flex h-11 items-center justify-center rounded-full bg-[#f97316] px-5 text-sm font-semibold text-slate-950 transition hover:bg-[#fb923c]"
               >
-                Request a Proposal
+                Request Access
               </Link>
             </div>
           </header>
@@ -133,7 +154,7 @@ export default function LandingPage() {
                   href="/signup"
                   className="inline-flex h-14 items-center justify-center rounded-full bg-[#f97316] px-7 text-base font-semibold text-slate-950 transition hover:bg-[#fb923c]"
                 >
-                  Request a Proposal
+                  Request Access
                 </Link>
                 <a
                   href="https://www.omnicrm.chat/login"
@@ -146,6 +167,22 @@ export default function LandingPage() {
               <p className="mt-4 text-sm text-slate-400">
                 Visitor credentials are provided for evaluation so your team can explore the live environment safely.
               </p>
+
+              <div className="mt-8 flex flex-wrap gap-3 text-sm text-slate-300">
+                {[
+                  "Source code included",
+                  "Brand customization included",
+                  "Production deployment included",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-cyan-300" />
+                    {item}
+                  </span>
+                ))}
+              </div>
 
               <div className="mt-10 grid gap-3 sm:grid-cols-3">
                 {[
@@ -234,7 +271,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-10">
+      <section id="package" className="mx-auto max-w-7xl scroll-mt-24 px-6 py-20 lg:px-10">
         <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#c2410c]">What you get</p>
@@ -298,7 +335,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-10">
+      <section id="rollout" className="mx-auto max-w-7xl scroll-mt-24 px-6 py-20 lg:px-10">
         <div className="grid gap-14 lg:grid-cols-[0.85fr_1.15fr]">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#7c3aed]">Customization & rollout</p>
@@ -327,7 +364,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="bg-[#111827] text-white">
+      <section id="demo" className="bg-[#111827] text-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-6 py-20 lg:grid-cols-[0.9fr_1.1fr] lg:px-10">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-200">Live demo</p>
@@ -357,6 +394,22 @@ export default function LandingPage() {
               </a>
             </div>
 
+            <div className="mt-6 rounded-[24px] border border-cyan-300/20 bg-cyan-300/8 p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">Demo access flow</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {[
+                  ["Open the login page", "The CTA sends visitors directly to the product login environment."],
+                  ["Use standard visitor credentials", "A default email and password are shared for product evaluation."],
+                  ["Explore the live workspace", "Review how the operation, branding, and interface flow work in practice."],
+                ].map(([title, text]) => (
+                  <div key={title} className="rounded-[20px] border border-white/10 bg-slate-950/25 p-4">
+                    <p className="text-sm font-semibold text-white">{title}</p>
+                    <p className="mt-2 text-sm leading-7 text-slate-300">{text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-6 grid gap-3 md:grid-cols-2">
               {[
                 ["Own the interface", "Operate a customer environment aligned to your company identity."],
@@ -372,7 +425,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-10">
+      <section id="faq" className="mx-auto max-w-7xl scroll-mt-24 px-6 py-20 lg:px-10">
         <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b45309]">FAQ</p>
@@ -411,7 +464,7 @@ export default function LandingPage() {
                 href="/signup"
                 className="inline-flex h-12 items-center justify-center rounded-full bg-[#f97316] px-5 text-sm font-semibold text-slate-950 transition hover:bg-[#fb923c]"
               >
-                Request a Proposal
+                Request Access
               </Link>
               <a
                 href="https://www.omnicrm.chat/login"
