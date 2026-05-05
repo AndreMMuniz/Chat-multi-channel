@@ -149,3 +149,21 @@ async def update_proposal_item(
     )
     proposal = await service.proposals.find_proposal(proposal_id)
     return create_response(ProposalDetailResponse.model_validate(serialize_proposal(proposal, include_items=True)))
+
+
+@router.delete("/proposals/{proposal_id}/items/{proposal_item_id}")
+@limiter.limit("60/minute")
+async def delete_proposal_item(
+    request: Request,
+    proposal_id: UUID,
+    proposal_item_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    service = ProposalService(db)
+    await service.delete_proposal_item(
+        proposal_id=proposal_id,
+        proposal_item_id=proposal_item_id,
+    )
+    proposal = await service.proposals.find_proposal(proposal_id)
+    return create_response(ProposalDetailResponse.model_validate(serialize_proposal(proposal, include_items=True)))

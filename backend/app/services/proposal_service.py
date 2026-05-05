@@ -156,6 +156,31 @@ class ProposalService:
         refreshed = await self.items.find_proposal_item(proposal_id, updated.id)
         return refreshed
 
+    async def delete_proposal_item(
+        self,
+        *,
+        proposal_id: UUID,
+        proposal_item_id: UUID,
+    ) -> None:
+        proposal_item = await self.items.find_proposal_item(proposal_id, proposal_item_id)
+        if not proposal_item:
+            error_response, status = create_error_response(
+                code="PROPOSAL_ITEM_NOT_FOUND",
+                message="Proposal item not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        deleted = await self.items.delete(proposal_item.id)
+        if not deleted:
+            error_response, status = create_error_response(
+                code="PROPOSAL_ITEM_NOT_FOUND",
+                message="Proposal item not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+        await self.recalculate_totals(proposal_id)
+
     async def recalculate_totals(self, proposal_id: UUID) -> None:
         proposal = await self.proposals.find_proposal(proposal_id)
         if not proposal:

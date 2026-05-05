@@ -171,3 +171,46 @@ def test_update_proposal_item_recalculates_totals(db):
     assert updated["items"][0]["quantity"] == 3
     assert updated["items"][0]["discount_amount"] == 200
     assert updated["items"][0]["total_amount"] == 12400
+
+
+def test_delete_proposal_item_recalculates_totals(db):
+    user = _seed_user(db)
+    first_item = _seed_quotable_catalog_item(db, user)
+    second_item = CatalogItem(
+        name="Premium SLA Monitoring",
+        commercial_name="Premium SLA Monitoring",
+        type=CatalogItemType.PRODUCT,
+        status=CatalogItemStatus.ACTIVE,
+        category="Operations",
+        sku="PRD-SLA-003",
+        commercial_description="Real-time SLA tracking with alerts.",
+        base_price=1490,
+        unit="Monthly",
+        active_for_support=True,
+        can_be_quoted=True,
+        allows_discount=False,
+        tags=["sla"],
+        created_by_user_id=user.id,
+        updated_by_user_id=user.id,
+    )
+    db.add(second_item)
+    db.commit()
+    db.refresh(second_item)
+
+    client = _make_client(db, user)
+    proposal_response = client.post(f"/api/v1/admin/proposals/from-catalog/{first_item.id}", json={})
+    proposal_id = proposal_response.json()["data"]["id"]
+    item_one_id = proposal_response.json()["data"]["items"][0]["id"]
+    add_response = client.post(
+        f"/api/v1/admin/proposals/{proposal_id}/items/from-catalog/{second_item.id}",
+        json={"quantity": 2},
+    )
+    assert add_response.status_code == 200
+
+    delete_response = client.delete(f"/api/v1/admin/proposals/{proposal_id}/items/{item_one_id}")
+    assert delete_response.status_code == 200
+    updated = delete_response.json()["data"]
+    assert updated["items_count"] == 1
+    assert updated["subtotal_amount"] == 2980
+    assert updated["total_amount"] == 2980
+    assert updated["items"][0]["commercial_name_snapshot"] == "Premium SLA Monitoring"

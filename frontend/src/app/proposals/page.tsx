@@ -13,6 +13,12 @@ const STATUS_META: Record<ProposalStatus, { label: string; className: string }> 
   archived: { label: "Archived", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-100" },
 };
 
+type ProposalFormState = {
+  title: string;
+  customer_name: string;
+  notes: string;
+};
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -31,6 +37,7 @@ export default function ProposalsPage() {
   const [proposals, setProposals] = useState<ProposalDto[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<ProposalDetailDto | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(requestedProposalId);
+  const [proposalForm, setProposalForm] = useState<ProposalFormState>({ title: "", customer_name: "", notes: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -66,6 +73,11 @@ export default function ProposalsPage() {
       setIsDetailLoading(true);
       const proposal = await proposalsApi.getProposal(proposalId);
       setSelectedProposal(proposal);
+      setProposalForm({
+        title: proposal.title,
+        customer_name: proposal.customer_name ?? "",
+        notes: proposal.notes ?? "",
+      });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load proposal details.");
     } finally {
@@ -101,6 +113,25 @@ export default function ProposalsPage() {
     }
   }
 
+  async function handleProposalMetaSave() {
+    if (!selectedProposal) return;
+    try {
+      setIsUpdating(true);
+      setActionMessage(null);
+      await proposalsApi.updateProposal(selectedProposal.id, {
+        title: proposalForm.title.trim(),
+        customer_name: proposalForm.customer_name.trim() || null,
+        notes: proposalForm.notes.trim() || null,
+      });
+      await Promise.all([loadProposals(true), loadProposalDetail(selectedProposal.id)]);
+      setActionMessage("Proposal details updated.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to update proposal details.");
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
   async function handleItemUpdate(proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) {
     if (!selectedProposal) return;
     try {
@@ -108,10 +139,36 @@ export default function ProposalsPage() {
       setActionMessage(null);
       const updated = await proposalsApi.updateProposalItem(selectedProposal.id, proposalItemId, payload);
       setSelectedProposal(updated);
+      setProposalForm({
+        title: updated.title,
+        customer_name: updated.customer_name ?? "",
+        notes: updated.notes ?? "",
+      });
       await loadProposals(true);
       setActionMessage("Proposal item updated.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to update proposal item.");
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
+  async function handleItemRemove(proposalItemId: string) {
+    if (!selectedProposal) return;
+    try {
+      setIsUpdating(true);
+      setActionMessage(null);
+      const updated = await proposalsApi.deleteProposalItem(selectedProposal.id, proposalItemId);
+      setSelectedProposal(updated);
+      setProposalForm({
+        title: updated.title,
+        customer_name: updated.customer_name ?? "",
+        notes: updated.notes ?? "",
+      });
+      await loadProposals(true);
+      setActionMessage("Proposal item removed.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to remove proposal item.");
     } finally {
       setIsUpdating(false);
     }
@@ -268,10 +325,14 @@ export default function ProposalsPage() {
             {selectedProposalId && selectedProposal ? (
               <ProposalDetail
                 proposal={selectedProposal}
+                proposalForm={proposalForm}
                 isLoading={isDetailLoading}
                 isUpdating={isUpdating}
+                onProposalFormChange={setProposalForm}
+                onProposalMetaSave={handleProposalMetaSave}
                 onStatusChange={handleStatusChange}
                 onItemUpdate={handleItemUpdate}
+                onItemRemove={handleItemRemove}
               />
             ) : (
               <div className="flex h-full min-h-[320px] flex-col items-center justify-center px-6 text-center">
@@ -291,16 +352,24 @@ export default function ProposalsPage() {
 
 function ProposalDetail({
   proposal,
+  proposalForm,
   isLoading,
   isUpdating,
+  onProposalFormChange,
+  onProposalMetaSave,
   onStatusChange,
   onItemUpdate,
+  onItemRemove,
 }: {
   proposal: ProposalDetailDto;
+  proposalForm: ProposalFormState;
   isLoading: boolean;
   isUpdating: boolean;
+  onProposalFormChange: React.Dispatch<React.SetStateAction<ProposalFormState>>;
+  onProposalMetaSave: () => void;
   onStatusChange: (status: ProposalStatus) => void;
   onItemUpdate: (proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) => void;
+  onItemRemove: (proposalItemId: string) => void;
 }) {
   const statusMeta = STATUS_META[proposal.status];
   return (
@@ -338,6 +407,45 @@ function ProposalDetail({
         <Metric label="Total" value={formatCurrency(proposal.total_amount)} />
       </div>
 
+      <div className="border-b border-slate-100 px-5 py-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Proposal title</span>
+            <input
+              value={proposalForm.title}
+              onChange={(event) => onProposalFormChange((current) => ({ ...current, title: event.target.value }))}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Customer</span>
+            <input
+              value={proposalForm.customer_name}
+              onChange={(event) => onProposalFormChange((current) => ({ ...current, customer_name: event.target.value }))}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            />
+          </label>
+        </div>
+        <label className="mt-3 block space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notes</span>
+          <textarea
+            value={proposalForm.notes}
+            onChange={(event) => onProposalFormChange((current) => ({ ...current, notes: event.target.value }))}
+            className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </label>
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={onProposalMetaSave}
+            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+          >
+            Save details
+          </button>
+        </div>
+      </div>
+
       <div className="flex-1 space-y-4 px-5 py-5">
         <div className="flex items-center justify-between">
           <div>
@@ -354,6 +462,7 @@ function ProposalDetail({
               item={item}
               isUpdating={isUpdating}
               onItemUpdate={onItemUpdate}
+              onItemRemove={onItemRemove}
             />
           ))}
         </div>
@@ -375,10 +484,12 @@ function ProposalItemCard({
   item,
   isUpdating,
   onItemUpdate,
+  onItemRemove,
 }: {
   item: ProposalItemDto;
   isUpdating: boolean;
   onItemUpdate: (proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) => void;
+  onItemRemove: (proposalItemId: string) => void;
 }) {
   const [quantity, setQuantity] = useState(String(item.quantity));
   const [discountAmount, setDiscountAmount] = useState(String(item.discount_amount));
@@ -392,7 +503,17 @@ function ProposalItemCard({
             {item.catalog_reference_code || item.sku_snapshot || item.category_snapshot} · {item.type_snapshot}
           </p>
         </div>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">x{item.quantity}</span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">x{item.quantity}</span>
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() => onItemRemove(item.id)}
+            className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 disabled:opacity-60"
+          >
+            Remove
+          </button>
+        </div>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-600">{item.commercial_description_snapshot}</p>
 

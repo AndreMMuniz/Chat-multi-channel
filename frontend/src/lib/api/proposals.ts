@@ -65,3 +65,13 @@ export async function updateProposalItem(
     body,
   );
 }
+
+export async function deleteProposalItem(
+  proposalId: string,
+  proposalItemId: string,
+): Promise<ProposalDetailDto> {
+  return apiMutate<undefined, ProposalDetailDto>(
+    `/admin/proposals/${proposalId}/items/${proposalItemId}`,
+    "DELETE",
+  );
+}
