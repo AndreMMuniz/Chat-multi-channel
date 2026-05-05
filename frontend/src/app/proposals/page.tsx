@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Modal from "@/components/shared/Modal";
 import { proposalsApi } from "@/lib/api";
 import type { ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto, ProposalStatus } from "@/types/proposal";
 
@@ -17,6 +18,12 @@ type ProposalFormState = {
   title: string;
   customer_name: string;
   notes: string;
+};
+
+const EMPTY_CREATE_FORM: ProposalFormState = {
+  title: "",
+  customer_name: "",
+  notes: "",
 };
 
 function formatCurrency(value: number) {
@@ -38,9 +45,12 @@ export default function ProposalsPage() {
   const [selectedProposal, setSelectedProposal] = useState<ProposalDetailDto | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(requestedProposalId);
   const [proposalForm, setProposalForm] = useState<ProposalFormState>({ title: "", customer_name: "", notes: "" });
+  const [createProposalForm, setCreateProposalForm] = useState<ProposalFormState>(EMPTY_CREATE_FORM);
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,6 +184,38 @@ export default function ProposalsPage() {
     }
   }
 
+  async function handleCreateProposal() {
+    const title = createProposalForm.title.trim();
+    if (!title) {
+      setErrorMessage("Proposal title is required.");
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      setErrorMessage(null);
+      setActionMessage(null);
+
+      const created = await proposalsApi.createProposal({
+        title,
+        customer_name: createProposalForm.customer_name.trim() || null,
+        notes: createProposalForm.notes.trim() || null,
+        status: "draft",
+      });
+
+      setSelectedProposalId(created.id);
+      setIsCreateModalOpen(false);
+      setCreateProposalForm(EMPTY_CREATE_FORM);
+
+      await Promise.all([loadProposals(true), loadProposalDetail(created.id)]);
+      setActionMessage("Draft proposal created.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create proposal.");
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   const visibleProposals = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return proposals.filter((proposal) => {
@@ -218,6 +260,19 @@ export default function ProposalsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setActionMessage(null);
+                  setCreateProposalForm(EMPTY_CREATE_FORM);
+                  setIsCreateModalOpen(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                New proposal
+              </button>
               <label className="flex min-w-[280px] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 shadow-sm">
                 <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
                 <input
@@ -315,7 +370,7 @@ export default function ProposalsPage() {
                     <span className="material-symbols-outlined">request_quote</span>
                   </div>
                   <h3 className="mt-4 text-sm font-semibold text-slate-900">No proposals found</h3>
-                  <p className="mt-1 text-sm text-slate-500">Create one from the catalog to start the commercial flow.</p>
+                  <p className="mt-1 text-sm text-slate-500">Create one manually or from the catalog to start the commercial flow.</p>
                 </div>
               ) : null}
             </div>
@@ -346,6 +401,67 @@ export default function ProposalsPage() {
           </aside>
         </div>
       </div>
+
+      {isCreateModalOpen ? (
+        <Modal title="New proposal" onClose={() => !isCreating && setIsCreateModalOpen(false)} maxWidth="max-w-lg">
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-slate-500">
+              Start a draft proposal manually, then add catalog items and adjust the commercial details from the workspace.
+            </p>
+
+            <label className="block space-y-1">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Proposal title</span>
+              <input
+                value={createProposalForm.title}
+                onChange={(event) => setCreateProposalForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Ex: Q2 onboarding package"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Customer</span>
+              <input
+                value={createProposalForm.customer_name}
+                onChange={(event) =>
+                  setCreateProposalForm((current) => ({ ...current, customer_name: event.target.value }))
+                }
+                placeholder="Optional customer name"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notes</span>
+              <textarea
+                value={createProposalForm.notes}
+                onChange={(event) => setCreateProposalForm((current) => ({ ...current, notes: event.target.value }))}
+                placeholder="Optional internal notes for this proposal"
+                className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+              />
+            </label>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isCreating}
+                onClick={() => setIsCreateModalOpen(false)}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isCreating}
+                onClick={handleCreateProposal}
+                className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {isCreating ? "Creating..." : "Create draft"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </main>
   );
 }
