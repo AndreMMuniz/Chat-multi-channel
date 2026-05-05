@@ -87,3 +87,12 @@ class ProposalItemRepository(BaseRepository[ProposalItem]):
         )
         result = self.session.execute(stmt)
         return result.scalars().all()
+
+    async def find_proposal_item(self, proposal_id: UUID | str, proposal_item_id: UUID | str) -> Optional[ProposalItem]:
+        stmt = (
+            select(ProposalItem)
+            .options(joinedload(ProposalItem.catalog_item), joinedload(ProposalItem.proposal))
+            .where(ProposalItem.proposal_id == proposal_id, ProposalItem.id == proposal_item_id)
+        )
+        result = self.session.execute(stmt)
+        return result.scalars().first()

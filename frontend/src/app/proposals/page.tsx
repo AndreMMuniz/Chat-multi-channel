@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { proposalsApi } from "@/lib/api";
-import type { ProposalDetailDto, ProposalDto, ProposalItemDto, ProposalStatus } from "@/types/proposal";
+import type { ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto, ProposalStatus } from "@/types/proposal";
 
 const STATUS_META: Record<ProposalStatus, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200" },
@@ -33,59 +33,89 @@ export default function ProposalsPage() {
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(requestedProposalId);
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "ALL">("ALL");
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadProposals = useCallback(async (preserveSelection: boolean) => {
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+      const response = await proposalsApi.listProposals({ limit: 200 });
+      setProposals(response.data);
 
-    async function loadProposals() {
-      try {
-        setIsLoading(true);
-        setErrorMessage(null);
-        const response = await proposalsApi.listProposals({ limit: 200 });
-        if (!isMounted) return;
-        setProposals(response.data);
-        const firstId = requestedProposalId ?? response.data[0]?.id ?? null;
-        setSelectedProposalId(firstId);
-      } catch (error) {
-        if (!isMounted) return;
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load proposals.");
-      } finally {
-        if (isMounted) setIsLoading(false);
+      if (!preserveSelection) {
+        setSelectedProposalId(requestedProposalId ?? response.data[0]?.id ?? null);
+        return;
       }
-    }
 
-    void loadProposals();
-    return () => {
-      isMounted = false;
-    };
-  }, [requestedProposalId]);
+      if (!response.data.some((proposal) => proposal.id === selectedProposalId)) {
+        setSelectedProposalId(response.data[0]?.id ?? null);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load proposals.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [requestedProposalId, selectedProposalId]);
+
+  const loadProposalDetail = useCallback(async (proposalId: string) => {
+    try {
+      setIsDetailLoading(true);
+      const proposal = await proposalsApi.getProposal(proposalId);
+      setSelectedProposal(proposal);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load proposal details.");
+    } finally {
+      setIsDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadProposals(false);
+    });
+  }, [loadProposals]);
 
   useEffect(() => {
     if (!selectedProposalId) return;
-    let isMounted = true;
+    queueMicrotask(() => {
+      void loadProposalDetail(selectedProposalId);
+    });
+  }, [loadProposalDetail, selectedProposalId]);
 
-    async function loadProposalDetail() {
-      try {
-        setIsDetailLoading(true);
-        const proposal = await proposalsApi.getProposal(selectedProposalId);
-        if (!isMounted) return;
-        setSelectedProposal(proposal);
-      } catch (error) {
-        if (!isMounted) return;
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load proposal details.");
-      } finally {
-        if (isMounted) setIsDetailLoading(false);
-      }
+  async function handleStatusChange(status: ProposalStatus) {
+    if (!selectedProposal) return;
+    try {
+      setIsUpdating(true);
+      setActionMessage(null);
+      await proposalsApi.updateProposal(selectedProposal.id, { status } satisfies Partial<ProposalCreateRequest>);
+      await Promise.all([loadProposals(true), loadProposalDetail(selectedProposal.id)]);
+      setActionMessage(`Proposal marked as ${status}.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to update proposal status.");
+    } finally {
+      setIsUpdating(false);
     }
+  }
 
-    void loadProposalDetail();
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedProposalId]);
+  async function handleItemUpdate(proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) {
+    if (!selectedProposal) return;
+    try {
+      setIsUpdating(true);
+      setActionMessage(null);
+      const updated = await proposalsApi.updateProposalItem(selectedProposal.id, proposalItemId, payload);
+      setSelectedProposal(updated);
+      await loadProposals(true);
+      setActionMessage("Proposal item updated.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to update proposal item.");
+    } finally {
+      setIsUpdating(false);
+    }
+  }
 
   const visibleProposals = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -175,6 +205,9 @@ export default function ProposalsPage() {
           {errorMessage ? (
             <div className="border-t border-rose-100 bg-rose-50 px-6 py-3 text-sm text-rose-700">{errorMessage}</div>
           ) : null}
+          {actionMessage ? (
+            <div className="border-t border-emerald-100 bg-emerald-50 px-6 py-3 text-sm text-emerald-700">{actionMessage}</div>
+          ) : null}
         </header>
 
         <div className="grid flex-1 gap-4 px-4 py-4 lg:px-6 xl:grid-cols-[420px_minmax(0,1fr)]">
@@ -233,7 +266,13 @@ export default function ProposalsPage() {
 
           <aside className="rounded-[28px] border border-slate-200 bg-white shadow-sm">
             {selectedProposalId && selectedProposal ? (
-              <ProposalDetail proposal={selectedProposal} isLoading={isDetailLoading} />
+              <ProposalDetail
+                proposal={selectedProposal}
+                isLoading={isDetailLoading}
+                isUpdating={isUpdating}
+                onStatusChange={handleStatusChange}
+                onItemUpdate={handleItemUpdate}
+              />
             ) : (
               <div className="flex h-full min-h-[320px] flex-col items-center justify-center px-6 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
@@ -250,7 +289,19 @@ export default function ProposalsPage() {
   );
 }
 
-function ProposalDetail({ proposal, isLoading }: { proposal: ProposalDetailDto; isLoading: boolean }) {
+function ProposalDetail({
+  proposal,
+  isLoading,
+  isUpdating,
+  onStatusChange,
+  onItemUpdate,
+}: {
+  proposal: ProposalDetailDto;
+  isLoading: boolean;
+  isUpdating: boolean;
+  onStatusChange: (status: ProposalStatus) => void;
+  onItemUpdate: (proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) => void;
+}) {
   const statusMeta = STATUS_META[proposal.status];
   return (
     <div className="flex h-full flex-col">
@@ -261,9 +312,23 @@ function ProposalDetail({ proposal, isLoading }: { proposal: ProposalDetailDto; 
             <h2 className="mt-1 text-lg font-semibold text-slate-900">{proposal.title}</h2>
             <p className="mt-1 text-sm text-slate-500">{proposal.customer_name || "No customer assigned"}</p>
           </div>
-          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}>
-            {statusMeta.label}
-          </span>
+          <div className="flex flex-col items-end gap-2">
+            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}>
+              {statusMeta.label}
+            </span>
+            <select
+              value={proposal.status}
+              onChange={(event) => onStatusChange(event.target.value as ProposalStatus)}
+              disabled={isUpdating}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm outline-none disabled:opacity-60"
+            >
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -279,14 +344,17 @@ function ProposalDetail({ proposal, isLoading }: { proposal: ProposalDetailDto; 
             <p className="text-sm font-semibold text-slate-900">Snapshot items</p>
             <p className="mt-1 text-xs text-slate-500">{proposal.items.length} items preserved from catalog state at insertion time.</p>
           </div>
-          {isLoading ? (
-            <span className="text-xs font-medium text-slate-500">Refreshing...</span>
-          ) : null}
+          {isLoading ? <span className="text-xs font-medium text-slate-500">Refreshing...</span> : null}
         </div>
 
         <div className="space-y-3">
           {proposal.items.map((item) => (
-            <ProposalItemCard key={item.id} item={item} />
+            <ProposalItemCard
+              key={`${item.id}:${item.quantity}:${item.discount_amount}`}
+              item={item}
+              isUpdating={isUpdating}
+              onItemUpdate={onItemUpdate}
+            />
           ))}
         </div>
       </div>
@@ -303,7 +371,18 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ProposalItemCard({ item }: { item: ProposalItemDto }) {
+function ProposalItemCard({
+  item,
+  isUpdating,
+  onItemUpdate,
+}: {
+  item: ProposalItemDto;
+  isUpdating: boolean;
+  onItemUpdate: (proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) => void;
+}) {
+  const [quantity, setQuantity] = useState(String(item.quantity));
+  const [discountAmount, setDiscountAmount] = useState(String(item.discount_amount));
+
   return (
     <article className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -313,11 +392,52 @@ function ProposalItemCard({ item }: { item: ProposalItemDto }) {
             {item.catalog_reference_code || item.sku_snapshot || item.category_snapshot} · {item.type_snapshot}
           </p>
         </div>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-          x{item.quantity}
-        </span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">x{item.quantity}</span>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-600">{item.commercial_description_snapshot}</p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Quantity</span>
+          <div className="flex gap-2">
+            <input
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              inputMode="numeric"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            />
+            <button
+              type="button"
+              disabled={isUpdating}
+              onClick={() => onItemUpdate(item.id, { quantity: Math.max(Number(quantity || 1), 1) })}
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+            >
+              Save
+            </button>
+          </div>
+        </label>
+
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Discount</span>
+          <div className="flex gap-2">
+            <input
+              value={discountAmount}
+              onChange={(event) => setDiscountAmount(event.target.value)}
+              inputMode="numeric"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            />
+            <button
+              type="button"
+              disabled={isUpdating}
+              onClick={() => onItemUpdate(item.id, { discount_amount: Math.max(Number(discountAmount || 0), 0) })}
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+            >
+              Save
+            </button>
+          </div>
+        </label>
+      </div>
+
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <Metric label="Unit price" value={formatCurrency(item.unit_price)} />
         <Metric label="Discount" value={formatCurrency(item.discount_amount)} />

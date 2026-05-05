@@ -33,6 +33,11 @@ class ProposalItemFromCatalogCreate(BaseModel):
     discount_amount: int = Field(default=0, ge=0)
 
 
+class ProposalItemUpdate(BaseModel):
+    quantity: Optional[int] = Field(default=None, ge=1)
+    discount_amount: Optional[int] = Field(default=None, ge=0)
+
+
 class ProposalItemResponse(BaseModel):
     id: UUID
     proposal_id: UUID

@@ -146,3 +146,28 @@ def test_list_and_get_proposals(db):
     assert get_response.status_code == 200
     assert get_response.json()["data"]["reference"].startswith("PRP-")
     assert len(get_response.json()["data"]["items"]) == 1
+
+
+def test_update_proposal_item_recalculates_totals(db):
+    user = _seed_user(db)
+    catalog_item = _seed_quotable_catalog_item(db, user)
+    client = _make_client(db, user)
+    create_response = client.post(
+        f"/api/v1/admin/proposals/from-catalog/{catalog_item.id}",
+        json={"quantity": 1},
+    )
+    proposal = create_response.json()["data"]
+    item_id = proposal["items"][0]["id"]
+
+    update_response = client.patch(
+        f"/api/v1/admin/proposals/{proposal['id']}/items/{item_id}",
+        json={"quantity": 3, "discount_amount": 200},
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()["data"]
+    assert updated["subtotal_amount"] == 12600
+    assert updated["discount_amount"] == 200
+    assert updated["total_amount"] == 12400
+    assert updated["items"][0]["quantity"] == 3
+    assert updated["items"][0]["discount_amount"] == 200
+    assert updated["items"][0]["total_amount"] == 12400

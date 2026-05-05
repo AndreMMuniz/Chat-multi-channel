@@ -24,6 +24,13 @@ export async function createProposal(body: ProposalCreateRequest): Promise<Propo
   return apiMutate<ProposalCreateRequest, ProposalDto>("/admin/proposals", "POST", body);
 }
 
+export async function updateProposal(
+  proposalId: string,
+  body: Partial<ProposalCreateRequest>,
+): Promise<ProposalDto> {
+  return apiMutate<Partial<ProposalCreateRequest>, ProposalDto>(`/admin/proposals/${proposalId}`, "PATCH", body);
+}
+
 export async function createProposalFromCatalog(
   catalogItemId: string,
   body: ProposalFromCatalogRequest,
@@ -43,6 +50,18 @@ export async function addCatalogItemToProposal(
   return apiMutate<ProposalItemFromCatalogRequest, ProposalDetailDto>(
     `/admin/proposals/${proposalId}/items/from-catalog/${catalogItemId}`,
     "POST",
+    body,
+  );
+}
+
+export async function updateProposalItem(
+  proposalId: string,
+  proposalItemId: string,
+  body: ProposalItemFromCatalogRequest,
+): Promise<ProposalDetailDto> {
+  return apiMutate<ProposalItemFromCatalogRequest, ProposalDetailDto>(
+    `/admin/proposals/${proposalId}/items/${proposalItemId}`,
+    "PATCH",
     body,
   );
 }

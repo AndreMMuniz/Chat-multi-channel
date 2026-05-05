@@ -8,7 +8,13 @@ from app.models.models import CatalogItem, CatalogItemStatus, Proposal, Proposal
 from app.repositories.catalog_repo import CatalogItemRepository
 from app.repositories.proposal_repo import ProposalItemRepository, ProposalRepository
 from app.schemas.common import create_error_response
-from app.schemas.proposal import ProposalCreate, ProposalFromCatalogCreate, ProposalItemFromCatalogCreate, ProposalUpdate
+from app.schemas.proposal import (
+    ProposalCreate,
+    ProposalFromCatalogCreate,
+    ProposalItemFromCatalogCreate,
+    ProposalItemUpdate,
+    ProposalUpdate,
+)
 
 
 class ProposalService:
@@ -117,6 +123,38 @@ class ProposalService:
         )
         await self.recalculate_totals(proposal.id)
         return proposal_item
+
+    async def update_proposal_item(
+        self,
+        *,
+        proposal_id: UUID,
+        proposal_item_id: UUID,
+        payload: ProposalItemUpdate,
+    ) -> ProposalItem:
+        proposal_item = await self.items.find_proposal_item(proposal_id, proposal_item_id)
+        if not proposal_item:
+            error_response, status = create_error_response(
+                code="PROPOSAL_ITEM_NOT_FOUND",
+                message="Proposal item not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        data = payload.model_dump(exclude_unset=True)
+        quantity = data.get("quantity", proposal_item.quantity)
+        discount_amount = data.get("discount_amount", proposal_item.discount_amount)
+        total_amount = max((quantity * proposal_item.unit_price) - discount_amount, 0)
+
+        updated = await self.items.update(
+            proposal_item.id,
+            {
+                **data,
+                "total_amount": total_amount,
+            },
+        )
+        await self.recalculate_totals(proposal_id)
+        refreshed = await self.items.find_proposal_item(proposal_id, updated.id)
+        return refreshed
 
     async def recalculate_totals(self, proposal_id: UUID) -> None:
         proposal = await self.proposals.find_proposal(proposal_id)

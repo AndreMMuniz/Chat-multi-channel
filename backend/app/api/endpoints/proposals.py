@@ -14,6 +14,7 @@ from app.schemas.proposal import (
     ProposalDetailResponse,
     ProposalFromCatalogCreate,
     ProposalItemFromCatalogCreate,
+    ProposalItemUpdate,
     ProposalResponse,
     ProposalUpdate,
 )
@@ -124,6 +125,26 @@ async def add_catalog_item_to_proposal(
     await service.add_catalog_item_to_proposal(
         proposal_id=proposal_id,
         catalog_item_id=catalog_item_id,
+        payload=payload,
+    )
+    proposal = await service.proposals.find_proposal(proposal_id)
+    return create_response(ProposalDetailResponse.model_validate(serialize_proposal(proposal, include_items=True)))
+
+
+@router.patch("/proposals/{proposal_id}/items/{proposal_item_id}")
+@limiter.limit("60/minute")
+async def update_proposal_item(
+    request: Request,
+    proposal_id: UUID,
+    proposal_item_id: UUID,
+    payload: ProposalItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    service = ProposalService(db)
+    await service.update_proposal_item(
+        proposal_id=proposal_id,
+        proposal_item_id=proposal_item_id,
         payload=payload,
     )
     proposal = await service.proposals.find_proposal(proposal_id)
