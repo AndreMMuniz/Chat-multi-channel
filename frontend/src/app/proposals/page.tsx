@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Modal from "@/components/shared/Modal";
-import { proposalsApi } from "@/lib/api";
+import { proposalsApi } from "@/lib/api/index";
 import type { ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto, ProposalStatus } from "@/types/proposal";
 
 const STATUS_META: Record<ProposalStatus, { label: string; className: string }> = {

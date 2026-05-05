@@ -39,3 +39,17 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     },
   });
 }
+
+export * as authApi from "./api/auth";
+export * as conversationsApi from "./api/conversations";
+export * as usersApi from "./api/users";
+export * as userTypesApi from "./api/userTypes";
+export * as settingsApi from "./api/settings";
+export * as dashboardApi from "./api/dashboard";
+export * as uploadApi from "./api/upload";
+export * as aiApi from "./api/ai";
+export * as quickRepliesApi from "./api/quickReplies";
+export * as auditApi from "./api/audit";
+export * as projectsApi from "./api/projects";
+export * as catalogApi from "./api/catalog";
+export * as proposalsApi from "./api/proposals";

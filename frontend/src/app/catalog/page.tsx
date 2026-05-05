@@ -3,7 +3,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/shared/Modal";
-import { catalogApi, proposalsApi } from "@/lib/api";
+import { catalogApi, proposalsApi } from "@/lib/api/index";
 import type { CatalogItemCreateRequest, CatalogItemDto, CatalogItemStatus, CatalogItemType, CatalogItemUpdateRequest } from "@/types/catalog";
 import type { ProposalDto } from "@/types/proposal";
 
