@@ -4,8 +4,30 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.models import CatalogItem
+from app.models.models import CatalogCategory, CatalogItem
 from app.repositories.base_repo import BaseRepository
+
+
+class CatalogCategoryRepository(BaseRepository[CatalogCategory]):
+    def __init__(self, session: Session):
+        super().__init__(CatalogCategory, session)
+
+    async def list_categories(self, *, active_only: bool = False) -> List[CatalogCategory]:
+        stmt = select(CatalogCategory).order_by(CatalogCategory.position.asc(), CatalogCategory.label.asc())
+        if active_only:
+            stmt = stmt.where(CatalogCategory.is_active.is_(True))
+        result = self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def find_by_label(self, label: str) -> Optional[CatalogCategory]:
+        stmt = select(CatalogCategory).where(CatalogCategory.label == label)
+        result = self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def find_by_key(self, key: str) -> Optional[CatalogCategory]:
+        stmt = select(CatalogCategory).where(CatalogCategory.key == key)
+        result = self.session.execute(stmt)
+        return result.scalars().first()
 
 
 class CatalogItemRepository(BaseRepository[CatalogItem]):
@@ -30,6 +52,7 @@ class CatalogItemRepository(BaseRepository[CatalogItem]):
                 joinedload(CatalogItem.created_by),
                 joinedload(CatalogItem.updated_by),
                 joinedload(CatalogItem.replaced_by_catalog_item),
+                joinedload(CatalogItem.category_definition),
             )
             .order_by(CatalogItem.updated_at.desc())
         )
@@ -105,6 +128,7 @@ class CatalogItemRepository(BaseRepository[CatalogItem]):
                 joinedload(CatalogItem.created_by),
                 joinedload(CatalogItem.updated_by),
                 joinedload(CatalogItem.replaced_by_catalog_item),
+                joinedload(CatalogItem.category_definition),
             )
             .where(CatalogItem.id == item_id)
         )

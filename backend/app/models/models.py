@@ -461,6 +461,20 @@ class ProjectTask(Base):
     created_by = relationship("User", foreign_keys=[created_by_user_id])
 
 
+class CatalogCategory(Base):
+    __tablename__ = "catalog_categories"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    key = Column(String(120), nullable=False, unique=True)
+    label = Column(String(120), nullable=False, unique=True)
+    position = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    items = relationship("CatalogItem", back_populates="category_definition")
+
+
 class CatalogItem(Base):
     __tablename__ = "catalog_items"
 
@@ -478,6 +492,7 @@ class CatalogItem(Base):
         default=CatalogItemStatus.ACTIVE,
     )
     category = Column(String(120), nullable=False)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("catalog_categories.id"), nullable=True)
     sku = Column(String(120), nullable=True)
     commercial_description = Column(Text, nullable=False)
     internal_notes = Column(Text, nullable=True)
@@ -499,6 +514,7 @@ class CatalogItem(Base):
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     updated_by = relationship("User", foreign_keys=[updated_by_user_id])
     replaced_by_catalog_item = relationship("CatalogItem", remote_side=[id], foreign_keys=[replaced_by_catalog_item_id])
+    category_definition = relationship("CatalogCategory", back_populates="items")
 
 
 class Proposal(Base):

@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from app.api.api import api_router
 from app.core.auth import get_current_user
 from app.core.database import get_db
-from app.models.models import CatalogItem, CatalogItemStatus, CatalogItemType, DefaultRole, User, UserType
+from app.models.models import AuditLog, CatalogCategory, CatalogItem, CatalogItemStatus, CatalogItemType, DefaultRole, User, UserType
 
 
 def _seed_user(db):
@@ -70,6 +70,7 @@ def test_create_list_and_get_catalog_items(db):
     created = create_response.json()["data"]
     assert created["reference"].startswith("CAT-")
     assert created["can_be_quoted"] is True
+    assert created["category_id"] is not None
 
     list_response = client.get("/api/v1/admin/catalog-items", params={"type": "service", "can_be_quoted": "true"})
     assert list_response.status_code == 200
@@ -79,6 +80,13 @@ def test_create_list_and_get_catalog_items(db):
     get_response = client.get(f"/api/v1/admin/catalog-items/{created['id']}")
     assert get_response.status_code == 200
     assert get_response.json()["data"]["sku"] == "SRV-WA-001"
+
+    categories_response = client.get("/api/v1/admin/catalog-categories")
+    assert categories_response.status_code == 200
+    assert categories_response.json()["data"][0]["label"] == "Implementation"
+
+    audit_actions = [log.action for log in db.query(AuditLog).order_by(AuditLog.created_at.asc()).all()]
+    assert "create_catalog_item" in audit_actions
 
 
 def test_update_duplicate_and_status_transition_catalog_item(db):
@@ -108,12 +116,14 @@ def test_update_duplicate_and_status_transition_catalog_item(db):
 
     update_response = client.patch(
         f"/api/v1/admin/catalog-items/{item.id}",
-        json={"base_price": 1590, "internal_notes": "Updated commercial baseline."},
+        json={"base_price": 1590, "internal_notes": "Updated commercial baseline.", "category": "Operations Premium"},
     )
     assert update_response.status_code == 200
     updated = update_response.json()["data"]
     assert updated["base_price"] == 1590
     assert updated["internal_notes"] == "Updated commercial baseline."
+    assert updated["category"] == "Operations Premium"
+    assert updated["category_id"] is not None
 
     duplicate_response = client.post(f"/api/v1/admin/catalog-items/{item.id}/duplicate")
     assert duplicate_response.status_code == 200
@@ -127,6 +137,30 @@ def test_update_duplicate_and_status_transition_catalog_item(db):
     )
     assert status_response.status_code == 200
     assert status_response.json()["data"]["status"] == "inactive"
+
+    categories = db.query(CatalogCategory).order_by(CatalogCategory.label.asc()).all()
+    assert [category.label for category in categories] == ["Operations Premium"]
+
+    audit_actions = [log.action for log in db.query(AuditLog).order_by(AuditLog.created_at.asc()).all()]
+    assert "update_catalog_item" in audit_actions
+    assert "update_catalog_price" in audit_actions
+    assert "update_catalog_status" in audit_actions
+    assert "duplicate_catalog_item" in audit_actions
+
+
+def test_create_catalog_category_endpoint_is_idempotent(db):
+    user = _seed_user(db)
+    client = _make_client(db, user)
+
+    first = client.post("/api/v1/admin/catalog-categories", json={"label": "Consulting", "position": 3})
+    assert first.status_code == 200
+    assert first.json()["data"]["key"] == "consulting"
+
+    second = client.post("/api/v1/admin/catalog-categories", json={"label": "Consulting", "position": 7})
+    assert second.status_code == 200
+    assert second.json()["data"]["id"] == first.json()["data"]["id"]
+
+    assert db.query(CatalogCategory).count() == 1
 
 
 def test_catalog_item_ready_for_proposal_requires_active_state(db):

@@ -7,6 +7,25 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.models import CatalogItemStatus, CatalogItemType
 
 
+class CatalogCategoryCreate(BaseModel):
+    label: str = Field(..., min_length=1, max_length=120)
+    key: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    position: int = Field(default=0, ge=0)
+    is_active: bool = True
+
+
+class CatalogCategoryResponse(BaseModel):
+    id: UUID
+    key: str
+    label: str
+    position: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CatalogItemBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     commercial_name: str = Field(..., min_length=1, max_length=255)
@@ -76,6 +95,7 @@ class CatalogItemResponse(BaseModel):
     type: CatalogItemType
     status: CatalogItemStatus
     category: str
+    category_id: Optional[UUID] = None
     sku: Optional[str] = None
     commercial_description: str
     internal_notes: Optional[str] = None

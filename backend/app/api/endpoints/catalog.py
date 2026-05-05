@@ -8,7 +8,14 @@ from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.core.limiter import limiter
 from app.models.models import User
-from app.schemas.catalog import CatalogItemCreate, CatalogItemResponse, CatalogItemStatusUpdate, CatalogItemUpdate
+from app.schemas.catalog import (
+    CatalogCategoryCreate,
+    CatalogCategoryResponse,
+    CatalogItemCreate,
+    CatalogItemResponse,
+    CatalogItemStatusUpdate,
+    CatalogItemUpdate,
+)
 from app.schemas.common import create_error_response, create_paginated_response, create_response
 from app.services.catalog_service import CatalogService, serialize_catalog_item
 
@@ -68,6 +75,30 @@ async def list_catalog_items(
         page=(skip // limit) + 1,
         page_size=limit,
     )
+
+
+@router.get("/catalog-categories")
+@limiter.limit("60/minute")
+async def list_catalog_categories(
+    request: Request,
+    active_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    categories = await CatalogService(db).categories.list_categories(active_only=active_only)
+    return create_response([CatalogCategoryResponse.model_validate(category) for category in categories])
+
+
+@router.post("/catalog-categories")
+@limiter.limit("60/minute")
+async def create_catalog_category(
+    request: Request,
+    payload: CatalogCategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    category = await CatalogService(db).create_category(payload, current_user)
+    return create_response(CatalogCategoryResponse.model_validate(category))
 
 
 @router.post("/catalog-items")
