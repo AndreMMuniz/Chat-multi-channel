@@ -87,6 +87,18 @@ class ProjectTaskAutomationStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
+class CatalogItemType(enum.Enum):
+    PRODUCT = "product"
+    SERVICE = "service"
+
+
+class CatalogItemStatus(enum.Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DISCONTINUED = "discontinued"
+    UNDER_REVIEW = "under_review"
+
+
 OFFICIAL_PROJECT_STAGES = [
     ("lead", "Lead", 1),
     ("qualification", "Qualification", 2),
@@ -439,3 +451,43 @@ class ProjectTask(Base):
     project = relationship("Project", back_populates="tasks")
     owner = relationship("User", foreign_keys=[owner_user_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+
+
+class CatalogItem(Base):
+    __tablename__ = "catalog_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reference_code = Column(String(32), nullable=False, unique=True, default=lambda: f"CAT-{uuid.uuid4().hex[:8].upper()}")
+    name = Column(String(255), nullable=False)
+    commercial_name = Column(String(255), nullable=False)
+    type = Column(
+        Enum(CatalogItemType, values_callable=lambda obj: [e.value for e in obj], name="catalogitemtype"),
+        nullable=False,
+    )
+    status = Column(
+        Enum(CatalogItemStatus, values_callable=lambda obj: [e.value for e in obj], name="catalogitemstatus"),
+        nullable=False,
+        default=CatalogItemStatus.ACTIVE,
+    )
+    category = Column(String(120), nullable=False)
+    sku = Column(String(120), nullable=True)
+    commercial_description = Column(Text, nullable=False)
+    internal_notes = Column(Text, nullable=True)
+    base_price = Column(Integer, nullable=False, default=0)
+    unit = Column(String(120), nullable=False)
+    sla_or_delivery_time = Column(String(255), nullable=True)
+    usage_rules = Column(Text, nullable=True)
+    active_for_support = Column(Boolean, nullable=False, default=True)
+    can_be_quoted = Column(Boolean, nullable=False, default=False)
+    allows_discount = Column(Boolean, nullable=False, default=False)
+    tags = Column(JSON, nullable=True)
+    replaced_by_catalog_item_id = Column(UUID(as_uuid=True), ForeignKey("catalog_items.id"), nullable=True)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    updated_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    price_updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    updated_by = relationship("User", foreign_keys=[updated_by_user_id])
+    replaced_by_catalog_item = relationship("CatalogItem", remote_side=[id], foreign_keys=[replaced_by_catalog_item_id])
