@@ -6,7 +6,7 @@ import SideNavBar from "./SideNavBar";
 import { getToken } from "@/lib/api";
 import { AuthProvider } from "@/contexts/AuthContext";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/auth");

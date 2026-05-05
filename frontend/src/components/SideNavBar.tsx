@@ -14,7 +14,7 @@ type NavItem = {
 
 const MAIN_ITEMS: NavItem[] = [
   { href: "/dashboard", icon: "dashboard", title: "Dashboard" },
-  { href: "/", icon: "chat_bubble", title: "Messages" },
+  { href: "/messages", icon: "chat_bubble", title: "Messages" },
   { href: "/projects", icon: "view_kanban", title: "Projects" },
   { href: "/proposals", icon: "request_quote", title: "Proposals" },
   { href: "/catalog", icon: "inventory_2", title: "Catalog" },
@@ -40,7 +40,7 @@ const ADMIN_DOMAIN_ITEMS: NavItem[] = [
 
 function isItemActive(pathname: string, item: NavItem) {
   const paths = item.activePaths ?? [item.href];
-  return paths.some((path) => (path === "/" ? pathname === "/" : pathname.startsWith(path)));
+  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 export default function SideNavBar() {
@@ -84,7 +84,7 @@ export default function SideNavBar() {
 
   return (
     <nav className="h-full w-[64px] shrink-0 bg-white border-r border-[#E9ECEF] hidden md:flex flex-col items-center py-4">
-      <Link href="/" className="mb-5 w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+      <Link href="/dashboard" className="mb-5 w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
         <span
           className="material-symbols-outlined text-white text-[22px]"
           style={{ fontVariationSettings: "'FILL' 1" }}
