@@ -62,129 +62,6 @@ const TYPE_META: Record<CatalogType, { label: string; icon: string; className: s
   service: { label: "Service", icon: "design_services", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-100" },
 };
 
-const MOCK_ITEMS: CatalogItem[] = [
-  {
-    id: "cat-1",
-    name: "WhatsApp Automation Setup",
-    commercialName: "WhatsApp Automation Setup",
-    type: "service",
-    category: "Implementation",
-    sku: "SRV-WA-001",
-    status: "active",
-    basePrice: 4200,
-    unit: "Fixed fee",
-    commercialDescription: "Setup and configure the first WhatsApp automation workflow with onboarding support.",
-    internalNotes: "Confirm channel credentials before proposal approval.",
-    slaOrDeliveryTime: "5 business days",
-    activeForSupport: true,
-    canBeQuoted: true,
-    allowsDiscount: true,
-    tags: ["onboarding", "whatsapp"],
-    updatedAt: "2026-05-04T10:00:00Z",
-    priceUpdatedAt: "2026-05-01T15:30:00Z",
-  },
-  {
-    id: "cat-2",
-    name: "AI Suggestion Pack",
-    commercialName: "AI Suggestion Productivity Pack",
-    type: "product",
-    category: "AI Add-on",
-    sku: "PRD-AI-014",
-    status: "active",
-    basePrice: 890,
-    unit: "Monthly",
-    commercialDescription: "Add AI-assisted reply suggestions and quick response generation to the support workflow.",
-    internalNotes: "Available only for customers with active inbox workspace.",
-    slaOrDeliveryTime: "Immediate after enablement",
-    activeForSupport: true,
-    canBeQuoted: true,
-    allowsDiscount: false,
-    tags: ["ai", "upsell"],
-    updatedAt: "2026-05-03T18:20:00Z",
-    priceUpdatedAt: "2026-04-28T12:00:00Z",
-  },
-  {
-    id: "cat-3",
-    name: "Telegram Channel Rollout",
-    commercialName: "Telegram Rollout",
-    type: "service",
-    category: "Deployment",
-    sku: "SRV-TG-007",
-    status: "under_review",
-    basePrice: 2600,
-    unit: "Fixed fee",
-    commercialDescription: "Launch Telegram channel support with configuration, testing, and go-live checklist.",
-    internalNotes: "Commercial description approved. Price pending margin review.",
-    slaOrDeliveryTime: "4 business days",
-    activeForSupport: true,
-    canBeQuoted: false,
-    allowsDiscount: false,
-    tags: ["telegram", "rollout"],
-    updatedAt: "2026-05-04T08:40:00Z",
-    priceUpdatedAt: "2026-04-20T10:00:00Z",
-  },
-  {
-    id: "cat-4",
-    name: "Premium SLA Monitoring",
-    commercialName: "Premium SLA Monitoring",
-    type: "product",
-    category: "Operations",
-    sku: "PRD-SLA-003",
-    status: "active",
-    basePrice: 1490,
-    unit: "Monthly",
-    commercialDescription: "Real-time SLA tracking with alerts for managers and queue prioritization insights.",
-    internalNotes: "High attach rate for enterprise accounts.",
-    slaOrDeliveryTime: "Immediate after provisioning",
-    activeForSupport: true,
-    canBeQuoted: true,
-    allowsDiscount: true,
-    tags: ["sla", "enterprise"],
-    updatedAt: "2026-05-02T14:10:00Z",
-    priceUpdatedAt: "2026-05-02T14:10:00Z",
-  },
-  {
-    id: "cat-5",
-    name: "Legacy SMS Connector",
-    commercialName: "Legacy SMS Connector",
-    type: "product",
-    category: "Channels",
-    sku: "PRD-SMS-LEG",
-    status: "inactive",
-    basePrice: 590,
-    unit: "Monthly",
-    commercialDescription: "Legacy SMS channel connector kept for existing accounts under maintenance contracts.",
-    internalNotes: "Do not propose for new customers.",
-    slaOrDeliveryTime: "Immediate for existing tenants",
-    activeForSupport: true,
-    canBeQuoted: false,
-    allowsDiscount: false,
-    tags: ["legacy", "sms"],
-    updatedAt: "2026-04-27T16:45:00Z",
-    priceUpdatedAt: "2026-03-18T09:00:00Z",
-  },
-  {
-    id: "cat-6",
-    name: "Proposal Template Advisory",
-    commercialName: "Proposal Template Advisory",
-    type: "service",
-    category: "Consulting",
-    sku: "SRV-PRP-002",
-    status: "active",
-    basePrice: 1200,
-    unit: "Per workshop",
-    commercialDescription: "Short advisory workshop to standardize proposal structure, copy, and pricing blocks.",
-    internalNotes: "Useful for customers expanding from support into project delivery.",
-    slaOrDeliveryTime: "2 business days scheduling",
-    activeForSupport: false,
-    canBeQuoted: true,
-    allowsDiscount: true,
-    tags: ["proposal", "consulting"],
-    updatedAt: "2026-05-01T11:15:00Z",
-    priceUpdatedAt: "2026-04-29T11:15:00Z",
-  },
-];
-
 const SCOPE_OPTIONS: Array<{ id: ScopeId; label: string }> = [
   { id: "all", label: "All" },
   { id: "products", label: "Products" },
@@ -253,7 +130,7 @@ function buildFormState(item?: CatalogItem | null): CatalogFormState {
 
 export default function CatalogPage() {
   const router = useRouter();
-  const [items, setItems] = useState<CatalogItem[]>(MOCK_ITEMS);
+  const [items, setItems] = useState<CatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -264,7 +141,7 @@ export default function CatalogPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [proposalFilter, setProposalFilter] = useState<"ALL" | "YES" | "NO">("ALL");
   const [supportFilter, setSupportFilter] = useState<"ALL" | "YES" | "NO">("ALL");
-  const [selectedItemId, setSelectedItemId] = useState<string>(MOCK_ITEMS[0].id);
+  const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -288,10 +165,15 @@ export default function CatalogPage() {
         if (mapped.length > 0) {
           setItems(mapped);
           setSelectedItemId((current) => (mapped.some((item) => item.id === current) ? current : mapped[0].id));
+        } else {
+          setItems([]);
+          setSelectedItemId("");
         }
       } catch (error) {
         if (!isMounted) return;
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load catalog items. Showing fallback data.");
+        setItems([]);
+        setSelectedItemId("");
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load catalog items.");
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -789,8 +671,14 @@ export default function CatalogPage() {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
                   <span className="material-symbols-outlined">search_off</span>
                 </div>
-                <h3 className="mt-4 text-sm font-semibold text-slate-900">No items found</h3>
-                <p className="mt-1 text-sm text-slate-500">Adjust filters or search terms to widen the current view.</p>
+                <h3 className="mt-4 text-sm font-semibold text-slate-900">
+                  {items.length === 0 ? "Catalog is empty" : "No items found"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {items.length === 0
+                    ? "Create the first catalog item to start using products and services in support and proposals."
+                    : "Adjust filters or search terms to widen the current view."}
+                </p>
               </div>
             ) : null}
           </section>
