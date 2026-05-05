@@ -16,6 +16,7 @@ const MAIN_ITEMS: NavItem[] = [
   { href: "/dashboard", icon: "dashboard", title: "Dashboard" },
   { href: "/", icon: "chat_bubble", title: "Messages" },
   { href: "/projects", icon: "view_kanban", title: "Projects" },
+  { href: "/proposals", icon: "request_quote", title: "Proposals" },
   { href: "/catalog", icon: "inventory_2", title: "Catalog" },
   { href: "/tasks", icon: "task", title: "Tasks" },
 ];

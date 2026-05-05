@@ -99,6 +99,14 @@ class CatalogItemStatus(enum.Enum):
     UNDER_REVIEW = "under_review"
 
 
+class ProposalStatus(enum.Enum):
+    DRAFT = "draft"
+    SENT = "sent"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    ARCHIVED = "archived"
+
+
 OFFICIAL_PROJECT_STAGES = [
     ("lead", "Lead", 1),
     ("qualification", "Qualification", 2),
@@ -491,3 +499,61 @@ class CatalogItem(Base):
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     updated_by = relationship("User", foreign_keys=[updated_by_user_id])
     replaced_by_catalog_item = relationship("CatalogItem", remote_side=[id], foreign_keys=[replaced_by_catalog_item_id])
+
+
+class Proposal(Base):
+    __tablename__ = "proposals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reference_code = Column(String(32), nullable=False, unique=True, default=lambda: f"PRP-{uuid.uuid4().hex[:8].upper()}")
+    title = Column(String(255), nullable=False)
+    customer_name = Column(String(255), nullable=True)
+    status = Column(
+        Enum(ProposalStatus, values_callable=lambda obj: [e.value for e in obj], name="proposalstatus"),
+        nullable=False,
+        default=ProposalStatus.DRAFT,
+    )
+    notes = Column(Text, nullable=True)
+    subtotal_amount = Column(Integer, nullable=False, default=0)
+    discount_amount = Column(Integer, nullable=False, default=0)
+    total_amount = Column(Integer, nullable=False, default=0)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    items = relationship(
+        "ProposalItem",
+        back_populates="proposal",
+        cascade="all, delete-orphan",
+        order_by="ProposalItem.position.asc()",
+    )
+
+
+class ProposalItem(Base):
+    __tablename__ = "proposal_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    proposal_id = Column(UUID(as_uuid=True), ForeignKey("proposals.id"), nullable=False)
+    catalog_item_id = Column(UUID(as_uuid=True), ForeignKey("catalog_items.id"), nullable=True)
+    catalog_reference_code = Column(String(32), nullable=True)
+    name_snapshot = Column(String(255), nullable=False)
+    commercial_name_snapshot = Column(String(255), nullable=False)
+    type_snapshot = Column(String(32), nullable=False)
+    sku_snapshot = Column(String(120), nullable=True)
+    category_snapshot = Column(String(120), nullable=False)
+    commercial_description_snapshot = Column(Text, nullable=False)
+    base_price_snapshot = Column(Integer, nullable=False)
+    unit_snapshot = Column(String(120), nullable=False)
+    sla_or_delivery_time_snapshot = Column(String(255), nullable=True)
+    allows_discount_snapshot = Column(Boolean, nullable=False, default=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    unit_price = Column(Integer, nullable=False)
+    discount_amount = Column(Integer, nullable=False, default=0)
+    total_amount = Column(Integer, nullable=False)
+    position = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    proposal = relationship("Proposal", back_populates="items")
+    catalog_item = relationship("CatalogItem", foreign_keys=[catalog_item_id])

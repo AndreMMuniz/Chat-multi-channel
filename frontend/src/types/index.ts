@@ -4,3 +4,4 @@ export * from "./chat";
 export * from "./settings";
 export * from "./quickReply";
 export * from "./catalog";
+export * from "./proposal";

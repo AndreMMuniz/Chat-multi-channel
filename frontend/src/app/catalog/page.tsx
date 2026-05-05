@@ -1,11 +1,13 @@
 "use client";
 
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { catalogApi } from "@/lib/api";
-import type { CatalogItemDto } from "@/types/catalog";
+import { useRouter } from "next/navigation";
+import Modal from "@/components/shared/Modal";
+import { catalogApi, proposalsApi } from "@/lib/api";
+import type { CatalogItemCreateRequest, CatalogItemDto, CatalogItemStatus, CatalogItemType, CatalogItemUpdateRequest } from "@/types/catalog";
 
-type CatalogType = "product" | "service";
-type CatalogStatus = "active" | "inactive" | "discontinued" | "under_review";
+type CatalogType = CatalogItemType;
+type CatalogStatus = CatalogItemStatus;
 type ScopeId = "all" | "products" | "services" | "active" | "proposal";
 
 type CatalogItem = {
@@ -27,6 +29,24 @@ type CatalogItem = {
   tags: string[];
   updatedAt: string;
   priceUpdatedAt: string;
+};
+
+type CatalogFormState = {
+  name: string;
+  commercialName: string;
+  type: CatalogType;
+  status: CatalogStatus;
+  category: string;
+  sku: string;
+  basePrice: string;
+  unit: string;
+  commercialDescription: string;
+  internalNotes: string;
+  slaOrDeliveryTime: string;
+  tags: string;
+  activeForSupport: boolean;
+  canBeQuoted: boolean;
+  allowsDiscount: boolean;
 };
 
 const STATUS_META: Record<CatalogStatus, { label: string; className: string }> = {
@@ -187,10 +207,55 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function mapDto(item: CatalogItemDto): CatalogItem {
+  return {
+    id: item.id,
+    name: item.name,
+    commercialName: item.commercial_name,
+    type: item.type,
+    category: item.category,
+    sku: item.sku ?? item.reference,
+    status: item.status,
+    basePrice: item.base_price,
+    unit: item.unit,
+    commercialDescription: item.commercial_description,
+    internalNotes: item.internal_notes ?? "No internal notes yet.",
+    slaOrDeliveryTime: item.sla_or_delivery_time ?? "Not defined",
+    activeForSupport: item.active_for_support,
+    canBeQuoted: item.can_be_quoted,
+    allowsDiscount: item.allows_discount,
+    tags: item.tags ?? [],
+    updatedAt: item.updated_at,
+    priceUpdatedAt: item.price_updated_at,
+  };
+}
+
+function buildFormState(item?: CatalogItem | null): CatalogFormState {
+  return {
+    name: item?.name ?? "",
+    commercialName: item?.commercialName ?? "",
+    type: item?.type ?? "service",
+    status: item?.status ?? "active",
+    category: item?.category ?? "",
+    sku: item?.sku ?? "",
+    basePrice: item ? String(item.basePrice) : "",
+    unit: item?.unit ?? "",
+    commercialDescription: item?.commercialDescription ?? "",
+    internalNotes: item?.internalNotes === "No internal notes yet." ? "" : (item?.internalNotes ?? ""),
+    slaOrDeliveryTime: item?.slaOrDeliveryTime === "Not defined" ? "" : (item?.slaOrDeliveryTime ?? ""),
+    tags: item?.tags.join(", ") ?? "",
+    activeForSupport: item?.activeForSupport ?? true,
+    canBeQuoted: item?.canBeQuoted ?? false,
+    allowsDiscount: item?.allowsDiscount ?? false,
+  };
+}
+
 export default function CatalogPage() {
+  const router = useRouter();
   const [items, setItems] = useState<CatalogItem[]>(MOCK_ITEMS);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeScope, setActiveScope] = useState<ScopeId>("all");
   const [typeFilter, setTypeFilter] = useState<CatalogType | "ALL">("ALL");
@@ -199,32 +264,15 @@ export default function CatalogPage() {
   const [proposalFilter, setProposalFilter] = useState<"ALL" | "YES" | "NO">("ALL");
   const [supportFilter, setSupportFilter] = useState<"ALL" | "YES" | "NO">("ALL");
   const [selectedItemId, setSelectedItemId] = useState<string>(MOCK_ITEMS[0].id);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isProposalSubmitting, setIsProposalSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formState, setFormState] = useState<CatalogFormState>(() => buildFormState());
 
   useEffect(() => {
     let isMounted = true;
-
-    function mapDto(item: CatalogItemDto): CatalogItem {
-      return {
-        id: item.id,
-        name: item.name,
-        commercialName: item.commercial_name,
-        type: item.type,
-        category: item.category,
-        sku: item.sku ?? item.reference,
-        status: item.status,
-        basePrice: item.base_price,
-        unit: item.unit,
-        commercialDescription: item.commercial_description,
-        internalNotes: item.internal_notes ?? "No internal notes yet.",
-        slaOrDeliveryTime: item.sla_or_delivery_time ?? "Not defined",
-        activeForSupport: item.active_for_support,
-        canBeQuoted: item.can_be_quoted,
-        allowsDiscount: item.allows_discount,
-        tags: item.tags ?? [],
-        updatedAt: item.updated_at,
-        priceUpdatedAt: item.price_updated_at,
-      };
-    }
 
     async function loadCatalog() {
       try {
@@ -251,6 +299,26 @@ export default function CatalogPage() {
       isMounted = false;
     };
   }, []);
+
+  async function refreshCatalog() {
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+      const response = await catalogApi.listCatalogItems({ limit: 200 });
+      const mapped = response.data.map(mapDto);
+      if (mapped.length > 0) {
+        setItems(mapped);
+        setSelectedItemId((current) => (mapped.some((item) => item.id === current) ? current : mapped[0].id));
+      } else {
+        setItems([]);
+        setSelectedItemId("");
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to refresh catalog items.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   const categories = useMemo(
     () => [...new Set(items.map((item) => item.category))].sort((a, b) => a.localeCompare(b)),
@@ -318,6 +386,124 @@ export default function CatalogPage() {
     [items]
   );
 
+  function openCreateModal() {
+    setEditingItemId(null);
+    setFormState(buildFormState());
+    setFormError(null);
+    setIsModalOpen(true);
+  }
+
+  function openEditModal(item: CatalogItem) {
+    setEditingItemId(item.id);
+    setFormState(buildFormState(item));
+    setFormError(null);
+    setIsModalOpen(true);
+  }
+
+  function closeModal() {
+    if (isSaving) return;
+    setIsModalOpen(false);
+    setFormError(null);
+  }
+
+  function updateForm<K extends keyof CatalogFormState>(key: K, value: CatalogFormState[K]) {
+    setFormState((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handleSubmitForm() {
+    try {
+      setIsSaving(true);
+      setFormError(null);
+      const payload: CatalogItemCreateRequest | CatalogItemUpdateRequest = {
+        name: formState.name.trim(),
+        commercial_name: formState.commercialName.trim(),
+        type: formState.type,
+        status: formState.status,
+        category: formState.category.trim(),
+        sku: formState.sku.trim() || null,
+        commercial_description: formState.commercialDescription.trim(),
+        internal_notes: formState.internalNotes.trim() || null,
+        base_price: Number(formState.basePrice || 0),
+        unit: formState.unit.trim(),
+        sla_or_delivery_time: formState.slaOrDeliveryTime.trim() || null,
+        active_for_support: formState.activeForSupport,
+        can_be_quoted: formState.canBeQuoted,
+        allows_discount: formState.allowsDiscount,
+        tags: formState.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      };
+
+      if (!payload.name || !payload.commercial_name || !payload.category || !payload.unit || !payload.commercial_description) {
+        throw new Error("Fill in the required fields before saving.");
+      }
+
+      if (editingItemId) {
+        await catalogApi.updateCatalogItem(editingItemId, payload);
+        setActionMessage("Catalog item updated.");
+      } else {
+        await catalogApi.createCatalogItem(payload as CatalogItemCreateRequest);
+        setActionMessage("Catalog item created.");
+      }
+      setIsModalOpen(false);
+      await refreshCatalog();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Failed to save catalog item.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDuplicateItem(item: CatalogItem) {
+    try {
+      setActionMessage(null);
+      await catalogApi.duplicateCatalogItem(item.id);
+      setActionMessage("Catalog item duplicated.");
+      await refreshCatalog();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to duplicate catalog item.");
+    }
+  }
+
+  async function handleToggleStatus(item: CatalogItem) {
+    try {
+      setActionMessage(null);
+      const nextStatus = item.status === "active" ? "inactive" : "active";
+      await catalogApi.updateCatalogItemStatus(item.id, nextStatus);
+      setActionMessage(`Catalog item marked as ${nextStatus}.`);
+      await refreshCatalog();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to update catalog status.");
+    }
+  }
+
+  async function handleCopyDescription(item: CatalogItem) {
+    try {
+      await navigator.clipboard.writeText(item.commercialDescription);
+      setActionMessage("Commercial description copied.");
+    } catch {
+      setErrorMessage("Clipboard copy failed on this browser.");
+    }
+  }
+
+  async function handleAddToProposal(item: CatalogItem) {
+    try {
+      setIsProposalSubmitting(true);
+      setActionMessage(null);
+      const proposal = await proposalsApi.createProposalFromCatalog(item.id, {
+        title: `Proposal for ${item.commercialName}`,
+        quantity: 1,
+      });
+      setActionMessage(`Draft proposal ${proposal.reference} created.`);
+      router.push(`/proposals?proposalId=${proposal.id}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create proposal from catalog item.");
+    } finally {
+      setIsProposalSubmitting(false);
+    }
+  }
+
   return (
     <main className="flex-1 overflow-y-auto bg-[#F6F8FC]">
       <div className="flex min-h-full flex-col">
@@ -349,6 +535,7 @@ export default function CatalogPage() {
               </label>
               <button
                 type="button"
+                onClick={openCreateModal}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
               >
                 <span className="material-symbols-outlined text-[18px]">add</span>
@@ -377,6 +564,11 @@ export default function CatalogPage() {
           {errorMessage ? (
             <div className="border-t border-amber-100 bg-amber-50 px-6 py-3 text-sm text-amber-800">
               {errorMessage}
+            </div>
+          ) : null}
+          {actionMessage ? (
+            <div className="border-t border-emerald-100 bg-emerald-50 px-6 py-3 text-sm text-emerald-800">
+              {actionMessage}
             </div>
           ) : null}
 
@@ -638,23 +830,43 @@ export default function CatalogPage() {
                   <div className="grid gap-2">
                     <button
                       type="button"
+                      onClick={() => void handleAddToProposal(selectedItem)}
+                      disabled={isProposalSubmitting || !selectedItem.canBeQuoted}
                       className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
                     >
                       <span className="material-symbols-outlined text-[18px]">request_quote</span>
-                      Add to proposal
+                      {isProposalSubmitting ? "Creating proposal..." : "Add to proposal"}
                     </button>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
+                        onClick={() => void handleCopyDescription(selectedItem)}
                         className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                       >
                         Copy description
                       </button>
                       <button
                         type="button"
+                        onClick={() => openEditModal(selectedItem)}
                         className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                       >
                         Edit item
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleDuplicateItem(selectedItem)}
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleStatus(selectedItem)}
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        {selectedItem.status === "active" ? "Deactivate" : "Activate"}
                       </button>
                     </div>
                   </div>
@@ -672,9 +884,103 @@ export default function CatalogPage() {
           </aside>
         </div>
       </div>
+      {isModalOpen ? (
+        <Modal title={editingItemId ? "Edit catalog item" : "New catalog item"} onClose={closeModal} maxWidth="max-w-3xl">
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField label="Internal name" required>
+                <input value={formState.name} onChange={(event) => updateForm("name", event.target.value)} className={INPUT_CLASS} />
+              </FormField>
+              <FormField label="Commercial name" required>
+                <input value={formState.commercialName} onChange={(event) => updateForm("commercialName", event.target.value)} className={INPUT_CLASS} />
+              </FormField>
+              <FormField label="Type" required>
+                <select value={formState.type} onChange={(event) => updateForm("type", event.target.value as CatalogType)} className={INPUT_CLASS}>
+                  <option value="service">Service</option>
+                  <option value="product">Product</option>
+                </select>
+              </FormField>
+              <FormField label="Status" required>
+                <select value={formState.status} onChange={(event) => updateForm("status", event.target.value as CatalogStatus)} className={INPUT_CLASS}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="under_review">Under review</option>
+                  <option value="discontinued">Discontinued</option>
+                </select>
+              </FormField>
+              <FormField label="Category" required>
+                <input value={formState.category} onChange={(event) => updateForm("category", event.target.value)} className={INPUT_CLASS} />
+              </FormField>
+              <FormField label="SKU / Code">
+                <input value={formState.sku} onChange={(event) => updateForm("sku", event.target.value)} className={INPUT_CLASS} />
+              </FormField>
+              <FormField label="Base price" required>
+                <input value={formState.basePrice} onChange={(event) => updateForm("basePrice", event.target.value)} className={INPUT_CLASS} inputMode="numeric" />
+              </FormField>
+              <FormField label="Billing unit" required>
+                <input value={formState.unit} onChange={(event) => updateForm("unit", event.target.value)} className={INPUT_CLASS} />
+              </FormField>
+              <FormField label="Delivery / SLA">
+                <input value={formState.slaOrDeliveryTime} onChange={(event) => updateForm("slaOrDeliveryTime", event.target.value)} className={INPUT_CLASS} />
+              </FormField>
+              <FormField label="Tags">
+                <input value={formState.tags} onChange={(event) => updateForm("tags", event.target.value)} className={INPUT_CLASS} placeholder="ai, onboarding, whatsapp" />
+              </FormField>
+            </div>
+
+            <FormField label="Commercial description" required>
+              <textarea value={formState.commercialDescription} onChange={(event) => updateForm("commercialDescription", event.target.value)} className={`${INPUT_CLASS} min-h-28`} />
+            </FormField>
+
+            <FormField label="Internal notes">
+              <textarea value={formState.internalNotes} onChange={(event) => updateForm("internalNotes", event.target.value)} className={`${INPUT_CLASS} min-h-24`} />
+            </FormField>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <ToggleCard
+                label="Active for support"
+                description="Visible for support-side consultation."
+                checked={formState.activeForSupport}
+                onChange={(checked) => updateForm("activeForSupport", checked)}
+              />
+              <ToggleCard
+                label="Ready for proposal"
+                description="Can be reused in commercial proposals."
+                checked={formState.canBeQuoted}
+                onChange={(checked) => updateForm("canBeQuoted", checked)}
+              />
+              <ToggleCard
+                label="Allows discount"
+                description="Commercial team may negotiate from base price."
+                checked={formState.allowsDiscount}
+                onChange={(checked) => updateForm("allowsDiscount", checked)}
+              />
+            </div>
+
+            {formError ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError}</p> : null}
+
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={closeModal} className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSubmitForm()}
+                disabled={isSaving}
+                className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSaving ? "Saving..." : editingItemId ? "Save changes" : "Create item"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </main>
   );
 }
+
+const INPUT_CLASS =
+  "w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-300";
 
 function FilterSelect({
   label,
@@ -698,6 +1004,57 @@ function FilterSelect({
         {children}
       </select>
     </label>
+  );
+}
+
+function FormField({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+        {label} {required ? <span className="text-rose-500">*</span> : null}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function ToggleCard({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`rounded-3xl border p-4 text-left transition ${
+        checked ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{label}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+        </div>
+        <span className={`material-symbols-outlined text-[20px] ${checked ? "text-emerald-600" : "text-slate-300"}`}>
+          {checked ? "check_circle" : "radio_button_unchecked"}
+        </span>
+      </div>
+    </button>
   );
 }
 
