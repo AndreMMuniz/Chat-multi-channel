@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Modal from "@/components/shared/Modal";
 import { catalogApi, proposalsApi } from "@/lib/api";
 import type { CatalogItemCreateRequest, CatalogItemDto, CatalogItemStatus, CatalogItemType, CatalogItemUpdateRequest } from "@/types/catalog";
+import type { ProposalDto } from "@/types/proposal";
 
 type CatalogType = CatalogItemType;
 type CatalogStatus = CatalogItemStatus;
@@ -268,6 +269,9 @@ export default function CatalogPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isProposalSubmitting, setIsProposalSubmitting] = useState(false);
+  const [isProposalPickerOpen, setIsProposalPickerOpen] = useState(false);
+  const [draftProposals, setDraftProposals] = useState<ProposalDto[]>([]);
+  const [proposalPickerItem, setProposalPickerItem] = useState<CatalogItem | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formState, setFormState] = useState<CatalogFormState>(() => buildFormState());
 
@@ -489,16 +493,47 @@ export default function CatalogPage() {
 
   async function handleAddToProposal(item: CatalogItem) {
     try {
+      setErrorMessage(null);
+      setActionMessage(null);
+      const response = await proposalsApi.listProposals({ limit: 50, status: "draft" });
+      setDraftProposals(response.data);
+      setProposalPickerItem(item);
+      setIsProposalPickerOpen(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load draft proposals.");
+    }
+  }
+
+  async function handleCreateNewProposal(item: CatalogItem) {
+    try {
       setIsProposalSubmitting(true);
       setActionMessage(null);
       const proposal = await proposalsApi.createProposalFromCatalog(item.id, {
         title: `Proposal for ${item.commercialName}`,
         quantity: 1,
       });
+      setIsProposalPickerOpen(false);
       setActionMessage(`Draft proposal ${proposal.reference} created.`);
       router.push(`/proposals?proposalId=${proposal.id}`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to create proposal from catalog item.");
+    } finally {
+      setIsProposalSubmitting(false);
+    }
+  }
+
+  async function handleAddToExistingProposal(proposalId: string, item: CatalogItem) {
+    try {
+      setIsProposalSubmitting(true);
+      setActionMessage(null);
+      const proposal = await proposalsApi.addCatalogItemToProposal(proposalId, item.id, {
+        quantity: 1,
+      });
+      setIsProposalPickerOpen(false);
+      setActionMessage(`Item added to proposal ${proposal.reference}.`);
+      router.push(`/proposals?proposalId=${proposal.id}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to add item to proposal.");
     } finally {
       setIsProposalSubmitting(false);
     }
@@ -971,6 +1006,66 @@ export default function CatalogPage() {
               >
                 {isSaving ? "Saving..." : editingItemId ? "Save changes" : "Create item"}
               </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+      {isProposalPickerOpen && proposalPickerItem ? (
+        <Modal
+          title={`Use "${proposalPickerItem.commercialName}" in proposal`}
+          onClose={() => {
+            if (isProposalSubmitting) return;
+            setIsProposalPickerOpen(false);
+            setProposalPickerItem(null);
+          }}
+          maxWidth="max-w-2xl"
+        >
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <p className="text-sm font-semibold text-slate-900">{proposalPickerItem.commercialName}</p>
+              <p className="mt-1 text-sm text-slate-500">{proposalPickerItem.sku} · {formatCurrency(proposalPickerItem.basePrice)}</p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => void handleCreateNewProposal(proposalPickerItem)}
+                disabled={isProposalSubmitting}
+                className="flex w-full items-center justify-between rounded-3xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Create new draft proposal</p>
+                  <p className="mt-1 text-xs text-slate-500">Start a fresh proposal with this catalog item as the first snapshot.</p>
+                </div>
+                <span className="material-symbols-outlined text-slate-400">add_circle</span>
+              </button>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Or add to an existing draft</p>
+                {draftProposals.length > 0 ? (
+                  draftProposals.map((proposal) => (
+                    <button
+                      key={proposal.id}
+                      type="button"
+                      onClick={() => void handleAddToExistingProposal(proposal.id, proposalPickerItem)}
+                      disabled={isProposalSubmitting}
+                      className="flex w-full items-center justify-between rounded-3xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{proposal.title}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {proposal.reference} · {proposal.items_count} items · {formatCurrency(proposal.total_amount)}
+                        </p>
+                      </div>
+                      <span className="material-symbols-outlined text-slate-400">arrow_forward</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    No draft proposals available yet.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </Modal>

@@ -58,3 +58,8 @@ export interface ProposalFromCatalogRequest {
   notes?: string | null;
   quantity?: number;
 }
+
+export interface ProposalItemFromCatalogRequest {
+  quantity?: number;
+  discount_amount?: number;
+}

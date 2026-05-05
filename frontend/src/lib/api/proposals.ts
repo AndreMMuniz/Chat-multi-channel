@@ -1,5 +1,11 @@
 import { apiGet, apiGetList, apiMutate } from "@/lib/apiClient";
-import type { ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalFromCatalogRequest } from "@/types/proposal";
+import type {
+  ProposalCreateRequest,
+  ProposalDetailDto,
+  ProposalDto,
+  ProposalFromCatalogRequest,
+  ProposalItemFromCatalogRequest,
+} from "@/types/proposal";
 
 export async function listProposals(params?: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
@@ -24,6 +30,18 @@ export async function createProposalFromCatalog(
 ): Promise<ProposalDetailDto> {
   return apiMutate<ProposalFromCatalogRequest, ProposalDetailDto>(
     `/admin/proposals/from-catalog/${catalogItemId}`,
+    "POST",
+    body,
+  );
+}
+
+export async function addCatalogItemToProposal(
+  proposalId: string,
+  catalogItemId: string,
+  body: ProposalItemFromCatalogRequest,
+): Promise<ProposalDetailDto> {
+  return apiMutate<ProposalItemFromCatalogRequest, ProposalDetailDto>(
+    `/admin/proposals/${proposalId}/items/from-catalog/${catalogItemId}`,
     "POST",
     body,
   );
