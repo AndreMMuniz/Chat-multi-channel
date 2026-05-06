@@ -519,7 +519,7 @@ export default function TasksPage() {
                           <button
                             type="button"
                             onClick={() => setSelectedTaskId(task.id)}
-                            className="truncate text-left text-sm font-semibold text-slate-900 transition hover:text-indigo-700"
+                            className="min-w-0 max-w-full truncate text-left text-sm font-semibold text-slate-900 transition hover:text-indigo-700"
                           >
                             {task.title}
                           </button>
@@ -546,9 +546,9 @@ export default function TasksPage() {
                         <button
                           type="button"
                           onClick={() => openProject(task.project_id)}
-                          className="text-left transition hover:text-indigo-700"
+                          className="w-full min-w-0 text-left transition hover:text-indigo-700"
                         >
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
                             {task.project_reference || "Project"}
                           </p>
                           <p className="truncate text-sm font-medium text-slate-800">
