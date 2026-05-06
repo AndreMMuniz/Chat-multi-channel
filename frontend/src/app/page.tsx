@@ -7,6 +7,11 @@ export const metadata: Metadata = {
     "Launch a branded omnichannel CRM platform with white-label source code, custom branding, and production deployment for internal business operations.",
 };
 
+const demoCredentials = {
+  email: "visitor@omnichat.demo",
+  password: "Replace-with-demo-password",
+};
+
 const packageItems = [
   {
     title: "White-label source code",
@@ -201,6 +206,7 @@ export default function LandingPage() {
             <div className="relative">
               <div className="absolute -left-8 top-10 h-28 w-28 rounded-full bg-cyan-300/20 blur-3xl" />
               <div className="absolute bottom-8 right-4 h-32 w-32 rounded-full bg-orange-400/20 blur-3xl" />
+              <div className="absolute -right-6 top-32 hidden h-20 w-20 rounded-full border border-white/10 bg-white/5 lg:block" />
 
               <div className="relative rounded-[32px] border border-white/10 bg-white/8 p-4 shadow-[0_40px_120px_rgba(2,6,23,0.55)] backdrop-blur">
                 <div className="rounded-[28px] border border-white/10 bg-[#f8fafc] p-4 text-slate-900">
@@ -265,6 +271,14 @@ export default function LandingPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="absolute -bottom-6 left-6 hidden max-w-[280px] rounded-[28px] border border-white/10 bg-slate-950/70 p-5 text-white shadow-[0_20px_60px_rgba(15,23,42,0.45)] backdrop-blur lg:block">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">Enterprise-ready package</p>
+                <p className="mt-3 text-lg font-semibold">Brand ownership, deployment, and internal rollout in one motion.</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">
+                  Designed for teams that need a branded CRM environment in production without a long custom build cycle.
+                </p>
               </div>
             </div>
           </div>
@@ -407,6 +421,34 @@ export default function LandingPage() {
                     <p className="mt-2 text-sm leading-7 text-slate-300">{text}</p>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-[24px] border border-orange-300/20 bg-orange-300/8 p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-200">Demo credentials</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-300">
+                    Replace these placeholder values with the final visitor login before publishing the landing page.
+                  </p>
+                </div>
+                <a
+                  href="https://www.omnicrm.chat/login"
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  Open Login
+                </a>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-[20px] border border-white/10 bg-slate-950/25 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Demo email</p>
+                  <p className="mt-2 break-all font-mono text-sm text-white">{demoCredentials.email}</p>
+                </div>
+                <div className="rounded-[20px] border border-white/10 bg-slate-950/25 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Demo password</p>
+                  <p className="mt-2 break-all font-mono text-sm text-white">{demoCredentials.password}</p>
+                </div>
               </div>
             </div>
 

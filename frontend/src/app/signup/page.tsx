@@ -1,25 +1,43 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { authApi } from "@/lib/api/index";
 
 interface PasswordRule {
   label: string;
-  test: (v: string) => boolean;
+  test: (value: string) => boolean;
 }
 
 const PASSWORD_RULES: PasswordRule[] = [
-  { label: "At least 8 characters",       test: (v) => v.length >= 8 },
-  { label: "Uppercase letter (A-Z)",       test: (v) => /[A-Z]/.test(v) },
-  { label: "Lowercase letter (a-z)",       test: (v) => /[a-z]/.test(v) },
-  { label: "Number (0-9)",                 test: (v) => /\d/.test(v) },
-  { label: "Special character (!@#$...)",  test: (v) => /[!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|`~]/.test(v) },
+  { label: "At least 8 characters", test: (value) => value.length >= 8 },
+  { label: "Uppercase letter (A-Z)", test: (value) => /[A-Z]/.test(value) },
+  { label: "Lowercase letter (a-z)", test: (value) => /[a-z]/.test(value) },
+  { label: "Number (0-9)", test: (value) => /\d/.test(value) },
+  { label: "Special character (!@#$...)", test: (value) => /[!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|`~]/.test(value) },
+];
+
+const onboardingSteps = [
+  {
+    step: "01",
+    title: "Submit your request",
+    description: "Share the contact who will receive onboarding and workspace approval updates.",
+  },
+  {
+    step: "02",
+    title: "Review and approval",
+    description: "The team validates the request before releasing access to the environment.",
+  },
+  {
+    step: "03",
+    title: "Continue the rollout",
+    description: "Move into workspace access, evaluation, and the commercial deployment process.",
+  },
 ];
 
 function PasswordStrength({ password }: { password: string }) {
-  const results = PASSWORD_RULES.map((r) => ({ ...r, passed: r.test(password) }));
-  const score = results.filter((r) => r.passed).length;
+  const results = PASSWORD_RULES.map((rule) => ({ ...rule, passed: rule.test(password) }));
+  const score = results.filter((rule) => rule.passed).length;
 
   const bar = [
     { min: 0, color: "bg-slate-200" },
@@ -29,27 +47,31 @@ function PasswordStrength({ password }: { password: string }) {
     { min: 4, color: "bg-blue-400" },
     { min: 5, color: "bg-green-500" },
   ];
-  const activeColor = [...bar].reverse().find((b) => score >= b.min)!.color;
+
+  const activeColor = [...bar].reverse().find((item) => score >= item.min)?.color ?? "bg-slate-200";
 
   if (!password) return null;
 
   return (
     <div className="mt-2 space-y-2">
       <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((i) => (
+        {[1, 2, 3, 4, 5].map((index) => (
           <div
-            key={i}
-            className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= score ? activeColor : "bg-slate-200"}`}
+            key={index}
+            className={`h-1 flex-1 rounded-full transition-all duration-300 ${index <= score ? activeColor : "bg-slate-200"}`}
           />
         ))}
       </div>
       <ul className="space-y-1">
-        {results.map((r) => (
-          <li key={r.label} className={`flex items-center gap-1.5 text-xs transition-colors ${r.passed ? "text-green-600" : "text-slate-400"}`}>
+        {results.map((rule) => (
+          <li
+            key={rule.label}
+            className={`flex items-center gap-1.5 text-xs transition-colors ${rule.passed ? "text-green-600" : "text-slate-400"}`}
+          >
             <span className="material-symbols-outlined text-[14px]">
-              {r.passed ? "check_circle" : "radio_button_unchecked"}
+              {rule.passed ? "check_circle" : "radio_button_unchecked"}
             </span>
-            {r.label}
+            {rule.label}
           </li>
         ))}
       </ul>
@@ -67,16 +89,17 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const passwordStrong = useMemo(() => PASSWORD_RULES.every((r) => r.test(password)), [password]);
+  const passwordStrong = useMemo(() => PASSWORD_RULES.every((rule) => rule.test(password)), [password]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
 
     if (!passwordStrong) {
       setError("Please meet all password requirements before submitting.");
       return;
     }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
@@ -86,8 +109,8 @@ export default function SignupPage() {
     try {
       await authApi.signup({ email, password, full_name: fullName });
       setSubmitted(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed. Try again.");
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : "Registration failed. Try again.");
     } finally {
       setLoading(false);
     }
@@ -95,113 +118,197 @@ export default function SignupPage() {
 
   if (submitted) {
     return (
-      <div className="flex h-screen bg-white items-center justify-center px-8">
-        <div className="w-full max-w-[400px] text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="material-symbols-outlined text-green-600 text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+      <div className="flex min-h-screen items-center justify-center bg-[#f5efe6] px-8 py-10">
+        <div className="w-full max-w-[520px] rounded-[32px] border border-[#e8dccf] bg-white p-10 text-center shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+            <span className="material-symbols-outlined text-[32px] text-green-600" style={{ fontVariationSettings: "'FILL' 1" }}>
               mark_email_read
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-3">Request received!</h2>
-          <p className="text-slate-500 text-sm leading-relaxed mb-8">
-            Your account is pending admin approval. You will receive an email at <strong>{email}</strong> once your access is approved.
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#c2410c]">Access request submitted</p>
+          <h2 className="mb-3 mt-3 text-3xl font-bold text-slate-900">Your onboarding request is in queue.</h2>
+          <p className="mb-8 text-sm leading-7 text-slate-500">
+            We received your request and the team will review it shortly. A confirmation will be sent to <strong>{email}</strong> as soon as your workspace access is approved.
           </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#7C4DFF] hover:text-[#632ce5] transition-colors"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Back to sign in
-          </Link>
+
+          <div className="mb-8 grid gap-3 text-left sm:grid-cols-3">
+            {[
+              ["1", "Request received"],
+              ["2", "Reviewed by team"],
+              ["3", "Workspace access released"],
+            ].map(([step, label]) => (
+              <div key={label} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Step {step}</p>
+                <p className="mt-1 text-sm text-slate-500">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              Back to sign in
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-full bg-[#f97316] px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-[#fb923c]"
+            >
+              Return to landing page
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-white">
-      {/* Brand panel */}
-      <div className="hidden lg:flex lg:w-[52%] relative flex-col justify-between p-12 overflow-hidden bg-gradient-to-br from-[#4A1DB5] via-[#632ce5] to-[#7C4DFF]">
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: "radial-gradient(circle at 20% 80%, #fff 1px, transparent 1px), radial-gradient(circle at 80% 20%, #fff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+    <div className="flex min-h-screen bg-[#f5efe6]">
+      <div className="relative hidden overflow-hidden bg-[linear-gradient(145deg,_#0f172a,_#172554_58%,_#0f766e)] p-12 lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 80%, #fff 1px, transparent 1px), radial-gradient(circle at 80% 20%, #fff 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        <div className="absolute -left-20 top-20 h-56 w-56 rounded-full bg-cyan-300/15 blur-3xl" />
+        <div className="absolute bottom-12 right-0 h-64 w-64 rounded-full bg-orange-400/15 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-            <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+            <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
+              support_agent
+            </span>
           </div>
-          <span className="font-bold text-lg text-white tracking-tight">Omnichat</span>
+          <span className="text-lg font-bold tracking-tight text-white">Omnichat</span>
         </div>
 
-        <div className="relative">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/15 rounded-full text-white/80 text-xs font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-300 animate-pulse" />
-            Platform powered by AI
+        <div className="relative max-w-xl">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-300 animate-pulse" />
+            White-label CRM onboarding
           </div>
-          <h1 className="text-4xl font-bold text-white leading-tight mb-4">
-            Join your team&apos;s workspace
+          <h1 className="mb-4 text-4xl font-bold leading-tight text-white">
+            Start the access flow for your branded CRM workspace.
           </h1>
-          <p className="text-white/70 text-lg leading-relaxed">
-            Request access and an admin will review your registration before granting entry.
+          <p className="text-lg leading-relaxed text-white/70">
+            Submit your request so the team can review your company details, approve access, and move your internal operation toward deployment.
           </p>
+
+          <div className="mt-10 space-y-3.5">
+            {[
+              "Commercial onboarding aligned with your branded CRM rollout",
+              "Access review before workspace release",
+              "Built for internal enterprise teams, not generic public signup",
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-3 text-white/85">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                  <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    check
+                  </span>
+                </div>
+                <span className="text-sm font-medium">{item}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <p className="relative text-white/35 text-xs">© 2026 Omnichat. All rights reserved.</p>
+        <div className="relative rounded-[28px] border border-white/10 bg-white/8 p-5 text-white backdrop-blur">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">What happens next</p>
+          <div className="mt-4 grid gap-3">
+            {onboardingSteps.map((item) => (
+              <div key={item.step} className="grid grid-cols-[40px_1fr] gap-3 rounded-[20px] border border-white/10 bg-slate-950/25 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold text-cyan-100">
+                  {item.step}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{item.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Form panel */}
-      <div className="flex-1 flex items-center justify-center px-8 overflow-y-auto py-8">
-        <div className="w-full max-w-[380px]">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-[#632ce5] rounded-lg flex items-center justify-center">
-              <span className="material-symbols-outlined text-white text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
+      <div className="flex flex-1 items-center justify-center overflow-y-auto px-8 py-10">
+        <div className="w-full max-w-[460px] rounded-[32px] border border-[#e8dccf] bg-white p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:p-10">
+          <div className="mb-8 flex items-center gap-2 lg:hidden">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f766e]">
+              <span className="material-symbols-outlined text-[18px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
+                support_agent
+              </span>
             </div>
             <span className="font-bold text-slate-900">Omnichat</span>
           </div>
 
-          <h2 className="text-2xl font-bold text-slate-900 mb-1">Request access</h2>
-          <p className="text-slate-500 text-sm mb-8">Create an account — an admin will approve your request.</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#c2410c]">Commercial onboarding</p>
+          <h2 className="mb-1 mt-3 text-3xl font-bold text-slate-900">Request workspace access</h2>
+          <p className="mb-8 text-sm leading-7 text-slate-500">
+            Create your request so the team can review your information and release access to the platform environment.
+          </p>
+
+          <div className="mb-6 rounded-[24px] border border-[#e9ded1] bg-[#fcfaf6] p-5">
+            <p className="text-sm font-semibold text-slate-900">What this request unlocks</p>
+            <div className="mt-3 grid gap-3">
+              {[
+                "Access review for your company workspace",
+                "Commercial follow-up for branding and deployment scope",
+                "A path into the Omnichat operating environment",
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-3">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#f97316]" />
+                  <p className="text-sm leading-6 text-slate-600">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Full name</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Full name</label>
               <input
                 type="text"
                 required
                 autoFocus
                 minLength={2}
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(event) => setFullName(event.target.value)}
                 placeholder="Jane Doe"
-                className="w-full h-11 px-3.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:bg-white focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all placeholder:text-slate-400"
+                className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-[#0f766e] focus:bg-white focus:ring-2 focus:ring-[#0f766e]/15"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Email address</label>
               <input
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@company.com"
-                className="w-full h-11 px-3.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:bg-white focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all placeholder:text-slate-400"
+                className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-[#0f766e] focus:bg-white focus:ring-2 focus:ring-[#0f766e]/15"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   placeholder="Create a strong password"
-                  className="w-full h-11 px-3.5 pr-10 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm outline-none focus:bg-white focus:border-[#7C4DFF] focus:ring-2 focus:ring-[#7C4DFF]/15 transition-all placeholder:text-slate-400"
+                  className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 pr-10 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-[#0f766e] focus:bg-white focus:ring-2 focus:ring-[#0f766e]/15"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
+                  onClick={() => setShowPassword((value) => !value)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
                   <span className="material-symbols-outlined text-[18px]">
@@ -213,51 +320,57 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm password</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm password</label>
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(event) => setConfirmPassword(event.target.value)}
                 placeholder="Repeat your password"
-                className={`w-full h-11 px-3.5 rounded-lg bg-slate-50 border text-slate-900 text-sm outline-none focus:bg-white focus:ring-2 transition-all placeholder:text-slate-400 ${
+                className={`h-11 w-full rounded-lg border bg-slate-50 px-3.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 ${
                   confirmPassword && confirmPassword !== password
                     ? "border-red-300 focus:border-red-400 focus:ring-red-400/15"
-                    : "border-slate-200 focus:border-[#7C4DFF] focus:ring-[#7C4DFF]/15"
+                    : "border-slate-200 focus:border-[#0f766e] focus:ring-[#0f766e]/15"
                 }`}
               />
-              {confirmPassword && confirmPassword !== password && (
-                <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
-              )}
+              {confirmPassword && confirmPassword !== password ? (
+                <p className="mt-1 text-xs text-red-500">Passwords do not match</p>
+              ) : null}
             </div>
 
-            {error && (
-              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                <span className="material-symbols-outlined text-[16px] mt-0.5 shrink-0">error</span>
+            {error ? (
+              <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <span className="material-symbols-outlined mt-0.5 shrink-0 text-[16px]">error</span>
                 <span>{error}</span>
               </div>
-            )}
+            ) : null}
 
             <button
               type="submit"
               disabled={loading || !passwordStrong || confirmPassword !== password}
-              className="w-full h-11 bg-[#7C4DFF] hover:bg-[#632ce5] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 mt-2"
+              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#f97316] text-sm font-semibold text-slate-950 transition-all hover:bg-[#fb923c] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? (
                 <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                   Submitting...
                 </>
               ) : (
-                "Request access"
+                "Submit request"
               )}
             </button>
           </form>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
+          <p className="mt-6 text-center text-sm text-slate-500">
             Already have an account?{" "}
-            <Link href="/login" className="font-semibold text-[#7C4DFF] hover:text-[#632ce5] transition-colors">
+            <Link href="/login" className="font-semibold text-[#0f766e] transition-colors hover:text-[#0b5f59]">
               Sign in
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-sm text-slate-500">
+            Want to review the offer first?{" "}
+            <Link href="/" className="font-semibold text-[#0f766e] transition-colors hover:text-[#0b5f59]">
+              Return to the landing page
             </Link>
           </p>
         </div>
