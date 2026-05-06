@@ -243,6 +243,21 @@ export default function LandingPage() {
                         ))}
                       </div>
 
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                        {["All tags", "Support", "Billing", "Feedback"].map((item, index) => (
+                          <span
+                            key={item}
+                            className={`rounded-full border px-3 py-1.5 ${
+                              index === 0
+                                ? "border-[#d9ccff] bg-[#f3f0ff] text-[#7C4DFF]"
+                                : "border-slate-200 bg-white text-slate-600"
+                            }`}
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+
                       <div className="mt-5 rounded-2xl border border-[#cfd7fb] bg-[#eef2ff] p-4">
                         <div className="flex items-start gap-3">
                           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d1fae5] text-sm font-bold text-[#15803d]">
@@ -253,7 +268,7 @@ export default function LandingPage() {
                               <p className="text-sm font-semibold text-slate-900">Andre</p>
                               <span className="text-[11px] text-slate-400">now</span>
                             </div>
-                            <p className="mt-1 text-sm text-slate-500">Sure, I&apos;m here to help with your request...</p>
+                            <p className="mt-1 text-sm text-slate-500">Sure, I&apos;m here to help with your demands...</p>
                           </div>
                         </div>
                       </div>
@@ -268,6 +283,9 @@ export default function LandingPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-600">
+                            Andre Muniz is viewing
+                          </span>
                           <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-600">Open</span>
                           <span className="rounded-full bg-[#f3f0ff] px-3 py-1 text-xs font-medium text-[#7C4DFF]">AI on</span>
                         </div>
@@ -275,43 +293,115 @@ export default function LandingPage() {
 
                       <div className="space-y-6 px-5 py-5">
                         <div className="max-w-[280px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm">
-                          Hi, I need help with plan changes.
+                          Hi, i need help with mas demands, please !!
                         </div>
 
                         <div className="ml-auto max-w-[340px] rounded-2xl bg-[#5b3df6] px-4 py-3 text-sm text-white shadow-sm">
-                          Of course. Please share the details and we can move forward together.
+                          Of course! Please share the details of your demands.
                         </div>
 
                         <div className="max-w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm">
-                          I want something that looks like our own system, not a generic tool.
+                          Help me to change my plan now.
                         </div>
 
                         <div className="ml-auto max-w-[360px] rounded-2xl bg-[#5b3df6] px-4 py-3 text-sm text-white shadow-sm">
-                          That is exactly the model: branded CRM workspace, source code, customization, and deployment.
+                          Sure, I&apos;m here to help with your demands. Please explain further.
+                        </div>
+
+                        <div className="max-w-[240px] rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-700 shadow-sm">
+                          Already a task • Open PRJ-D45F9A14
                         </div>
                       </div>
 
-                      <div className="border-t border-slate-200 px-4 py-4">
+                      <div className="border-t border-slate-200 px-4 py-3">
+                        <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
+                          {["/hello-im-here-to-help", "Hello-im-here-to-help"].map((item, index) => (
+                            <span
+                              key={item}
+                              className={`rounded-full border px-3 py-1.5 ${
+                                index === 0
+                                  ? "border-[#d9ccff] bg-[#f3f0ff] text-[#7C4DFF]"
+                                  : "border-slate-200 bg-white text-slate-600"
+                              }`}
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-400">
                           Type a message or use AI-powered suggestions...
+                        </div>
+                        <div className="mt-4 rounded-2xl border border-[#e9ddff] bg-[#faf7ff] p-4">
+                          <div className="mb-3 flex items-center justify-between">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7C4DFF]">
+                                AI Suggestions
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-400">Cached • 21:25</p>
+                            </div>
+                            <span className="rounded-full border border-[#d9ccff] px-3 py-1 text-[11px] font-medium text-[#7C4DFF]">
+                              Generate
+                            </span>
+                          </div>
+
+                          <div className="space-y-3">
+                            {[
+                              ["I’m here to help! What specific aspects of your plan do you want to change?", "97%"],
+                              ["Please let me know the details of the plan change you need.", "89%"],
+                              ["I’m ready to assist! What changes do you want to make to your plan?", "81%"],
+                            ].map(([text, confidence]) => (
+                              <div key={text} className="rounded-2xl border border-[#eadfff] bg-white px-4 py-3">
+                                <p className="text-sm text-slate-700">{text}</p>
+                                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                                  <span>Confidence</span>
+                                  <span className="font-semibold text-[#7C4DFF]">{confidence}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="bg-white p-4">
-                      <div className="border-b border-slate-200 pb-4 text-center">
+                      <div className="flex items-center justify-around border-b border-slate-200 pb-4 text-center text-[11px] font-medium text-slate-500">
+                        <div className="text-[#7C4DFF]">
+                          <span className="material-symbols-outlined block text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            person
+                          </span>
+                          Contact
+                        </div>
+                        <div>
+                          <span className="material-symbols-outlined block text-[18px]">info</span>
+                          Details
+                        </div>
+                        <div>
+                          <span className="material-symbols-outlined block text-[18px]">history</span>
+                          History
+                        </div>
+                      </div>
+
+                      <div className="pt-4 text-center">
                         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#d1fae5] text-2xl font-bold text-[#15803d]">
                           A
                         </div>
                         <p className="mt-3 text-lg font-semibold text-slate-900">Andre</p>
-                        <p className="mt-1 text-sm text-slate-500">Contact details</p>
+                        <p className="mt-1 text-sm text-slate-500">1649220542</p>
+                        <div className="mt-3 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                          Telegram
+                        </div>
                       </div>
 
-                      <div className="mt-5 space-y-4 text-sm">
+                      <div className="mt-5 border-t border-slate-200 pt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        Contact details
+                      </div>
+
+                      <div className="mt-4 space-y-4 text-sm">
                         {[
+                          ["Name", "Andre"],
+                          ["Identifier", "1649220542"],
                           ["Channel", "Telegram"],
                           ["Status", "Open"],
-                          ["Workspace", "Branded environment"],
                           ["First response", "On time"],
                         ].map(([label, value]) => (
                           <div key={label} className="flex items-center justify-between gap-4">
