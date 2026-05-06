@@ -166,7 +166,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex min-h-screen bg-[#f5efe6]">
-      <div className="relative hidden overflow-hidden bg-[linear-gradient(145deg,_#0f172a,_#172554_58%,_#0f766e)] p-12 lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
+      <div className="relative hidden min-w-0 overflow-hidden bg-[linear-gradient(145deg,_#0f172a,_#172554_58%,_#0f766e)] p-12 lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
         <div
           className="absolute inset-0 opacity-20"
           style={{
@@ -178,7 +178,7 @@ export default function SignupPage() {
         <div className="absolute -left-20 top-20 h-56 w-56 rounded-full bg-cyan-300/15 blur-3xl" />
         <div className="absolute bottom-12 right-0 h-64 w-64 rounded-full bg-orange-400/15 blur-3xl" />
 
-        <div className="relative flex items-center gap-3">
+        <div className="relative flex w-full items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
             <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
               support_agent
@@ -187,7 +187,7 @@ export default function SignupPage() {
           <span className="text-lg font-bold tracking-tight text-white">Omnichat</span>
         </div>
 
-        <div className="relative max-w-xl">
+        <div className="relative w-full max-w-2xl">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white/80">
             <span className="h-1.5 w-1.5 rounded-full bg-green-300 animate-pulse" />
             White-label CRM onboarding
@@ -199,7 +199,7 @@ export default function SignupPage() {
             Submit your request so the team can review your company details, approve access, and move your internal operation toward deployment.
           </p>
 
-          <div className="mt-10 space-y-3.5">
+          <div className="mt-10 w-full space-y-3.5">
             {[
               "Commercial onboarding aligned with your branded CRM rollout",
               "Access review before workspace release",
@@ -217,7 +217,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <div className="relative rounded-[28px] border border-white/10 bg-white/8 p-5 text-white backdrop-blur">
+        <div className="relative w-full max-w-4xl rounded-[28px] border border-white/10 bg-white/8 p-5 text-white backdrop-blur">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">What happens next</p>
           <div className="mt-4 grid gap-3">
             {onboardingSteps.map((item) => (
