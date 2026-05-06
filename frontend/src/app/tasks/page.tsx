@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { projectsApi } from "@/lib/api/index";
@@ -211,7 +212,139 @@ export default function TasksPage() {
     }
   };
 
+  const taskPanel = selectedTask ? createPortal(
+    <div className="pointer-events-none fixed inset-0 z-50">
+      <div
+        className="pointer-events-auto absolute inset-0 bg-slate-900/20"
+        onClick={() => setSelectedTaskId(null)}
+      />
+      <aside className="pointer-events-auto absolute right-0 top-0 flex h-full w-[min(100vw,36rem)] flex-col border-l border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+              {selectedTask.project_reference || "Project task"}
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">{selectedTask.title}</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {selectedTask.project_title || "Untitled project"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedTaskId(null)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">Execution Context</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Status</p>
+                <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${TASK_STATUS_META[selectedTask.status].className}`}>
+                  {TASK_STATUS_META[selectedTask.status].label}
+                </span>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Priority</p>
+                <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${PRIORITY_META[selectedTask.priority].className}`}>
+                  {PRIORITY_META[selectedTask.priority].label}
+                </span>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Assignee</p>
+                <p className="mt-2 text-sm font-medium text-slate-800">{selectedTask.owner_name || "Unassigned"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Created by</p>
+                <p className="mt-2 text-sm font-medium text-slate-800">{selectedTask.created_by_name || "Unknown"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:col-span-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Due Date</p>
+                <p className={`mt-2 text-sm font-medium ${isOverdue(selectedTask.due_date, selectedTask.status) ? "text-rose-600" : "text-slate-800"}`}>
+                  {formatDate(selectedTask.due_date)}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">Notes</h3>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+              {selectedTask.description || "No additional notes were added to this task."}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">Provenance</h3>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+              {selectedTask.source_message_id ? (
+                <div className="space-y-2">
+                  <p className="font-medium text-slate-800">This task was created from a message.</p>
+                  <p>Message ID: <span className="font-mono text-[12px] text-slate-500">{selectedTask.source_message_id}</span></p>
+                  <p>Conversation ID: <span className="font-mono text-[12px] text-slate-500">{selectedTask.source_conversation_id || "Unavailable"}</span></p>
+                </div>
+              ) : (
+                <p>This task was created directly inside project execution flow.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">Automation</h3>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+              {selectedTask.automation_type ? (
+                <div className="space-y-3">
+                  {selectedTask.automation_status ? (
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${AUTOMATION_STATUS_META[selectedTask.automation_status].className}`}>
+                      {AUTOMATION_STATUS_META[selectedTask.automation_status].label}
+                    </span>
+                  ) : null}
+                  <p><span className="font-medium text-slate-800">Type:</span> {selectedTask.automation_type === "send_message" ? "Send message" : "Scheduled action"}</p>
+                  <p><span className="font-medium text-slate-800">Run at:</span> {formatDateTime(selectedTask.automation_run_at)}</p>
+                  {selectedTask.automation_message_content ? (
+                    <p><span className="font-medium text-slate-800">Message:</span> {selectedTask.automation_message_content}</p>
+                  ) : null}
+                  {selectedTask.automation_action_label ? (
+                    <p><span className="font-medium text-slate-800">Action:</span> {selectedTask.automation_action_label}</p>
+                  ) : null}
+                  {selectedTask.automation_last_error ? (
+                    <p className="font-medium text-rose-600">Last error: {selectedTask.automation_last_error}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <p>No automation is attached to this task.</p>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
+          <button
+            type="button"
+            onClick={() => openProject(selectedTask.project_id)}
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700"
+          >
+            Open Project
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedTaskId(null)}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            Close
+          </button>
+        </div>
+      </aside>
+    </div>,
+    document.body
+  ) : null;
+
   return (
+    <>
     <main className="flex-1 overflow-y-auto bg-[#F6F8FC]">
       <div className="flex min-h-full flex-col">
         <header className="border-b border-[#E6EBF3] bg-white">
@@ -482,136 +615,9 @@ export default function TasksPage() {
           )}
         </section>
 
-        {selectedTask ? (
-          <div className="pointer-events-none fixed inset-0 z-40">
-            <div
-              className="pointer-events-auto absolute inset-0 bg-slate-900/20"
-              onClick={() => setSelectedTaskId(null)}
-            />
-            <aside className="pointer-events-auto absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-slate-200 bg-white shadow-2xl">
-              <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                    {selectedTask.project_reference || "Project task"}
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">{selectedTask.title}</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedTask.project_title || "Untitled project"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTaskId(null)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
-
-              <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Execution Context</h3>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Status</p>
-                      <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${TASK_STATUS_META[selectedTask.status].className}`}>
-                        {TASK_STATUS_META[selectedTask.status].label}
-                      </span>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Priority</p>
-                      <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${PRIORITY_META[selectedTask.priority].className}`}>
-                        {PRIORITY_META[selectedTask.priority].label}
-                      </span>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Assignee</p>
-                      <p className="mt-2 text-sm font-medium text-slate-800">{selectedTask.owner_name || "Unassigned"}</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Created by</p>
-                      <p className="mt-2 text-sm font-medium text-slate-800">{selectedTask.created_by_name || "Unknown"}</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:col-span-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Due Date</p>
-                      <p className={`mt-2 text-sm font-medium ${isOverdue(selectedTask.due_date, selectedTask.status) ? "text-rose-600" : "text-slate-800"}`}>
-                        {formatDate(selectedTask.due_date)}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Notes</h3>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
-                    {selectedTask.description || "No additional notes were added to this task."}
-                  </div>
-                </section>
-
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Provenance</h3>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                    {selectedTask.source_message_id ? (
-                      <div className="space-y-2">
-                        <p className="font-medium text-slate-800">This task was created from a message.</p>
-                        <p>Message ID: <span className="font-mono text-[12px] text-slate-500">{selectedTask.source_message_id}</span></p>
-                        <p>Conversation ID: <span className="font-mono text-[12px] text-slate-500">{selectedTask.source_conversation_id || "Unavailable"}</span></p>
-                      </div>
-                    ) : (
-                      <p>This task was created directly inside project execution flow.</p>
-                    )}
-                  </div>
-                </section>
-
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Automation</h3>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                    {selectedTask.automation_type ? (
-                      <div className="space-y-3">
-                        {selectedTask.automation_status ? (
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${AUTOMATION_STATUS_META[selectedTask.automation_status].className}`}>
-                            {AUTOMATION_STATUS_META[selectedTask.automation_status].label}
-                          </span>
-                        ) : null}
-                        <p><span className="font-medium text-slate-800">Type:</span> {selectedTask.automation_type === "send_message" ? "Send message" : "Scheduled action"}</p>
-                        <p><span className="font-medium text-slate-800">Run at:</span> {formatDateTime(selectedTask.automation_run_at)}</p>
-                        {selectedTask.automation_message_content ? (
-                          <p><span className="font-medium text-slate-800">Message:</span> {selectedTask.automation_message_content}</p>
-                        ) : null}
-                        {selectedTask.automation_action_label ? (
-                          <p><span className="font-medium text-slate-800">Action:</span> {selectedTask.automation_action_label}</p>
-                        ) : null}
-                        {selectedTask.automation_last_error ? (
-                          <p className="font-medium text-rose-600">Last error: {selectedTask.automation_last_error}</p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <p>No automation is attached to this task.</p>
-                    )}
-                  </div>
-                </section>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
-                <button
-                  type="button"
-                  onClick={() => openProject(selectedTask.project_id)}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700"
-                >
-                  Open Project
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTaskId(null)}
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  Close
-                </button>
-              </div>
-            </aside>
-          </div>
-        ) : null}
       </div>
     </main>
+    {taskPanel}
+    </>
   );
 }
