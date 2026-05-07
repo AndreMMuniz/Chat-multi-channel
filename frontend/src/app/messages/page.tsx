@@ -2604,7 +2604,7 @@ export default function ChatPage() {
                                 try {
                                   const newClient = await clientsApi.createClient({
                                     name: quickClientForm.name,
-                                    email: quickClientForm.email,
+                                    email: quickClientForm.email || null,
                                     phone: quickClientForm.phone || null,
                                     company_name: quickClientForm.company_name || null,
                                   });

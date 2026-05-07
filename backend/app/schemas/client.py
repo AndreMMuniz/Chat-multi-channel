@@ -19,6 +19,13 @@ class ClientBase(BaseModel):
     notes: Optional[str] = None
     contact_id: Optional[UUID] = None
 
+    @field_validator("email", "phone", "company_name", "website", "notes", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
     @model_validator(mode="after")
     def tax_id_consistency(self) -> "ClientBase":
         if self.tax_id and not self.tax_id_type:
