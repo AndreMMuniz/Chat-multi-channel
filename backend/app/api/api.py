@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import chat, telegram, whatsapp, auth, users, audit, dashboard, upload, channels, quick_replies, projects, catalog, proposals
+from app.api.endpoints import chat, telegram, whatsapp, auth, users, audit, dashboard, upload, channels, quick_replies, projects, catalog, proposals, clients
 from app.api.endpoints.config_routes import router as config_router
 
 api_router = APIRouter()
@@ -14,6 +14,7 @@ api_router.include_router(telegram.router,  prefix="/telegram",  tags=["telegram
 api_router.include_router(whatsapp.router,  prefix="/whatsapp",  tags=["whatsapp"])
 api_router.include_router(channels.router,  prefix="/channels",  tags=["channels"])
 api_router.include_router(quick_replies.router, prefix="/admin", tags=["quick-replies"])
-api_router.include_router(projects.router, prefix="/admin", tags=["projects"])
-api_router.include_router(catalog.router, prefix="/admin", tags=["catalog"])
-api_router.include_router(proposals.router, prefix="/admin", tags=["proposals"])
+api_router.include_router(projects.router,  prefix="/admin",     tags=["projects"])
+api_router.include_router(catalog.router,   prefix="/admin",     tags=["catalog"])
+api_router.include_router(proposals.router, prefix="/admin",     tags=["proposals"])
+api_router.include_router(clients.router,   prefix="/admin",     tags=["clients"])

@@ -1,8 +1,8 @@
 import enum
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum, JSON, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Enum, JSON, Integer, Numeric, Date, CheckConstraint
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.core.encryption import EncryptedString
@@ -105,6 +105,18 @@ class ProposalStatus(enum.Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
     ARCHIVED = "archived"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
+class ProposalType(enum.Enum):
+    PRODUCT = "product"
+    SERVICE = "service"
+
+
+class ClientType(enum.Enum):
+    INDIVIDUAL = "individual"
+    COMPANY = "company"
 
 
 OFFICIAL_PROJECT_STAGES = [
@@ -537,12 +549,40 @@ class Proposal(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
+    # --- novos campos do módulo comercial ---
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=True)
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    proposal_type = Column(
+        Enum(ProposalType, values_callable=lambda obj: [e.value for e in obj], name="proposaltype"),
+        nullable=True,
+    )
+    currency = Column(String(3), nullable=False, default="BRL")
+    payment_method = Column(String(100), nullable=True)
+    payment_terms = Column(Text, nullable=True)
+    payment_installments = Column(Integer, nullable=True)
+    delivery_deadline = Column(Date, nullable=True)
+    delivery_days = Column(Integer, nullable=True)
+    valid_until = Column(Date, nullable=True)
+
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    owner = relationship("User", foreign_keys=[owner_user_id])
+    client = relationship("Client", back_populates="proposals")
     items = relationship(
         "ProposalItem",
         back_populates="proposal",
         cascade="all, delete-orphan",
         order_by="ProposalItem.position.asc()",
+    )
+    service_details = relationship(
+        "ProposalServiceDetails",
+        back_populates="proposal",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    status_history = relationship(
+        "ProposalStatusHistory",
+        back_populates="proposal",
+        order_by="ProposalStatusHistory.created_at.asc()",
     )
 
 
@@ -573,3 +613,72 @@ class ProposalItem(Base):
 
     proposal = relationship("Proposal", back_populates="items")
     catalog_item = relationship("CatalogItem", foreign_keys=[catalog_item_id])
+
+
+# --- Módulo Comercial: Clientes e Propostas Estruturadas ---
+
+class Client(Base):
+    __tablename__ = "clients"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False)
+    phone = Column(String(50), nullable=True)
+    country = Column(String(2), nullable=False, default="BR")
+    client_type = Column(
+        Enum(ClientType, values_callable=lambda obj: [e.value for e in obj], name="clienttype"),
+        nullable=False,
+        default=ClientType.COMPANY,
+    )
+    tax_id = Column(String(30), nullable=True)
+    tax_id_type = Column(String(20), nullable=True)   # CPF, CNPJ, VAT, EIN, OTHER
+    currency = Column(String(3), nullable=False, default="BRL")
+    company_name = Column(String(255), nullable=True)
+    website = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+    contact_id = Column(UUID(as_uuid=True), ForeignKey("contacts.id"), nullable=True)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    contact = relationship("Contact", foreign_keys=[contact_id])
+    proposals = relationship("Proposal", back_populates="client")
+
+
+class ProposalServiceDetails(Base):
+    """Campos específicos de propostas do tipo Serviço."""
+    __tablename__ = "proposal_service_details"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    proposal_id = Column(UUID(as_uuid=True), ForeignKey("proposals.id"), nullable=False, unique=True)
+    service_name = Column(String(255), nullable=False)
+    scope_of_work = Column(Text, nullable=True)
+    methodology = Column(Text, nullable=True)
+    hourly_rate = Column(Numeric(15, 2), nullable=True)
+    estimated_hours = Column(Integer, nullable=True)
+    client_responsibilities = Column(ARRAY(Text), nullable=False, default=list)
+    delivery_responsibilities = Column(ARRAY(Text), nullable=False, default=list)
+    revision_rounds = Column(Integer, nullable=True)
+    support_period_days = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    proposal = relationship("Proposal", back_populates="service_details")
+
+
+class ProposalStatusHistory(Base):
+    """Histórico imutável de transições de status de uma proposta."""
+    __tablename__ = "proposal_status_history"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    proposal_id = Column(UUID(as_uuid=True), ForeignKey("proposals.id"), nullable=False)
+    from_status = Column(String(30), nullable=True)   # NULL na criação
+    to_status = Column(String(30), nullable=False)
+    changed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    proposal = relationship("Proposal", back_populates="status_history")
+    changed_by = relationship("User", foreign_keys=[changed_by_user_id])
