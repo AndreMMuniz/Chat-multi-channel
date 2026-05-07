@@ -68,16 +68,17 @@ async def create_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    # deduplicação por email
-    existing = db.query(Client).filter(
-        Client.email == payload.email,
-        Client.deleted_at.is_(None),
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Já existe um cliente com o e-mail {payload.email}",
-        )
+    # deduplicação por email (apenas quando fornecido)
+    if payload.email:
+        existing = db.query(Client).filter(
+            Client.email == payload.email,
+            Client.deleted_at.is_(None),
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Já existe um cliente com o e-mail {payload.email}",
+            )
 
     client = Client(
         **payload.model_dump(exclude={"contact_id"}),

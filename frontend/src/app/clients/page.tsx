@@ -181,13 +181,13 @@ function ClientForm({ initial, onSave, onClose, saving, error }: ClientFormProps
       <div className="grid grid-cols-2 gap-3">
         <label className="block space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Email <span className="text-rose-500">*</span>
+            Email
           </span>
           <input
-            required type="email"
-            value={form.email}
+            type="email"
+            value={form.email ?? ""}
             onChange={(e) => set("email", e.target.value)}
-            placeholder="contact@company.com"
+            placeholder="contact@company.com (optional)"
             className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-900/10"
           />
         </label>

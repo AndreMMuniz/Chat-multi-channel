@@ -2572,7 +2572,7 @@ export default function ChatPage() {
                           <input
                             value={quickClientForm.email}
                             onChange={e => setQuickClientForm(f => ({ ...f, email: e.target.value }))}
-                            placeholder="Email *"
+                            placeholder="Email (optional)"
                             type="email"
                             className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
                           />
@@ -2596,7 +2596,7 @@ export default function ChatPage() {
                               Cancel
                             </button>
                             <button
-                              disabled={quickClientSaving || !quickClientForm.name || !quickClientForm.email}
+                              disabled={quickClientSaving || !quickClientForm.name}
                               onClick={async () => {
                                 if (!activeConversation.contact_id) return;
                                 setQuickClientSaving(true);

@@ -7,7 +7,7 @@ from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 class ClientBase(BaseModel):
     name: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     country: str = "BR"
     client_type: str = "company"       # individual | company
@@ -58,7 +58,7 @@ class ClientResponse(ClientBase):
 class ClientListResponse(BaseModel):
     id: UUID
     name: str
-    email: str
+    email: Optional[str] = None
     company_name: Optional[str] = None
     country: str
     client_type: str

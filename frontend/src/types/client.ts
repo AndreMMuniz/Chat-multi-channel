@@ -34,7 +34,7 @@ export interface ClientListDto {
 
 export interface ClientCreateRequest {
   name: string;
-  email: string;
+  email?: string | null;
   phone?: string | null;
   country?: string;
   client_type?: ClientType;
