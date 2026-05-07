@@ -53,3 +53,4 @@ export * as auditApi from "./api/audit";
 export * as projectsApi from "./api/projects";
 export * as catalogApi from "./api/catalog";
 export * as proposalsApi from "./api/proposals";
+export * as clientsApi from "./api/clients";

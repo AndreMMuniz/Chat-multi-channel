@@ -1,4 +1,5 @@
-export type ProposalStatus = "draft" | "sent" | "approved" | "rejected" | "archived";
+export type ProposalStatus = "draft" | "sent" | "approved" | "rejected" | "archived" | "expired" | "cancelled";
+export type ProposalType = "product" | "service";
 
 export interface ProposalItemDto {
   id: string;
@@ -37,6 +38,17 @@ export interface ProposalDto {
   created_by_id: string;
   created_by_name?: string | null;
   items_count: number;
+  // campos comerciais
+  client_id?: string | null;
+  owner_user_id?: string | null;
+  proposal_type?: ProposalType | null;
+  currency: string;
+  payment_method?: string | null;
+  payment_terms?: string | null;
+  payment_installments?: number | null;
+  delivery_deadline?: string | null;
+  delivery_days?: number | null;
+  valid_until?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,6 +62,16 @@ export interface ProposalCreateRequest {
   customer_name?: string | null;
   notes?: string | null;
   status?: ProposalStatus;
+  client_id?: string | null;
+  owner_user_id?: string | null;
+  proposal_type?: ProposalType | null;
+  currency?: string;
+  payment_method?: string | null;
+  payment_terms?: string | null;
+  payment_installments?: number | null;
+  delivery_deadline?: string | null;
+  delivery_days?: number | null;
+  valid_until?: string | null;
 }
 
 export interface ProposalFromCatalogRequest {

@@ -3,49 +3,192 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Modal from "@/components/shared/Modal";
-import { proposalsApi } from "@/lib/api/index";
-import type { ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto, ProposalStatus } from "@/types/proposal";
+import { clientsApi, proposalsApi } from "@/lib/api/index";
+import type { ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto, ProposalStatus, ProposalType } from "@/types/proposal";
+import type { ClientListDto } from "@/types/client";
+
+// ─── status meta ─────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<ProposalStatus, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200" },
-  sent: { label: "Sent", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
-  approved: { label: "Approved", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
-  rejected: { label: "Rejected", className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
-  archived: { label: "Archived", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-100" },
+  draft:     { label: "Rascunho",  className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200" },
+  sent:      { label: "Enviada",   className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
+  approved:  { label: "Aprovada",  className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
+  rejected:  { label: "Recusada",  className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
+  archived:  { label: "Arquivada", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-100" },
+  expired:   { label: "Expirada",  className: "bg-orange-50 text-orange-700 ring-1 ring-orange-100" },
+  cancelled: { label: "Cancelada", className: "bg-gray-100 text-gray-500 ring-1 ring-gray-200" },
 };
+
+const PAYMENT_PRESETS = [
+  "À vista",
+  "50% na assinatura + 50% na entrega",
+  "30/60/90 dias",
+  "Mensal (recorrente)",
+  "Personalizado",
+];
+
+// ─── tipos locais ─────────────────────────────────────────────────────────────
 
 type ProposalFormState = {
   title: string;
   customer_name: string;
   notes: string;
+  client_id: string;
+  proposal_type: ProposalType | "";
+  payment_method: string;
+  payment_terms: string;
+  payment_installments: string;
+  delivery_mode: "date" | "days";
+  delivery_deadline: string;
+  delivery_days: string;
+  valid_until: string;
 };
 
-const EMPTY_CREATE_FORM: ProposalFormState = {
-  title: "",
-  customer_name: "",
-  notes: "",
+const EMPTY_FORM: ProposalFormState = {
+  title: "", customer_name: "", notes: "",
+  client_id: "", proposal_type: "",
+  payment_method: "", payment_terms: "", payment_installments: "",
+  delivery_mode: "days", delivery_deadline: "", delivery_days: "",
+  valid_until: "",
 };
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function formatCurrency(value: number, currency = "BRL") {
+  return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: "USD",
+    currency,
     maximumFractionDigits: 0,
   }).format(value);
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(value));
+  return new Intl.DateTimeFormat("pt-BR", { month: "short", day: "numeric" }).format(new Date(value));
 }
+
+function proposalToForm(p: ProposalDetailDto): ProposalFormState {
+  return {
+    title: p.title,
+    customer_name: p.customer_name ?? "",
+    notes: p.notes ?? "",
+    client_id: p.client_id ?? "",
+    proposal_type: (p.proposal_type as ProposalType) ?? "",
+    payment_method: p.payment_method ?? "",
+    payment_terms: p.payment_terms ?? "",
+    payment_installments: p.payment_installments ? String(p.payment_installments) : "",
+    delivery_mode: p.delivery_deadline ? "date" : "days",
+    delivery_deadline: p.delivery_deadline ?? "",
+    delivery_days: p.delivery_days ? String(p.delivery_days) : "",
+    valid_until: p.valid_until ?? "",
+  };
+}
+
+function formToPayload(f: ProposalFormState): Partial<ProposalCreateRequest> {
+  return {
+    title: f.title.trim() || undefined,
+    customer_name: f.customer_name.trim() || null,
+    notes: f.notes.trim() || null,
+    client_id: f.client_id || null,
+    proposal_type: (f.proposal_type as ProposalType) || null,
+    payment_method: f.payment_method || null,
+    payment_terms: f.payment_terms || null,
+    payment_installments: f.payment_installments ? Number(f.payment_installments) : null,
+    delivery_deadline: f.delivery_mode === "date" ? (f.delivery_deadline || null) : null,
+    delivery_days: f.delivery_mode === "days" ? (f.delivery_days ? Number(f.delivery_days) : null) : null,
+    valid_until: f.valid_until || null,
+  };
+}
+
+// ─── Seletor de cliente ───────────────────────────────────────────────────────
+
+function ClientSelector({
+  value,
+  onChange,
+  clients,
+}: {
+  value: string;
+  onChange: (id: string, name: string) => void;
+  clients: ClientListDto[];
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const selected = clients.find((c) => c.id === value);
+  const filtered = clients.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="relative">
+      <div
+        className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm cursor-pointer"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {selected ? (
+          <span className="text-slate-700 truncate">{selected.name}</span>
+        ) : (
+          <span className="text-slate-400">Selecionar cliente...</span>
+        )}
+        <span className="material-symbols-outlined text-[16px] text-slate-400 shrink-0">
+          {open ? "expand_less" : "expand_more"}
+        </span>
+      </div>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nome ou e-mail..."
+              className="w-full px-2 py-1.5 text-sm text-slate-700 outline-none"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => { onChange("", ""); setOpen(false); setSearch(""); }}
+              className="w-full text-left px-3 py-2 text-sm text-slate-400 hover:bg-slate-50"
+            >
+              Nenhum cliente
+            </button>
+            {filtered.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => { onChange(c.id, c.name); setOpen(false); setSearch(""); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${value === c.id ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-700"}`}
+              >
+                <span className="block truncate">{c.name}</span>
+                <span className="block text-xs text-slate-400 truncate">{c.email}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-3 py-3 text-sm text-slate-400 text-center">Nenhum cliente encontrado</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function ProposalsPage() {
   const searchParams = useSearchParams();
   const requestedProposalId = searchParams.get("proposalId");
+
   const [proposals, setProposals] = useState<ProposalDto[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<ProposalDetailDto | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(requestedProposalId);
-  const [proposalForm, setProposalForm] = useState<ProposalFormState>({ title: "", customer_name: "", notes: "" });
-  const [createProposalForm, setCreateProposalForm] = useState<ProposalFormState>(EMPTY_CREATE_FORM);
+  const [proposalForm, setProposalForm] = useState<ProposalFormState>(EMPTY_FORM);
+  const [createForm, setCreateForm] = useState<ProposalFormState>(EMPTY_FORM);
+  const [clients, setClients] = useState<ClientListDto[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -56,23 +199,26 @@ export default function ProposalsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "ALL">("ALL");
 
+  // carrega clientes para o seletor
+  useEffect(() => {
+    clientsApi.listClients({ limit: 500 }).then((r: { data: ClientListDto[] }) => setClients(r.data ?? [])).catch(() => {});
+  }, []);
+
   const loadProposals = useCallback(async (preserveSelection: boolean) => {
     try {
       setIsLoading(true);
       setErrorMessage(null);
       const response = await proposalsApi.listProposals({ limit: 200 });
       setProposals(response.data);
-
       if (!preserveSelection) {
         setSelectedProposalId(requestedProposalId ?? response.data[0]?.id ?? null);
         return;
       }
-
-      if (!response.data.some((proposal) => proposal.id === selectedProposalId)) {
+      if (!response.data.some((p) => p.id === selectedProposalId)) {
         setSelectedProposalId(response.data[0]?.id ?? null);
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load proposals.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao carregar propostas.");
     } finally {
       setIsLoading(false);
     }
@@ -83,29 +229,18 @@ export default function ProposalsPage() {
       setIsDetailLoading(true);
       const proposal = await proposalsApi.getProposal(proposalId);
       setSelectedProposal(proposal);
-      setProposalForm({
-        title: proposal.title,
-        customer_name: proposal.customer_name ?? "",
-        notes: proposal.notes ?? "",
-      });
+      setProposalForm(proposalToForm(proposal));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load proposal details.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao carregar detalhes.");
     } finally {
       setIsDetailLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      void loadProposals(false);
-    });
-  }, [loadProposals]);
-
+  useEffect(() => { queueMicrotask(() => { void loadProposals(false); }); }, [loadProposals]);
   useEffect(() => {
     if (!selectedProposalId) return;
-    queueMicrotask(() => {
-      void loadProposalDetail(selectedProposalId);
-    });
+    queueMicrotask(() => { void loadProposalDetail(selectedProposalId); });
   }, [loadProposalDetail, selectedProposalId]);
 
   async function handleStatusChange(status: ProposalStatus) {
@@ -115,9 +250,9 @@ export default function ProposalsPage() {
       setActionMessage(null);
       await proposalsApi.updateProposal(selectedProposal.id, { status } satisfies Partial<ProposalCreateRequest>);
       await Promise.all([loadProposals(true), loadProposalDetail(selectedProposal.id)]);
-      setActionMessage(`Proposal marked as ${status}.`);
+      setActionMessage(`Proposta marcada como ${STATUS_META[status].label}.`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update proposal status.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao atualizar status.");
     } finally {
       setIsUpdating(false);
     }
@@ -128,15 +263,11 @@ export default function ProposalsPage() {
     try {
       setIsUpdating(true);
       setActionMessage(null);
-      await proposalsApi.updateProposal(selectedProposal.id, {
-        title: proposalForm.title.trim(),
-        customer_name: proposalForm.customer_name.trim() || null,
-        notes: proposalForm.notes.trim() || null,
-      });
+      await proposalsApi.updateProposal(selectedProposal.id, formToPayload(proposalForm));
       await Promise.all([loadProposals(true), loadProposalDetail(selectedProposal.id)]);
-      setActionMessage("Proposal details updated.");
+      setActionMessage("Proposta atualizada.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update proposal details.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao salvar.");
     } finally {
       setIsUpdating(false);
     }
@@ -146,18 +277,13 @@ export default function ProposalsPage() {
     if (!selectedProposal) return;
     try {
       setIsUpdating(true);
-      setActionMessage(null);
       const updated = await proposalsApi.updateProposalItem(selectedProposal.id, proposalItemId, payload);
       setSelectedProposal(updated);
-      setProposalForm({
-        title: updated.title,
-        customer_name: updated.customer_name ?? "",
-        notes: updated.notes ?? "",
-      });
+      setProposalForm(proposalToForm(updated));
       await loadProposals(true);
-      setActionMessage("Proposal item updated.");
+      setActionMessage("Item atualizado.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update proposal item.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao atualizar item.");
     } finally {
       setIsUpdating(false);
     }
@@ -167,50 +293,34 @@ export default function ProposalsPage() {
     if (!selectedProposal) return;
     try {
       setIsUpdating(true);
-      setActionMessage(null);
       const updated = await proposalsApi.deleteProposalItem(selectedProposal.id, proposalItemId);
       setSelectedProposal(updated);
-      setProposalForm({
-        title: updated.title,
-        customer_name: updated.customer_name ?? "",
-        notes: updated.notes ?? "",
-      });
+      setProposalForm(proposalToForm(updated));
       await loadProposals(true);
-      setActionMessage("Proposal item removed.");
+      setActionMessage("Item removido.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to remove proposal item.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao remover item.");
     } finally {
       setIsUpdating(false);
     }
   }
 
   async function handleCreateProposal() {
-    const title = createProposalForm.title.trim();
-    if (!title) {
-      setErrorMessage("Proposal title is required.");
+    if (!createForm.title.trim()) {
+      setErrorMessage("Título da proposta é obrigatório.");
       return;
     }
-
     try {
       setIsCreating(true);
       setErrorMessage(null);
-      setActionMessage(null);
-
-      const created = await proposalsApi.createProposal({
-        title,
-        customer_name: createProposalForm.customer_name.trim() || null,
-        notes: createProposalForm.notes.trim() || null,
-        status: "draft",
-      });
-
+      const created = await proposalsApi.createProposal(formToPayload(createForm) as ProposalCreateRequest);
       setSelectedProposalId(created.id);
       setIsCreateModalOpen(false);
-      setCreateProposalForm(EMPTY_CREATE_FORM);
-
+      setCreateForm(EMPTY_FORM);
       await Promise.all([loadProposals(true), loadProposalDetail(created.id)]);
-      setActionMessage("Draft proposal created.");
+      setActionMessage("Proposta criada como rascunho.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create proposal.");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao criar proposta.");
     } finally {
       setIsCreating(false);
     }
@@ -218,27 +328,22 @@ export default function ProposalsPage() {
 
   const visibleProposals = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return proposals.filter((proposal) => {
+    return proposals.filter((p) => {
       const matchesQuery =
-        query.length === 0 ||
-        [proposal.reference, proposal.title, proposal.customer_name ?? "", proposal.created_by_name ?? ""]
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
-      const matchesStatus = statusFilter === "ALL" || proposal.status === statusFilter;
+        !query ||
+        [p.reference, p.title, p.customer_name ?? "", p.created_by_name ?? ""]
+          .join(" ").toLowerCase().includes(query);
+      const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
   }, [proposals, searchQuery, statusFilter]);
 
-  const summary = useMemo(
-    () => ({
-      total: proposals.length,
-      draft: proposals.filter((proposal) => proposal.status === "draft").length,
-      sent: proposals.filter((proposal) => proposal.status === "sent").length,
-      value: proposals.reduce((sum, proposal) => sum + proposal.total_amount, 0),
-    }),
-    [proposals]
-  );
+  const summary = useMemo(() => ({
+    total: proposals.length,
+    draft: proposals.filter((p) => p.status === "draft").length,
+    sent: proposals.filter((p) => p.status === "sent").length,
+    value: proposals.reduce((sum, p) => sum + p.total_amount, 0),
+  }), [proposals]);
 
   return (
     <main className="flex-1 overflow-y-auto bg-[#F6F8FC]">
@@ -252,9 +357,9 @@ export default function ProposalsPage() {
                 </span>
               </div>
               <div className="min-w-0">
-                <h1 className="text-[18px] font-semibold leading-5 text-slate-900">Proposals</h1>
+                <h1 className="text-[18px] font-semibold leading-5 text-slate-900">Propostas</h1>
                 <p className="mt-0.5 text-[13px] text-slate-500">
-                  Draft and reusable commercial proposals generated from catalog items.
+                  Propostas comerciais vinculadas a clientes e itens do catálogo.
                 </p>
               </div>
             </div>
@@ -262,47 +367,40 @@ export default function ProposalsPage() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => {
-                  setErrorMessage(null);
-                  setActionMessage(null);
-                  setCreateProposalForm(EMPTY_CREATE_FORM);
-                  setIsCreateModalOpen(true);
-                }}
+                onClick={() => { setErrorMessage(null); setActionMessage(null); setCreateForm(EMPTY_FORM); setIsCreateModalOpen(true); }}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
               >
                 <span className="material-symbols-outlined text-[18px]">add</span>
-                New proposal
+                Nova proposta
               </button>
               <label className="flex min-w-[280px] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 shadow-sm">
                 <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
                 <input
                   value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search by reference, title, or customer"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por referência, título ou cliente"
                   className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 />
               </label>
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as ProposalStatus | "ALL")}
+                onChange={(e) => setStatusFilter(e.target.value as ProposalStatus | "ALL")}
                 className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm outline-none"
               >
-                <option value="ALL">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="archived">Archived</option>
+                <option value="ALL">Todos os status</option>
+                {(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => (
+                  <option key={s} value={s}>{STATUS_META[s].label}</option>
+                ))}
               </select>
             </div>
           </div>
 
           <div className="grid gap-3 border-t border-[#EEF2F7] px-6 py-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              { label: "Total proposals", value: summary.total, accent: "text-slate-900", icon: "description" },
-              { label: "Drafts", value: summary.draft, accent: "text-slate-700", icon: "edit_note" },
-              { label: "Sent", value: summary.sent, accent: "text-sky-700", icon: "send" },
-              { label: "Pipeline value", value: formatCurrency(summary.value), accent: "text-emerald-700", icon: "payments" },
+              { label: "Total de propostas", value: summary.total, accent: "text-slate-900", icon: "description" },
+              { label: "Rascunhos", value: summary.draft, accent: "text-slate-700", icon: "edit_note" },
+              { label: "Enviadas", value: summary.sent, accent: "text-sky-700", icon: "send" },
+              { label: "Valor em pipeline", value: formatCurrency(summary.value), accent: "text-emerald-700", icon: "payments" },
             ].map((card) => (
               <div key={card.label} className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="flex items-center justify-between">
@@ -314,73 +412,75 @@ export default function ProposalsPage() {
             ))}
           </div>
 
-          {errorMessage ? (
+          {errorMessage && (
             <div className="border-t border-rose-100 bg-rose-50 px-6 py-3 text-sm text-rose-700">{errorMessage}</div>
-          ) : null}
-          {actionMessage ? (
+          )}
+          {actionMessage && (
             <div className="border-t border-emerald-100 bg-emerald-50 px-6 py-3 text-sm text-emerald-700">{actionMessage}</div>
-          ) : null}
+          )}
         </header>
 
         <div className="grid flex-1 gap-4 px-4 py-4 lg:px-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+          {/* Fila de propostas */}
           <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-900">Proposal queue</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Fila de propostas</h2>
               <p className="mt-1 text-xs text-slate-500">
-                {isLoading ? "Loading proposals..." : `${visibleProposals.length} proposals in the current view`}
+                {isLoading ? "Carregando..." : `${visibleProposals.length} proposta(s) na visualização atual`}
               </p>
             </div>
-
             <div className="divide-y divide-slate-100">
               {visibleProposals.map((proposal) => {
                 const isSelected = proposal.id === selectedProposalId;
-                const statusMeta = STATUS_META[proposal.status];
+                const statusMeta = STATUS_META[proposal.status] ?? STATUS_META.draft;
+                const clientName = clients.find((c) => c.id === proposal.client_id)?.name;
                 return (
                   <button
                     key={proposal.id}
                     type="button"
                     onClick={() => setSelectedProposalId(proposal.id)}
-                    className={`w-full px-5 py-4 text-left transition hover:bg-slate-50 ${
-                      isSelected ? "bg-amber-50/50" : "bg-white"
-                    }`}
+                    className={`w-full px-5 py-4 text-left transition hover:bg-slate-50 ${isSelected ? "bg-amber-50/50" : "bg-white"}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{proposal.reference}</p>
                         <p className="truncate text-sm font-semibold text-slate-900">{proposal.title}</p>
                         <p className="mt-1 truncate text-xs text-slate-500">
-                          {proposal.customer_name || "No customer yet"} · {proposal.items_count} items
+                          {clientName ?? proposal.customer_name ?? "Sem cliente"} · {proposal.items_count} item(s)
                         </p>
                       </div>
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}>
+                      <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}>
                         {statusMeta.label}
                       </span>
                     </div>
                     <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                       <span>{formatDate(proposal.updated_at)}</span>
-                      <span className="font-semibold text-slate-700">{formatCurrency(proposal.total_amount)}</span>
+                      <span className="font-semibold text-slate-700">
+                        {formatCurrency(proposal.total_amount, proposal.currency)}
+                      </span>
                     </div>
                   </button>
                 );
               })}
-
-              {!isLoading && visibleProposals.length === 0 ? (
+              {!isLoading && visibleProposals.length === 0 && (
                 <div className="px-5 py-16 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
                     <span className="material-symbols-outlined">request_quote</span>
                   </div>
-                  <h3 className="mt-4 text-sm font-semibold text-slate-900">No proposals found</h3>
-                  <p className="mt-1 text-sm text-slate-500">Create one manually or from the catalog to start the commercial flow.</p>
+                  <h3 className="mt-4 text-sm font-semibold text-slate-900">Nenhuma proposta encontrada</h3>
+                  <p className="mt-1 text-sm text-slate-500">Crie uma proposta manualmente ou a partir do catálogo.</p>
                 </div>
-              ) : null}
+              )}
             </div>
           </section>
 
-          <aside className="rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          {/* Painel de detalhe */}
+          <aside className="rounded-[28px] border border-slate-200 bg-white shadow-sm overflow-y-auto">
             {selectedProposalId && selectedProposal ? (
               <ProposalDetail
                 proposal={selectedProposal}
                 proposalForm={proposalForm}
+                clients={clients}
                 isLoading={isDetailLoading}
                 isUpdating={isUpdating}
                 onProposalFormChange={setProposalForm}
@@ -394,50 +494,81 @@ export default function ProposalsPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
                   <span className="material-symbols-outlined">description</span>
                 </div>
-                <h2 className="mt-4 text-sm font-semibold text-slate-900">Select a proposal</h2>
-                <p className="mt-1 text-sm text-slate-500">Pick a proposal from the list to inspect item snapshots and totals.</p>
+                <h2 className="mt-4 text-sm font-semibold text-slate-900">Selecione uma proposta</h2>
+                <p className="mt-1 text-sm text-slate-500">Escolha uma proposta na lista para ver os detalhes.</p>
               </div>
             )}
           </aside>
         </div>
       </div>
 
-      {isCreateModalOpen ? (
-        <Modal title="New proposal" onClose={() => !isCreating && setIsCreateModalOpen(false)} maxWidth="max-w-lg">
+      {/* Modal nova proposta */}
+      {isCreateModalOpen && (
+        <Modal title="Nova proposta" onClose={() => !isCreating && setIsCreateModalOpen(false)} maxWidth="max-w-lg">
           <div className="space-y-4">
-            <p className="text-sm leading-6 text-slate-500">
-              Start a draft proposal manually, then add catalog items and adjust the commercial details from the workspace.
-            </p>
+            {/* Tipo */}
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400 mb-2">Tipo de proposta</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([["product", "📦 Produto"], ["service", "🔧 Serviço"]] as const).map(([type, label]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setCreateForm((f) => ({ ...f, proposal_type: type }))}
+                    className={`py-2.5 rounded-2xl text-sm font-medium border transition-colors ${
+                      createForm.proposal_type === type
+                        ? "bg-indigo-50 border-indigo-300 text-indigo-700"
+                        : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
+            {/* Título */}
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Proposal title</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Título <span className="text-rose-500">*</span></span>
               <input
-                value={createProposalForm.title}
-                onChange={(event) => setCreateProposalForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Ex: Q2 onboarding package"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                value={createForm.title}
+                onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="Ex: Implementação de sistema ERP"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
               />
             </label>
 
+            {/* Cliente */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Cliente</span>
+              <ClientSelector
+                value={createForm.client_id}
+                onChange={(id) => setCreateForm((f) => ({ ...f, client_id: id }))}
+                clients={clients}
+              />
+            </div>
+
+            {/* Validade */}
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Customer</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                Validade da proposta
+              </span>
               <input
-                value={createProposalForm.customer_name}
-                onChange={(event) =>
-                  setCreateProposalForm((current) => ({ ...current, customer_name: event.target.value }))
-                }
-                placeholder="Optional customer name"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                type="date"
+                value={createForm.valid_until}
+                onChange={(e) => setCreateForm((f) => ({ ...f, valid_until: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
               />
             </label>
 
+            {/* Notas */}
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notes</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notas internas</span>
               <textarea
-                value={createProposalForm.notes}
-                onChange={(event) => setCreateProposalForm((current) => ({ ...current, notes: event.target.value }))}
-                placeholder="Optional internal notes for this proposal"
-                className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                value={createForm.notes}
+                onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Observações internas sobre esta proposta..."
+                className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none resize-none"
               />
             </label>
 
@@ -448,7 +579,7 @@ export default function ProposalsPage() {
                 onClick={() => setIsCreateModalOpen(false)}
                 className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 type="button"
@@ -456,29 +587,25 @@ export default function ProposalsPage() {
                 onClick={handleCreateProposal}
                 className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
-                {isCreating ? "Creating..." : "Create draft"}
+                {isCreating ? "Criando..." : "Criar rascunho"}
               </button>
             </div>
           </div>
         </Modal>
-      ) : null}
+      )}
     </main>
   );
 }
 
+// ─── Painel de detalhe ────────────────────────────────────────────────────────
+
 function ProposalDetail({
-  proposal,
-  proposalForm,
-  isLoading,
-  isUpdating,
-  onProposalFormChange,
-  onProposalMetaSave,
-  onStatusChange,
-  onItemUpdate,
-  onItemRemove,
+  proposal, proposalForm, clients, isLoading, isUpdating,
+  onProposalFormChange, onProposalMetaSave, onStatusChange, onItemUpdate, onItemRemove,
 }: {
   proposal: ProposalDetailDto;
   proposalForm: ProposalFormState;
+  clients: ClientListDto[];
   isLoading: boolean;
   isUpdating: boolean;
   onProposalFormChange: React.Dispatch<React.SetStateAction<ProposalFormState>>;
@@ -487,15 +614,27 @@ function ProposalDetail({
   onItemUpdate: (proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) => void;
   onItemRemove: (proposalItemId: string) => void;
 }) {
-  const statusMeta = STATUS_META[proposal.status];
+  const statusMeta = STATUS_META[proposal.status] ?? STATUS_META.draft;
+  const selectedClient = clients.find((c) => c.id === proposalForm.client_id);
+  const [paymentCustom, setPaymentCustom] = useState(
+    !PAYMENT_PRESETS.slice(0, -1).includes(proposalForm.payment_terms)
+  );
+
+  function setField(field: keyof ProposalFormState, value: string) {
+    onProposalFormChange((f) => ({ ...f, [field]: value }));
+  }
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
+      {/* Cabeçalho */}
       <div className="border-b border-slate-100 px-5 py-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">{proposal.reference}</p>
             <h2 className="mt-1 text-lg font-semibold text-slate-900">{proposal.title}</h2>
-            <p className="mt-1 text-sm text-slate-500">{proposal.customer_name || "No customer assigned"}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {selectedClient?.name ?? proposal.customer_name ?? "Sem cliente"}
+            </p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}>
@@ -503,79 +642,223 @@ function ProposalDetail({
             </span>
             <select
               value={proposal.status}
-              onChange={(event) => onStatusChange(event.target.value as ProposalStatus)}
+              onChange={(e) => onStatusChange(e.target.value as ProposalStatus)}
               disabled={isUpdating}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm outline-none disabled:opacity-60"
             >
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="archived">Archived</option>
+              {(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => (
+                <option key={s} value={s}>{STATUS_META[s].label}</option>
+              ))}
             </select>
           </div>
         </div>
       </div>
 
+      {/* Métricas */}
       <div className="grid gap-3 border-b border-slate-100 px-5 py-4 sm:grid-cols-3">
-        <Metric label="Subtotal" value={formatCurrency(proposal.subtotal_amount)} />
-        <Metric label="Discount" value={formatCurrency(proposal.discount_amount)} />
-        <Metric label="Total" value={formatCurrency(proposal.total_amount)} />
+        <Metric label="Subtotal" value={formatCurrency(proposal.subtotal_amount, proposal.currency)} />
+        <Metric label="Desconto" value={formatCurrency(proposal.discount_amount, proposal.currency)} />
+        <Metric label="Total" value={formatCurrency(proposal.total_amount, proposal.currency)} />
       </div>
 
-      <div className="border-b border-slate-100 px-5 py-4">
+      {/* Informações gerais */}
+      <div className="border-b border-slate-100 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Informações gerais</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Proposal title</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Título</span>
             <input
               value={proposalForm.title}
-              onChange={(event) => onProposalFormChange((current) => ({ ...current, title: event.target.value }))}
+              onChange={(e) => setField("title", e.target.value)}
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Customer</span>
-            <input
-              value={proposalForm.customer_name}
-              onChange={(event) => onProposalFormChange((current) => ({ ...current, customer_name: event.target.value }))}
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Tipo</span>
+            <select
+              value={proposalForm.proposal_type}
+              onChange={(e) => setField("proposal_type", e.target.value)}
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
-            />
+            >
+              <option value="">Não definido</option>
+              <option value="product">📦 Produto</option>
+              <option value="service">🔧 Serviço</option>
+            </select>
           </label>
         </div>
-        <label className="mt-3 block space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notes</span>
+
+        {/* Cliente */}
+        <div className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Cliente</span>
+          <ClientSelector
+            value={proposalForm.client_id}
+            onChange={(id) => onProposalFormChange((f) => ({ ...f, client_id: id }))}
+            clients={clients}
+          />
+        </div>
+
+        <label className="block space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notas internas</span>
           <textarea
             value={proposalForm.notes}
-            onChange={(event) => onProposalFormChange((current) => ({ ...current, notes: event.target.value }))}
-            className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            onChange={(e) => setField("notes", e.target.value)}
+            className="min-h-20 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none resize-none"
           />
         </label>
-        <div className="mt-3 flex justify-end">
+      </div>
+
+      {/* Termos comerciais */}
+      <div className="border-b border-slate-100 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          💳 Termos comerciais
+        </p>
+
+        {/* Forma de pagamento */}
+        <div className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Forma de pagamento</span>
+          <select
+            value={paymentCustom ? "Personalizado" : (proposalForm.payment_terms || "")}
+            onChange={(e) => {
+              if (e.target.value === "Personalizado") {
+                setPaymentCustom(true);
+                setField("payment_terms", "");
+              } else {
+                setPaymentCustom(false);
+                setField("payment_terms", e.target.value);
+              }
+            }}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          >
+            <option value="">Selecionar...</option>
+            {PAYMENT_PRESETS.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          {paymentCustom && (
+            <input
+              value={proposalForm.payment_terms}
+              onChange={(e) => setField("payment_terms", e.target.value)}
+              placeholder="Descreva as condições de pagamento..."
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none mt-2"
+            />
+          )}
+        </div>
+
+        {/* Método + Parcelas */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Método</span>
+            <select
+              value={proposalForm.payment_method}
+              onChange={(e) => setField("payment_method", e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            >
+              <option value="">Selecionar...</option>
+              <option value="pix">PIX</option>
+              <option value="boleto">Boleto</option>
+              <option value="credit_card">Cartão de crédito</option>
+              <option value="bank_transfer">Transferência</option>
+              <option value="wire_transfer">Wire transfer</option>
+              <option value="check">Cheque</option>
+              <option value="other">Outro</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Parcelas</span>
+            <input
+              type="number"
+              min={1}
+              value={proposalForm.payment_installments}
+              onChange={(e) => setField("payment_installments", e.target.value)}
+              placeholder="1 = à vista"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Prazo de entrega */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Prazo de entrega</span>
+            <div className="flex gap-2">
+              {(["date", "days"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onProposalFormChange((f) => ({ ...f, delivery_mode: mode }))}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                    proposalForm.delivery_mode === mode
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {mode === "date" ? "Data específica" : "Prazo relativo"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {proposalForm.delivery_mode === "date" ? (
+            <input
+              type="date"
+              value={proposalForm.delivery_deadline}
+              onChange={(e) => setField("delivery_deadline", e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={proposalForm.delivery_days}
+                onChange={(e) => setField("delivery_days", e.target.value)}
+                placeholder="Ex: 30"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+              />
+              <span className="text-sm text-slate-500 shrink-0">dias após aprovação</span>
+            </div>
+          )}
+        </div>
+
+        {/* Validade */}
+        <div className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Validade da proposta
+          </span>
+          <input
+            type="date"
+            value={proposalForm.valid_until}
+            onChange={(e) => setField("valid_until", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </div>
+
+        <div className="flex justify-end">
           <button
             type="button"
             disabled={isUpdating}
             onClick={onProposalMetaSave}
-            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+            className="rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
           >
-            Save details
+            {isUpdating ? "Salvando..." : "Salvar proposta"}
           </button>
         </div>
       </div>
 
+      {/* Itens */}
       <div className="flex-1 space-y-4 px-5 py-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-slate-900">Snapshot items</p>
-            <p className="mt-1 text-xs text-slate-500">{proposal.items.length} items preserved from catalog state at insertion time.</p>
+            <p className="text-sm font-semibold text-slate-900">Itens do catálogo</p>
+            <p className="mt-1 text-xs text-slate-500">{proposal.items.length} item(s) preservados do catálogo.</p>
           </div>
-          {isLoading ? <span className="text-xs font-medium text-slate-500">Refreshing...</span> : null}
+          {isLoading && <span className="text-xs font-medium text-slate-500">Atualizando...</span>}
         </div>
-
         <div className="space-y-3">
           {proposal.items.map((item) => (
             <ProposalItemCard
               key={`${item.id}:${item.quantity}:${item.discount_amount}`}
               item={item}
+              currency={proposal.currency}
               isUpdating={isUpdating}
               onItemUpdate={onItemUpdate}
               onItemRemove={onItemRemove}
@@ -597,12 +880,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function ProposalItemCard({
-  item,
-  isUpdating,
-  onItemUpdate,
-  onItemRemove,
+  item, currency, isUpdating, onItemUpdate, onItemRemove,
 }: {
   item: ProposalItemDto;
+  currency: string;
   isUpdating: boolean;
   onItemUpdate: (proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) => void;
   onItemRemove: (proposalItemId: string) => void;
@@ -627,7 +908,7 @@ function ProposalItemCard({
             onClick={() => onItemRemove(item.id)}
             className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 disabled:opacity-60"
           >
-            Remove
+            Remover
           </button>
         </div>
       </div>
@@ -635,11 +916,11 @@ function ProposalItemCard({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Quantity</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Quantidade</span>
           <div className="flex gap-2">
             <input
               value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
+              onChange={(e) => setQuantity(e.target.value)}
               inputMode="numeric"
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
             />
@@ -649,17 +930,16 @@ function ProposalItemCard({
               onClick={() => onItemUpdate(item.id, { quantity: Math.max(Number(quantity || 1), 1) })}
               className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
             >
-              Save
+              OK
             </button>
           </div>
         </label>
-
         <label className="space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Discount</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Desconto</span>
           <div className="flex gap-2">
             <input
               value={discountAmount}
-              onChange={(event) => setDiscountAmount(event.target.value)}
+              onChange={(e) => setDiscountAmount(e.target.value)}
               inputMode="numeric"
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
             />
@@ -669,16 +949,16 @@ function ProposalItemCard({
               onClick={() => onItemUpdate(item.id, { discount_amount: Math.max(Number(discountAmount || 0), 0) })}
               className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
             >
-              Save
+              OK
             </button>
           </div>
         </label>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Metric label="Unit price" value={formatCurrency(item.unit_price)} />
-        <Metric label="Discount" value={formatCurrency(item.discount_amount)} />
-        <Metric label="Line total" value={formatCurrency(item.total_amount)} />
+        <Metric label="Preço unit." value={formatCurrency(item.unit_price, currency)} />
+        <Metric label="Desconto" value={formatCurrency(item.discount_amount, currency)} />
+        <Metric label="Total linha" value={formatCurrency(item.total_amount, currency)} />
       </div>
     </article>
   );
