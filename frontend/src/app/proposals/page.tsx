@@ -7,7 +7,7 @@ import { clientsApi, proposalsApi } from "@/lib/api/index";
 import type {
   ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto,
   ProposalServiceDetailsDto, ProposalServiceDetailsRequest,
-  ProposalStatus, ProposalType,
+  ProposalStatusHistoryDto, ProposalStatus, ProposalType,
 } from "@/types/proposal";
 import type { ClientListDto } from "@/types/client";
 
@@ -869,6 +869,90 @@ function ServiceDetailsSection({
   );
 }
 
+// ─── Timeline de histórico de status ─────────────────────────────────────────
+
+const STATUS_ICONS: Record<string, string> = {
+  draft:     "edit_note",
+  sent:      "send",
+  approved:  "check_circle",
+  rejected:  "cancel",
+  archived:  "archive",
+  expired:   "schedule",
+  cancelled: "block",
+};
+
+function StatusTimeline({ history }: { history: ProposalStatusHistoryDto[] }) {
+  if (!history || history.length === 0) return null;
+
+  return (
+    <div className="border-b border-slate-100 px-5 py-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 mb-4">
+        🕐 Histórico de status
+      </p>
+      <div className="relative">
+        {/* linha vertical */}
+        <div className="absolute left-[15px] top-0 bottom-0 w-px bg-slate-100" />
+
+        <div className="space-y-4">
+          {history.map((entry, idx) => {
+            const isLast = idx === history.length - 1;
+            const statusMeta = STATUS_META[entry.to_status as ProposalStatus];
+            const icon = STATUS_ICONS[entry.to_status] ?? "circle";
+            const date = new Date(entry.created_at);
+            const label = statusMeta?.label ?? entry.to_status;
+
+            return (
+              <div key={entry.id} className="flex items-start gap-3 relative">
+                {/* ícone do nó */}
+                <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${
+                  isLast
+                    ? "bg-indigo-100 text-indigo-600"
+                    : "bg-slate-100 text-slate-400"
+                }`}>
+                  <span className="material-symbols-outlined text-[14px]"
+                    style={isLast ? { fontVariationSettings: "'FILL' 1" } : {}}>
+                    {icon}
+                  </span>
+                </div>
+
+                <div className="flex-1 min-w-0 pb-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {entry.from_status ? (
+                        <>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            STATUS_META[entry.from_status as ProposalStatus]?.className ?? "bg-slate-100 text-slate-600"
+                          }`}>
+                            {STATUS_META[entry.from_status as ProposalStatus]?.label ?? entry.from_status}
+                          </span>
+                          <span className="material-symbols-outlined text-[14px] text-slate-300">arrow_forward</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-slate-400">Criado como</span>
+                      )}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        statusMeta?.className ?? "bg-slate-100 text-slate-600"
+                      }`}>
+                        {label}
+                      </span>
+                    </div>
+                    <time className="text-[10px] text-slate-400 shrink-0" title={date.toLocaleString("pt-BR")}>
+                      {date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </time>
+                  </div>
+                  {entry.reason && (
+                    <p className="mt-1 text-xs text-slate-500 italic">"{entry.reason}"</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Painel de detalhe ────────────────────────────────────────────────────────
 
 function ProposalDetail({
@@ -1150,6 +1234,11 @@ function ProposalDetail({
           ))}
         </div>
       </div>
+
+      {/* Histórico de status */}
+      {proposal.status_history && proposal.status_history.length > 0 && (
+        <StatusTimeline history={proposal.status_history} />
+      )}
     </div>
   );
 }

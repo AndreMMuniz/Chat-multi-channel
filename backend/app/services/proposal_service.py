@@ -4,7 +4,8 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.models import CatalogItem, CatalogItemStatus, Proposal, ProposalItem, ProposalServiceDetails, ProposalStatus, User
+import uuid as _uuid
+from app.models.models import CatalogItem, CatalogItemStatus, Proposal, ProposalItem, ProposalServiceDetails, ProposalStatus, ProposalStatusHistory, User
 from app.repositories.catalog_repo import CatalogItemRepository
 from app.repositories.proposal_repo import ProposalItemRepository, ProposalRepository
 from app.schemas.common import create_error_response
@@ -41,17 +42,51 @@ class ProposalService:
             raise HTTPException(status_code=status, detail=error_response)
         return item
 
+    def _record_status(self, proposal_id, from_status, to_status, user_id, reason=None):
+        entry = ProposalStatusHistory(
+            id=_uuid.uuid4(),
+            proposal_id=proposal_id,
+            from_status=from_status.value if hasattr(from_status, "value") else from_status,
+            to_status=to_status.value if hasattr(to_status, "value") else to_status,
+            changed_by_user_id=user_id,
+            reason=reason,
+        )
+        self.db.add(entry)
+
     async def create_proposal(self, payload: ProposalCreate, current_user: User) -> Proposal:
         proposal = await self.proposals.create(
             {
-                **payload.model_dump(),
+                **payload.model_dump(exclude={"service_details"}),
                 "created_by_user_id": current_user.id,
             }
         )
+        # registro inicial de criação
+        self._record_status(
+            proposal_id=proposal.id,
+            from_status=None,
+            to_status=proposal.status.value if hasattr(proposal.status, "value") else proposal.status,
+            user_id=current_user.id,
+        )
+        self.db.commit()
         return await self.proposals.find_proposal(proposal.id)
 
-    async def update_proposal(self, proposal: Proposal, payload: ProposalUpdate) -> Proposal:
-        updated = await self.proposals.update(proposal.id, payload.model_dump(exclude_unset=True))
+    async def update_proposal(self, proposal: Proposal, payload: ProposalUpdate, current_user: User | None = None) -> Proposal:
+        data = payload.model_dump(exclude_unset=True, exclude={"service_details"})
+        new_status = data.get("status")
+        old_status = proposal.status
+
+        updated = await self.proposals.update(proposal.id, data)
+
+        # grava histórico se status mudou
+        if new_status and current_user and str(new_status) != str(old_status):
+            self._record_status(
+                proposal_id=proposal.id,
+                from_status=old_status,
+                to_status=new_status,
+                user_id=current_user.id,
+            )
+            self.db.commit()
+
         return await self.proposals.find_proposal(updated.id)
 
     async def create_proposal_from_catalog(
@@ -277,4 +312,16 @@ def serialize_proposal(proposal: Proposal, include_items: bool = False) -> dict:
             serialize_service_details(proposal.service_details)
             if proposal.service_details else None
         )
+        data["status_history"] = [
+            {
+                "id": h.id,
+                "proposal_id": h.proposal_id,
+                "from_status": h.from_status,
+                "to_status": h.to_status,
+                "changed_by_user_id": h.changed_by_user_id,
+                "reason": h.reason,
+                "created_at": h.created_at,
+            }
+            for h in sorted(proposal.status_history or [], key=lambda x: x.created_at)
+        ]
     return data

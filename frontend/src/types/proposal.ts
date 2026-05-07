@@ -81,9 +81,20 @@ export interface ProposalServiceDetailsRequest {
   support_period_days?: number | null;
 }
 
+export interface ProposalStatusHistoryDto {
+  id: string;
+  proposal_id: string;
+  from_status?: string | null;
+  to_status: string;
+  changed_by_user_id: string;
+  reason?: string | null;
+  created_at: string;
+}
+
 export interface ProposalDetailDto extends ProposalDto {
   items: ProposalItemDto[];
   service_details?: ProposalServiceDetailsDto | null;
+  status_history?: ProposalStatusHistoryDto[];
 }
 
 export interface ProposalCreateRequest {

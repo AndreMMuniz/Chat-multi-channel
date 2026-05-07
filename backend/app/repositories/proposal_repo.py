@@ -26,6 +26,7 @@ class ProposalRepository(BaseRepository[Proposal]):
                 joinedload(Proposal.created_by),
                 joinedload(Proposal.items),
                 joinedload(Proposal.service_details),
+                joinedload(Proposal.status_history),
             )
             .order_by(Proposal.updated_at.desc())
         )
@@ -69,6 +70,7 @@ class ProposalRepository(BaseRepository[Proposal]):
                 joinedload(Proposal.created_by),
                 joinedload(Proposal.items),
                 joinedload(Proposal.service_details),
+                joinedload(Proposal.status_history),
             )
             .where(Proposal.id == proposal_id)
         )

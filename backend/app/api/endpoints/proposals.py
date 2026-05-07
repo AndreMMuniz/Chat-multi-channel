@@ -98,7 +98,7 @@ async def update_proposal(
             status_code=404,
         )
         raise HTTPException(status_code=status, detail=error_response)
-    updated = await service.update_proposal(proposal, payload)
+    updated = await service.update_proposal(proposal, payload, current_user)
     return create_response(ProposalResponse.model_validate(serialize_proposal(updated)))
 
 
