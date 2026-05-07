@@ -53,8 +53,37 @@ export interface ProposalDto {
   updated_at: string;
 }
 
+export interface ProposalServiceDetailsDto {
+  id: string;
+  proposal_id: string;
+  service_name: string;
+  scope_of_work?: string | null;
+  methodology?: string | null;
+  hourly_rate?: number | null;
+  estimated_hours?: number | null;
+  client_responsibilities: string[];
+  delivery_responsibilities: string[];
+  revision_rounds?: number | null;
+  support_period_days?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProposalServiceDetailsRequest {
+  service_name: string;
+  scope_of_work?: string | null;
+  methodology?: string | null;
+  hourly_rate?: number | null;
+  estimated_hours?: number | null;
+  client_responsibilities: string[];
+  delivery_responsibilities: string[];
+  revision_rounds?: number | null;
+  support_period_days?: number | null;
+}
+
 export interface ProposalDetailDto extends ProposalDto {
   items: ProposalItemDto[];
+  service_details?: ProposalServiceDetailsDto | null;
 }
 
 export interface ProposalCreateRequest {

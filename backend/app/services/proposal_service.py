@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.models import CatalogItem, CatalogItemStatus, Proposal, ProposalItem, ProposalStatus, User
+from app.models.models import CatalogItem, CatalogItemStatus, Proposal, ProposalItem, ProposalServiceDetails, ProposalStatus, User
 from app.repositories.catalog_repo import CatalogItemRepository
 from app.repositories.proposal_repo import ProposalItemRepository, ProposalRepository
 from app.schemas.common import create_error_response
@@ -225,6 +225,24 @@ def serialize_proposal_item(item: ProposalItem) -> dict:
     }
 
 
+def serialize_service_details(sd: ProposalServiceDetails) -> dict:
+    return {
+        "id": sd.id,
+        "proposal_id": sd.proposal_id,
+        "service_name": sd.service_name,
+        "scope_of_work": sd.scope_of_work,
+        "methodology": sd.methodology,
+        "hourly_rate": float(sd.hourly_rate) if sd.hourly_rate is not None else None,
+        "estimated_hours": sd.estimated_hours,
+        "client_responsibilities": sd.client_responsibilities or [],
+        "delivery_responsibilities": sd.delivery_responsibilities or [],
+        "revision_rounds": sd.revision_rounds,
+        "support_period_days": sd.support_period_days,
+        "created_at": sd.created_at,
+        "updated_at": sd.updated_at,
+    }
+
+
 def serialize_proposal(proposal: Proposal, include_items: bool = False) -> dict:
     data = {
         "id": proposal.id,
@@ -239,9 +257,24 @@ def serialize_proposal(proposal: Proposal, include_items: bool = False) -> dict:
         "created_by_id": proposal.created_by_user_id,
         "created_by_name": proposal.created_by.full_name if proposal.created_by else None,
         "items_count": len(proposal.items or []),
+        # campos comerciais
+        "client_id": proposal.client_id,
+        "owner_user_id": proposal.owner_user_id,
+        "proposal_type": proposal.proposal_type.value if proposal.proposal_type else None,
+        "currency": proposal.currency or "BRL",
+        "payment_method": proposal.payment_method,
+        "payment_terms": proposal.payment_terms,
+        "payment_installments": proposal.payment_installments,
+        "delivery_deadline": proposal.delivery_deadline,
+        "delivery_days": proposal.delivery_days,
+        "valid_until": proposal.valid_until,
         "created_at": proposal.created_at,
         "updated_at": proposal.updated_at,
     }
     if include_items:
         data["items"] = [serialize_proposal_item(item) for item in proposal.items]
+        data["service_details"] = (
+            serialize_service_details(proposal.service_details)
+            if proposal.service_details else None
+        )
     return data

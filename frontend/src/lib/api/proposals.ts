@@ -5,6 +5,8 @@ import type {
   ProposalDto,
   ProposalFromCatalogRequest,
   ProposalItemFromCatalogRequest,
+  ProposalServiceDetailsDto,
+  ProposalServiceDetailsRequest,
 } from "@/types/proposal";
 
 export async function listProposals(params?: Record<string, string | number | undefined>) {
@@ -73,5 +75,27 @@ export async function deleteProposalItem(
   return apiMutate<undefined, ProposalDetailDto>(
     `/admin/proposals/${proposalId}/items/${proposalItemId}`,
     "DELETE",
+  );
+}
+
+export async function createServiceDetails(
+  proposalId: string,
+  body: ProposalServiceDetailsRequest,
+): Promise<ProposalServiceDetailsDto> {
+  return apiMutate<ProposalServiceDetailsRequest, ProposalServiceDetailsDto>(
+    `/admin/proposals/${proposalId}/service-details`,
+    "POST",
+    body,
+  );
+}
+
+export async function updateServiceDetails(
+  proposalId: string,
+  body: Partial<ProposalServiceDetailsRequest>,
+): Promise<ProposalServiceDetailsDto> {
+  return apiMutate<Partial<ProposalServiceDetailsRequest>, ProposalServiceDetailsDto>(
+    `/admin/proposals/${proposalId}/service-details`,
+    "PATCH",
+    body,
   );
 }

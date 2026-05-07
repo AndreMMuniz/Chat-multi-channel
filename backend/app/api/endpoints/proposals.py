@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.limiter import limiter
 from app.models.models import User
 from app.schemas.common import create_error_response, create_paginated_response, create_response
+from app.models.models import ProposalServiceDetails
 from app.schemas.proposal import (
     ProposalCreate,
     ProposalDetailResponse,
@@ -16,9 +17,12 @@ from app.schemas.proposal import (
     ProposalItemFromCatalogCreate,
     ProposalItemUpdate,
     ProposalResponse,
+    ProposalServiceDetailsCreate,
+    ProposalServiceDetailsResponse,
+    ProposalServiceDetailsUpdate,
     ProposalUpdate,
 )
-from app.services.proposal_service import ProposalService, serialize_proposal
+from app.services.proposal_service import ProposalService, serialize_proposal, serialize_service_details
 
 router = APIRouter()
 
@@ -167,3 +171,78 @@ async def delete_proposal_item(
     )
     proposal = await service.proposals.find_proposal(proposal_id)
     return create_response(ProposalDetailResponse.model_validate(serialize_proposal(proposal, include_items=True)))
+
+
+# ── service details ────────────────────────────────────────────────────────────
+
+def _get_proposal_or_404(db: Session, proposal_id: UUID):
+    from app.models.models import Proposal as _Proposal
+    from sqlalchemy import select
+    from sqlalchemy.orm import joinedload
+    stmt = (
+        select(_Proposal)
+        .options(
+            joinedload(_Proposal.created_by),
+            joinedload(_Proposal.items),
+            joinedload(_Proposal.service_details),
+        )
+        .where(_Proposal.id == proposal_id)
+    )
+    proposal = db.execute(stmt).unique().scalars().first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada")
+    return proposal
+
+
+@router.post("/proposals/{proposal_id}/service-details")
+@limiter.limit("30/minute")
+async def create_service_details(
+    request: Request,
+    proposal_id: UUID,
+    payload: ProposalServiceDetailsCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    _get_proposal_or_404(db, proposal_id)
+
+    existing = db.query(ProposalServiceDetails).filter(
+        ProposalServiceDetails.proposal_id == proposal_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Detalhes de serviço já existem. Use PATCH para atualizar.")
+
+    import uuid as _uuid
+    sd = ProposalServiceDetails(
+        id=_uuid.uuid4(),
+        proposal_id=proposal_id,
+        **payload.model_dump(),
+    )
+    db.add(sd)
+    db.commit()
+    db.refresh(sd)
+    return create_response(ProposalServiceDetailsResponse.model_validate(serialize_service_details(sd)))
+
+
+@router.patch("/proposals/{proposal_id}/service-details")
+@limiter.limit("30/minute")
+async def update_service_details(
+    request: Request,
+    proposal_id: UUID,
+    payload: ProposalServiceDetailsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    _get_proposal_or_404(db, proposal_id)
+
+    sd = db.query(ProposalServiceDetails).filter(
+        ProposalServiceDetails.proposal_id == proposal_id
+    ).first()
+    if not sd:
+        raise HTTPException(status_code=404, detail="Detalhes de serviço não encontrados. Use POST para criar.")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(sd, field, value)
+
+    db.commit()
+    db.refresh(sd)
+    return create_response(ProposalServiceDetailsResponse.model_validate(serialize_service_details(sd)))

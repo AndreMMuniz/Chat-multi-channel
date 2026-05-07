@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.models import Proposal, ProposalItem
+from app.models.models import Proposal, ProposalItem, ProposalServiceDetails
 from app.repositories.base_repo import BaseRepository
 
 
@@ -25,6 +25,7 @@ class ProposalRepository(BaseRepository[Proposal]):
             .options(
                 joinedload(Proposal.created_by),
                 joinedload(Proposal.items),
+                joinedload(Proposal.service_details),
             )
             .order_by(Proposal.updated_at.desc())
         )
@@ -67,6 +68,7 @@ class ProposalRepository(BaseRepository[Proposal]):
             .options(
                 joinedload(Proposal.created_by),
                 joinedload(Proposal.items),
+                joinedload(Proposal.service_details),
             )
             .where(Proposal.id == proposal_id)
         )

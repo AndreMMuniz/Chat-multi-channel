@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Modal from "@/components/shared/Modal";
 import { clientsApi, proposalsApi } from "@/lib/api/index";
-import type { ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto, ProposalStatus, ProposalType } from "@/types/proposal";
+import type {
+  ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto,
+  ProposalServiceDetailsDto, ProposalServiceDetailsRequest,
+  ProposalStatus, ProposalType,
+} from "@/types/proposal";
 import type { ClientListDto } from "@/types/client";
 
 // ─── status meta ─────────────────────────────────────────────────────────────
@@ -597,6 +601,274 @@ export default function ProposalsPage() {
   );
 }
 
+// ─── Editor de responsabilidades (lista dinâmica) ────────────────────────────
+
+function ResponsibilityList({
+  label,
+  items,
+  onChange,
+}: {
+  label: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function addItem() {
+    const val = inputRef.current?.value.trim();
+    if (!val) return;
+    onChange([...items, val]);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function removeItem(idx: number) {
+    onChange(items.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400 mb-2">{label}</p>
+      <div className="space-y-1.5 mb-2">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex items-start gap-2 group">
+            <span className="mt-0.5 text-indigo-400 shrink-0">
+              <span className="material-symbols-outlined text-[14px]">check_circle</span>
+            </span>
+            <p className="flex-1 text-sm text-slate-700 leading-snug">{item}</p>
+            <button
+              type="button"
+              onClick={() => removeItem(idx)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-rose-400"
+            >
+              <span className="material-symbols-outlined text-[14px]">close</span>
+            </button>
+          </div>
+        ))}
+        {items.length === 0 && (
+          <p className="text-xs text-slate-400 italic">Nenhum item adicionado</p>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          placeholder="Adicionar item..."
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addItem())}
+          className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+        />
+        <button
+          type="button"
+          onClick={addItem}
+          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm transition-colors"
+        >
+          <span className="material-symbols-outlined text-[14px]">add</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Seção de detalhes de serviço ─────────────────────────────────────────────
+
+function ServiceDetailsSection({
+  proposalId,
+  initial,
+  onSaved,
+}: {
+  proposalId: string;
+  initial?: ProposalServiceDetailsDto | null;
+  onSaved: (sd: ProposalServiceDetailsDto) => void;
+}) {
+  const [form, setForm] = useState<ProposalServiceDetailsRequest>({
+    service_name: initial?.service_name ?? "",
+    scope_of_work: initial?.scope_of_work ?? "",
+    methodology: initial?.methodology ?? "",
+    hourly_rate: initial?.hourly_rate ?? null,
+    estimated_hours: initial?.estimated_hours ?? null,
+    client_responsibilities: initial?.client_responsibilities ?? [],
+    delivery_responsibilities: initial?.delivery_responsibilities ?? [],
+    revision_rounds: initial?.revision_rounds ?? null,
+    support_period_days: initial?.support_period_days ?? null,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function set(field: keyof ProposalServiceDetailsRequest, value: unknown) {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handleSave() {
+    if (!form.service_name.trim()) { setError("Nome do serviço é obrigatório."); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      let sd: ProposalServiceDetailsDto;
+      if (initial) {
+        sd = await proposalsApi.updateServiceDetails(proposalId, form);
+      } else {
+        sd = await proposalsApi.createServiceDetails(proposalId, form);
+      }
+      onSaved(sd);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar detalhes.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const totalValue =
+    (form.hourly_rate ?? 0) * (form.estimated_hours ?? 0);
+
+  return (
+    <div className="border-b border-slate-100 px-5 py-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          🔧 Detalhes do Serviço
+        </p>
+        {initial && (
+          <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+            Salvo
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <p className="text-xs text-rose-600 bg-rose-50 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      {/* Nome + escopo */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Nome do serviço <span className="text-rose-400">*</span>
+          </span>
+          <input
+            value={form.service_name}
+            onChange={(e) => set("service_name", e.target.value)}
+            placeholder="Ex: Desenvolvimento de sistema"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Metodologia
+          </span>
+          <input
+            value={form.methodology ?? ""}
+            onChange={(e) => set("methodology", e.target.value || null)}
+            placeholder="Ex: Scrum, Kanban..."
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </label>
+      </div>
+
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+          Escopo do trabalho
+        </span>
+        <textarea
+          value={form.scope_of_work ?? ""}
+          onChange={(e) => set("scope_of_work", e.target.value || null)}
+          rows={3}
+          placeholder="Descreva detalhadamente o que será executado..."
+          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none resize-none"
+        />
+      </label>
+
+      {/* Valor hora + horas + total calculado */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Valor/hora (R$)
+          </span>
+          <input
+            type="number"
+            min={0}
+            value={form.hourly_rate ?? ""}
+            onChange={(e) => set("hourly_rate", e.target.value ? Number(e.target.value) : null)}
+            placeholder="0,00"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Horas estimadas
+          </span>
+          <input
+            type="number"
+            min={0}
+            value={form.estimated_hours ?? ""}
+            onChange={(e) => set("estimated_hours", e.target.value ? Number(e.target.value) : null)}
+            placeholder="0"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </label>
+        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-3 py-2">
+          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-indigo-400">
+            Total calculado
+          </p>
+          <p className="mt-1 text-base font-semibold text-indigo-700">
+            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue)}
+          </p>
+        </div>
+      </div>
+
+      {/* Revisões + suporte */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Rodadas de revisão
+          </span>
+          <input
+            type="number"
+            min={0}
+            value={form.revision_rounds ?? ""}
+            onChange={(e) => set("revision_rounds", e.target.value ? Number(e.target.value) : null)}
+            placeholder="Ex: 2"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Suporte pós-entrega (dias)
+          </span>
+          <input
+            type="number"
+            min={0}
+            value={form.support_period_days ?? ""}
+            onChange={(e) => set("support_period_days", e.target.value ? Number(e.target.value) : null)}
+            placeholder="Ex: 30"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+        </label>
+      </div>
+
+      {/* Responsabilidades */}
+      <ResponsibilityList
+        label="Responsabilidades do cliente"
+        items={form.client_responsibilities}
+        onChange={(items) => set("client_responsibilities", items)}
+      />
+
+      <ResponsibilityList
+        label="Responsabilidades da entrega"
+        items={form.delivery_responsibilities}
+        onChange={(items) => set("delivery_responsibilities", items)}
+      />
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={handleSave}
+          className="rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
+        >
+          {saving ? "Salvando..." : initial ? "Atualizar serviço" : "Salvar detalhes do serviço"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Painel de detalhe ────────────────────────────────────────────────────────
 
 function ProposalDetail({
@@ -616,6 +888,9 @@ function ProposalDetail({
 }) {
   const statusMeta = STATUS_META[proposal.status] ?? STATUS_META.draft;
   const selectedClient = clients.find((c) => c.id === proposalForm.client_id);
+  const [serviceDetails, setServiceDetails] = useState<ProposalServiceDetailsDto | null | undefined>(
+    proposal.service_details
+  );
   const [paymentCustom, setPaymentCustom] = useState(
     !PAYMENT_PRESETS.slice(0, -1).includes(proposalForm.payment_terms)
   );
@@ -843,6 +1118,15 @@ function ProposalDetail({
           </button>
         </div>
       </div>
+
+      {/* Detalhes do serviço — exibido apenas se tipo = service */}
+      {(proposalForm.proposal_type === "service" || proposal.proposal_type === "service") && (
+        <ServiceDetailsSection
+          proposalId={proposal.id}
+          initial={serviceDetails}
+          onSaved={(sd) => setServiceDetails(sd)}
+        />
+      )}
 
       {/* Itens */}
       <div className="flex-1 space-y-4 px-5 py-5">
