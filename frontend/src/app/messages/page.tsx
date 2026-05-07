@@ -886,6 +886,10 @@ export default function ChatPage() {
   const [clientLinking, setClientLinking] = useState(false);
   const [clientHistory, setClientHistory] = useState<import('@/lib/api/conversations').ConversationSummary[]>([]);
   const [clientHistoryLoading, setClientHistoryLoading] = useState(false);
+  const [showQuickClientForm, setShowQuickClientForm] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState({ name: '', email: '', phone: '', company_name: '' });
+  const [quickClientSaving, setQuickClientSaving] = useState(false);
+  const [quickClientError, setQuickClientError] = useState<string | null>(null);
   const [allQuickReplies, setAllQuickReplies] = useState<import('@/types/quickReply').QuickReply[]>([]);
   const [newQRModal, setNewQRModal] = useState(false);
   const [newQRShortcut, setNewQRShortcut] = useState('');
@@ -1013,8 +1017,10 @@ export default function ChatPage() {
       setClientMatches([]);
       setClientAlreadyLinked(false);
       setClientHistory([]);
+      setShowQuickClientForm(false);
       return;
     }
+    setShowQuickClientForm(false);
     const convId = activeConversation.id;
     setClientDetecting(true);
     conversationsApi.detectClientForConversation(convId)
@@ -2460,12 +2466,15 @@ export default function ChatPage() {
                     {/* ── Linked client section ── */}
                     <div className="border-t border-[#E9ECEF] pt-3.5 mt-1">
                       <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Linked client</p>
+
                       {clientDetecting ? (
                         <div className="flex items-center gap-2 text-xs text-slate-400">
                           <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
                           Detecting…
                         </div>
+
                       ) : clientAlreadyLinked && clientMatches[0] ? (
+                        /* ── Já vinculado ── */
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-1.5">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -2474,28 +2483,38 @@ export default function ChatPage() {
                                 <p className="text-[11px] text-slate-500 truncate">{clientMatches[0].company_name}</p>
                               )}
                             </div>
-                            <a
-                              href={`/clients`}
-                              className="shrink-0 text-[10px] text-indigo-600 hover:underline font-medium"
+                            <button
+                              onClick={async () => {
+                                if (!activeConversation.contact_id) return;
+                                if (!confirm('Unlink this client?')) return;
+                                await conversationsApi.linkContactToClient(activeConversation.contact_id, null).catch(() => {});
+                                setClientAlreadyLinked(false);
+                                setClientMatches([]);
+                                setClientHistory([]);
+                              }}
+                              className="shrink-0 text-[10px] text-slate-400 hover:text-red-500 transition-colors"
+                              title="Unlink"
                             >
-                              View ↗
-                            </a>
+                              <span className="material-symbols-outlined text-[14px]">link_off</span>
+                            </button>
                           </div>
                           <button
                             onClick={() => setRightPanelTab('history')}
-                            className="text-[11px] text-slate-500 hover:text-slate-700 underline"
+                            className="text-[11px] text-indigo-600 hover:underline"
                           >
                             See full history →
                           </button>
                         </div>
-                      ) : clientMatches.length > 0 ? (
+
+                      ) : clientMatches.length > 0 && !showQuickClientForm ? (
+                        /* ── Match detectado ── */
                         <div className="space-y-2">
-                          <p className="text-[11px] text-slate-500">Possible match found:</p>
+                          <p className="text-[11px] text-slate-500">Existing client found:</p>
                           {clientMatches.slice(0, 2).map(m => (
                             <div key={m.id} className="rounded-xl border border-indigo-100 bg-indigo-50 p-2.5">
                               <p className="text-[12px] font-semibold text-slate-800">{m.name}</p>
                               {m.company_name && <p className="text-[11px] text-slate-500">{m.company_name}</p>}
-                              <p className="text-[10px] text-slate-400">Match by {m.match_field}</p>
+                              <p className="text-[10px] text-slate-400 mb-1.5">Matched by {m.match_field}</p>
                               <button
                                 disabled={clientLinking}
                                 onClick={async () => {
@@ -2513,23 +2532,118 @@ export default function ChatPage() {
                                     setClientHistoryLoading(false);
                                   }
                                 }}
-                                className="mt-1.5 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium py-1 transition-colors disabled:opacity-60"
+                                className="w-full rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-medium py-1.5 transition-colors disabled:opacity-60"
                               >
                                 {clientLinking ? 'Linking…' : 'Link to this client'}
                               </button>
                             </div>
                           ))}
-                          <p className="text-[11px] text-slate-400 text-center">or</p>
-                          <a href="/clients" className="block text-center text-[11px] text-slate-500 hover:text-slate-700 underline">
-                            + Create new client
-                          </a>
+                          <div className="text-center">
+                            <button
+                              onClick={() => {
+                                setShowQuickClientForm(true);
+                                setQuickClientForm({
+                                  name: activeConversation.contact.name ?? '',
+                                  email: activeConversation.contact.email ?? '',
+                                  phone: activeConversation.contact.phone ?? activeConversation.contact.channel_identifier ?? '',
+                                  company_name: '',
+                                });
+                                setQuickClientError(null);
+                              }}
+                              className="text-[11px] text-slate-500 hover:text-slate-700 underline"
+                            >
+                              + Create new client instead
+                            </button>
+                          </div>
                         </div>
+
+                      ) : showQuickClientForm ? (
+                        /* ── Formulário rápido de criação ── */
+                        <div className="space-y-2">
+                          {quickClientError && (
+                            <p className="text-[11px] text-red-500 bg-red-50 rounded-lg px-2 py-1">{quickClientError}</p>
+                          )}
+                          <input
+                            value={quickClientForm.name}
+                            onChange={e => setQuickClientForm(f => ({ ...f, name: e.target.value }))}
+                            placeholder="Name *"
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
+                          />
+                          <input
+                            value={quickClientForm.email}
+                            onChange={e => setQuickClientForm(f => ({ ...f, email: e.target.value }))}
+                            placeholder="Email *"
+                            type="email"
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
+                          />
+                          <input
+                            value={quickClientForm.phone}
+                            onChange={e => setQuickClientForm(f => ({ ...f, phone: e.target.value }))}
+                            placeholder="Phone"
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
+                          />
+                          <input
+                            value={quickClientForm.company_name}
+                            onChange={e => setQuickClientForm(f => ({ ...f, company_name: e.target.value }))}
+                            placeholder="Company name (optional)"
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
+                          />
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={() => { setShowQuickClientForm(false); setQuickClientError(null); }}
+                              className="flex-1 rounded-lg border border-slate-200 text-[11px] text-slate-600 py-1.5 hover:bg-slate-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              disabled={quickClientSaving || !quickClientForm.name || !quickClientForm.email}
+                              onClick={async () => {
+                                if (!activeConversation.contact_id) return;
+                                setQuickClientSaving(true);
+                                setQuickClientError(null);
+                                try {
+                                  const newClient = await clientsApi.createClient({
+                                    name: quickClientForm.name,
+                                    email: quickClientForm.email,
+                                    phone: quickClientForm.phone || null,
+                                    company_name: quickClientForm.company_name || null,
+                                  });
+                                  await conversationsApi.linkContactToClient(activeConversation.contact_id, newClient.id);
+                                  setClientAlreadyLinked(true);
+                                  setClientMatches([{ id: newClient.id, name: newClient.name, company_name: newClient.company_name ?? null, email: newClient.email, match_field: 'linked' }]);
+                                  setShowQuickClientForm(false);
+                                } catch (err: unknown) {
+                                  setQuickClientError(err instanceof Error ? err.message : 'Failed to create client.');
+                                } finally {
+                                  setQuickClientSaving(false);
+                                }
+                              }}
+                              className="flex-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-medium py-1.5 transition-colors disabled:opacity-60"
+                            >
+                              {quickClientSaving ? 'Saving…' : 'Create & link'}
+                            </button>
+                          </div>
+                        </div>
+
                       ) : (
-                        <div className="text-center space-y-2 py-1">
-                          <p className="text-[11px] text-slate-400">No client linked.</p>
-                          <a href="/clients" className="text-[11px] text-indigo-600 hover:underline font-medium">
+                        /* ── Sem cliente, sem match ── */
+                        <div className="space-y-2 py-1">
+                          <p className="text-[11px] text-slate-400 text-center">No client linked.</p>
+                          <button
+                            onClick={() => {
+                              setShowQuickClientForm(true);
+                              setQuickClientForm({
+                                name: activeConversation.contact.name ?? '',
+                                email: activeConversation.contact.email ?? '',
+                                phone: activeConversation.contact.phone ?? activeConversation.contact.channel_identifier ?? '',
+                                company_name: '',
+                              });
+                              setQuickClientError(null);
+                            }}
+                            className="w-full rounded-lg border border-dashed border-slate-300 text-[11px] text-slate-500 hover:border-slate-400 hover:text-slate-700 py-2 transition-colors"
+                          >
                             + Create client from contact
-                          </a>
+                          </button>
                         </div>
                       )}
                     </div>
