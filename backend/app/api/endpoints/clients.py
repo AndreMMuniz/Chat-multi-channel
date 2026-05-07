@@ -1,13 +1,15 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.core.limiter import limiter
-from app.models.models import Client, User
+from app.models.models import Client, Contact, Conversation, User
 from app.schemas.client import ClientCreate, ClientListResponse, ClientResponse, ClientUpdate
 from app.schemas.common import create_error_response, create_paginated_response, create_response
 
@@ -143,3 +145,153 @@ async def delete_client(
     client = _get_client_or_404(client_id, db)
     client.deleted_at = datetime.now(timezone.utc)
     db.commit()
+
+
+# ── Conversas vinculadas ao cliente ──────────────────────────────────────────
+
+@router.get("/clients/{client_id}/conversations")
+@limiter.limit("60/minute")
+async def get_client_conversations(
+    request: Request,
+    client_id: UUID,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    _get_client_or_404(client_id, db)
+    conversations = (
+        db.query(Conversation)
+        .join(Contact, Contact.id == Conversation.contact_id)
+        .filter(Contact.client_id == client_id)
+        .options(joinedload(Conversation.contact))
+        .order_by(Conversation.updated_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    total = (
+        db.query(func.count(Conversation.id))
+        .join(Contact, Contact.id == Conversation.contact_id)
+        .filter(Contact.client_id == client_id)
+        .scalar()
+    )
+    data = [
+        {
+            "id": str(c.id),
+            "channel": c.channel.value if hasattr(c.channel, "value") else c.channel,
+            "status": c.status.value if hasattr(c.status, "value") else c.status,
+            "last_message": c.last_message,
+            "last_message_date": c.last_message_date,
+            "created_at": c.created_at,
+            "updated_at": c.updated_at,
+            "contact_id": str(c.contact_id),
+            "contact_name": c.contact.name if c.contact else None,
+            "channel_identifier": c.contact.channel_identifier if c.contact else None,
+        }
+        for c in conversations
+    ]
+    return create_paginated_response(data=data, total=total, page=(skip // limit) + 1, page_size=limit)
+
+
+# ── Vínculo contato ↔ cliente ─────────────────────────────────────────────────
+
+class ContactClientLinkRequest(BaseModel):
+    client_id: Optional[UUID] = None  # None = desvincular
+
+
+@router.patch("/contacts/{contact_id}/client")
+@limiter.limit("30/minute")
+async def link_contact_to_client(
+    request: Request,
+    contact_id: UUID,
+    payload: ContactClientLinkRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+    if payload.client_id is not None:
+        client = db.query(Client).filter(
+            Client.id == payload.client_id,
+            Client.deleted_at.is_(None),
+        ).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    contact.client_id = payload.client_id
+    db.commit()
+    db.refresh(contact)
+    return create_response({
+        "contact_id": str(contact.id),
+        "client_id": str(contact.client_id) if contact.client_id else None,
+    })
+
+
+# ── Detecção de cliente para uma conversa ─────────────────────────────────────
+
+@router.get("/conversations/{conversation_id}/detect-client")
+@limiter.limit("60/minute")
+async def detect_client_for_conversation(
+    request: Request,
+    conversation_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+
+    contact = db.query(Contact).filter(Contact.id == conv.contact_id).first()
+    if not contact:
+        return create_response({"matches": [], "already_linked": False})
+
+    # Se o contato já tem cliente vinculado, retorna direto
+    if contact.client_id:
+        client = db.query(Client).filter(
+            Client.id == contact.client_id, Client.deleted_at.is_(None)
+        ).first()
+        if client:
+            return create_response({
+                "already_linked": True,
+                "matches": [{
+                    "id": str(client.id),
+                    "name": client.name,
+                    "company_name": client.company_name,
+                    "email": client.email,
+                    "match_field": "linked",
+                }],
+            })
+
+    # Fallback: busca por email ou phone
+    filters = []
+    if contact.email:
+        filters.append(func.lower(Client.email) == func.lower(contact.email))
+    if contact.phone:
+        filters.append(Client.phone == contact.phone)
+
+    if not filters:
+        return create_response({"matches": [], "already_linked": False})
+
+    candidates = (
+        db.query(Client)
+        .filter(or_(*filters), Client.deleted_at.is_(None))
+        .limit(5)
+        .all()
+    )
+
+    matches = []
+    for c in candidates:
+        match_field = "email" if (contact.email and c.email and
+                                   c.email.lower() == contact.email.lower()) else "phone"
+        matches.append({
+            "id": str(c.id),
+            "name": c.name,
+            "company_name": c.company_name,
+            "email": c.email,
+            "match_field": match_field,
+        })
+
+    return create_response({"matches": matches, "already_linked": False})

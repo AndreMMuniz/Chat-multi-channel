@@ -215,10 +215,12 @@ class Contact(Base):
     phone = Column(String(50), nullable=True)
     avatar = Column(String, nullable=True) # URL to image
     channel_identifier = Column(String(255), nullable=True) # phone number, telegram chat_id, email, etc.
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True, index=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     conversations = relationship("Conversation", back_populates="contact")
+    client = relationship("Client", back_populates="contacts", foreign_keys=[client_id])
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -645,6 +647,7 @@ class Client(Base):
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     contact = relationship("Contact", foreign_keys=[contact_id])
     proposals = relationship("Proposal", back_populates="client")
+    contacts = relationship("Contact", back_populates="client", foreign_keys="Contact.client_id")
 
 
 class ProposalServiceDetails(Base):

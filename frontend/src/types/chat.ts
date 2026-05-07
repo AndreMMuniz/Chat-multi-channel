@@ -6,6 +6,17 @@ export type ConversationTag = "SUPPORT" | "BILLING" | "FEEDBACK" | "SALES" | "GE
 export type MessageType = "text" | "image" | "file" | "audio";
 export type DeliveryStatus = "pending" | "sent" | "delivered" | "failed";
 
+export interface ClientSummary {
+  id: string;
+  name: string;
+  company_name?: string | null;
+  email?: string | null;
+}
+
+export interface ClientMatch extends ClientSummary {
+  match_field: "email" | "phone" | "linked";
+}
+
 export interface Contact {
   id: string;
   name?: string;
@@ -13,6 +24,8 @@ export interface Contact {
   phone?: string;
   avatar?: string;
   channel_identifier?: string;
+  client_id?: string | null;
+  client?: ClientSummary | null;
   created_at?: string;
 }
 

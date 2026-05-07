@@ -1,8 +1,9 @@
 /** Conversations & messages API */
 
-import { apiGetList, apiMutate } from "@/lib/apiClient";
+import { apiGet, apiGetList, apiMutate } from "@/lib/apiClient";
 import type { ApiResponse } from "@/types/api";
 import type {
+  ClientMatch,
   Conversation,
   Message,
   SendMessageRequest,
@@ -95,6 +96,51 @@ export async function retryMessage(
     `/chat/conversations/${conversationId}/messages/${messageId}/retry`,
     "POST"
   );
+}
+
+// ── Client ↔ Contact linking ────────────────────────────────────────────────
+
+export async function detectClientForConversation(
+  conversationId: string
+): Promise<{ matches: ClientMatch[]; already_linked: boolean }> {
+  return apiGet<{ matches: ClientMatch[]; already_linked: boolean }>(
+    `/admin/conversations/${conversationId}/detect-client`
+  );
+}
+
+export async function linkContactToClient(
+  contactId: string,
+  clientId: string | null
+): Promise<{ contact_id: string; client_id: string | null }> {
+  return apiMutate(
+    `/admin/contacts/${contactId}/client`,
+    "PATCH",
+    { client_id: clientId }
+  );
+}
+
+export async function getClientConversations(
+  clientId: string,
+  params?: { skip?: number; limit?: number }
+): Promise<ApiResponse<ConversationSummary[]>> {
+  const q = new URLSearchParams();
+  if (params?.skip) q.set("skip", String(params.skip));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const suffix = q.toString() ? `?${q}` : "";
+  return apiGetList<ConversationSummary>(`/admin/clients/${clientId}/conversations${suffix}`);
+}
+
+export interface ConversationSummary {
+  id: string;
+  channel: string;
+  status: string;
+  last_message?: string | null;
+  last_message_date?: string | null;
+  created_at: string;
+  updated_at: string;
+  contact_id: string;
+  contact_name?: string | null;
+  channel_identifier?: string | null;
 }
 
 export async function deleteMessage(

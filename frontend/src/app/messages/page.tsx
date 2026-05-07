@@ -18,7 +18,7 @@ import { useMessages } from '@/hooks/useMessages';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
-import { conversationsApi, usersApi, quickRepliesApi, projectsApi } from '@/lib/api/index';
+import { conversationsApi, usersApi, quickRepliesApi, projectsApi, clientsApi } from '@/lib/api/index';
 import type { SequencedEvent } from '@/types/api';
 import type { ChannelType, Conversation, ConversationTag, Message } from '@/types/chat';
 import type { ProjectDto, ProjectPriority, ProjectStage, ProjectStageKey, ProjectTaskDto, ProjectTaskStatus } from '@/types/project';
@@ -880,6 +880,12 @@ export default function ChatPage() {
   const [aiSheetOpen, setAiSheetOpen] = useState(false);
   const [showAIDesktop, setShowAIDesktop] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'contact' | 'details' | 'history'>('contact');
+  const [clientMatches, setClientMatches] = useState<import('@/types/chat').ClientMatch[]>([]);
+  const [clientAlreadyLinked, setClientAlreadyLinked] = useState(false);
+  const [clientDetecting, setClientDetecting] = useState(false);
+  const [clientLinking, setClientLinking] = useState(false);
+  const [clientHistory, setClientHistory] = useState<import('@/lib/api/conversations').ConversationSummary[]>([]);
+  const [clientHistoryLoading, setClientHistoryLoading] = useState(false);
   const [allQuickReplies, setAllQuickReplies] = useState<import('@/types/quickReply').QuickReply[]>([]);
   const [newQRModal, setNewQRModal] = useState(false);
   const [newQRShortcut, setNewQRShortcut] = useState('');
@@ -907,6 +913,7 @@ export default function ChatPage() {
   useEffect(() => {
     quickRepliesApi.listQuickReplies().then(r => setAllQuickReplies(r.data ?? [])).catch(() => {});
   }, []);
+
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -999,6 +1006,36 @@ export default function ChatPage() {
     const tB = b.last_message_date ? new Date(b.last_message_date).getTime() : 0;
     return tA - tB; // oldest unread first within same risk tier
   });
+
+  // Detecta cliente vinculado ao trocar de conversa ativa
+  useEffect(() => {
+    if (!activeConversation?.id) {
+      setClientMatches([]);
+      setClientAlreadyLinked(false);
+      setClientHistory([]);
+      return;
+    }
+    const convId = activeConversation.id;
+    setClientDetecting(true);
+    conversationsApi.detectClientForConversation(convId)
+      .then(res => {
+        setClientMatches(res.matches ?? []);
+        setClientAlreadyLinked(res.already_linked ?? false);
+        if (res.already_linked && res.matches?.[0]) {
+          const linkedClientId = res.matches[0].id;
+          setClientHistoryLoading(true);
+          conversationsApi.getClientConversations(linkedClientId, { limit: 20 })
+            .then(r => setClientHistory((r.data ?? []).filter(c => c.id !== convId)))
+            .catch(() => setClientHistory([]))
+            .finally(() => setClientHistoryLoading(false));
+        } else {
+          setClientHistory([]);
+        }
+      })
+      .catch(() => { setClientMatches([]); setClientAlreadyLinked(false); })
+      .finally(() => setClientDetecting(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversation?.id]);
 
   const availableChannels = Object.keys(CHANNEL_META) as ChannelType[];
   const hasActiveFilters = Boolean(searchQuery.trim()) || selectedChannel !== 'ALL' || selectedTag !== 'ALL';
@@ -2419,6 +2456,83 @@ export default function ChatPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* ── Linked client section ── */}
+                    <div className="border-t border-[#E9ECEF] pt-3.5 mt-1">
+                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>Linked client</p>
+                      {clientDetecting ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                          Detecting…
+                        </div>
+                      ) : clientAlreadyLinked && clientMatches[0] ? (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[12px] font-semibold text-slate-800 truncate">{clientMatches[0].name}</p>
+                              {clientMatches[0].company_name && (
+                                <p className="text-[11px] text-slate-500 truncate">{clientMatches[0].company_name}</p>
+                              )}
+                            </div>
+                            <a
+                              href={`/clients`}
+                              className="shrink-0 text-[10px] text-indigo-600 hover:underline font-medium"
+                            >
+                              View ↗
+                            </a>
+                          </div>
+                          <button
+                            onClick={() => setRightPanelTab('history')}
+                            className="text-[11px] text-slate-500 hover:text-slate-700 underline"
+                          >
+                            See full history →
+                          </button>
+                        </div>
+                      ) : clientMatches.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-[11px] text-slate-500">Possible match found:</p>
+                          {clientMatches.slice(0, 2).map(m => (
+                            <div key={m.id} className="rounded-xl border border-indigo-100 bg-indigo-50 p-2.5">
+                              <p className="text-[12px] font-semibold text-slate-800">{m.name}</p>
+                              {m.company_name && <p className="text-[11px] text-slate-500">{m.company_name}</p>}
+                              <p className="text-[10px] text-slate-400">Match by {m.match_field}</p>
+                              <button
+                                disabled={clientLinking}
+                                onClick={async () => {
+                                  if (!activeConversation.contact_id) return;
+                                  setClientLinking(true);
+                                  try {
+                                    await conversationsApi.linkContactToClient(activeConversation.contact_id, m.id);
+                                    setClientAlreadyLinked(true);
+                                    setClientMatches([m]);
+                                    setClientHistoryLoading(true);
+                                    const r = await conversationsApi.getClientConversations(m.id, { limit: 20 });
+                                    setClientHistory((r.data ?? []).filter(c => c.id !== activeConversation.id));
+                                  } catch { /* ignore */ } finally {
+                                    setClientLinking(false);
+                                    setClientHistoryLoading(false);
+                                  }
+                                }}
+                                className="mt-1.5 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium py-1 transition-colors disabled:opacity-60"
+                              >
+                                {clientLinking ? 'Linking…' : 'Link to this client'}
+                              </button>
+                            </div>
+                          ))}
+                          <p className="text-[11px] text-slate-400 text-center">or</p>
+                          <a href="/clients" className="block text-center text-[11px] text-slate-500 hover:text-slate-700 underline">
+                            + Create new client
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="text-center space-y-2 py-1">
+                          <p className="text-[11px] text-slate-400">No client linked.</p>
+                          <a href="/clients" className="text-[11px] text-indigo-600 hover:underline font-medium">
+                            + Create client from contact
+                          </a>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -2478,41 +2592,95 @@ export default function ChatPage() {
 
                 {/* ── History tab ── */}
                 {rightPanelTab === 'history' && (
-                  <div className="p-4">
-                    <p className="text-[10px] font-bold text-[#575f67] uppercase mb-3" style={{ letterSpacing: '0.06em' }}>Other Conversations</p>
+                  <div className="p-4 space-y-4">
+                    {/* Same contact, same channel */}
                     {(() => {
-                      const otherConvs = conversations.filter(
+                      const sameContact = conversations.filter(
                         c => c.contact_id === activeConversation.contact_id && c.id !== activeConversation.id
                       );
-                      if (otherConvs.length === 0) return (
-                        <p className="text-xs text-slate-400 text-center py-6">No previous conversations</p>
-                      );
                       return (
-                        <div className="flex flex-col divide-y divide-slate-100">
-                          {otherConvs.map(c => (
-                            <button
-                              key={c.id}
-                              onClick={() => handleSelectConversation(c)}
-                              className="flex flex-col gap-1.5 py-3 text-left hover:bg-slate-50 transition-colors px-1 rounded-lg"
-                            >
-                              <div className="flex items-center justify-between">
-                                <ChannelBadge channel={c.channel} compact />
-                                <span className="text-[10px] text-slate-400">
-                                  {c.last_message_date ? new Date(c.last_message_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-600 truncate">{c.last_message || 'No messages'}</p>
-                              <span className={cn(
-                                "text-[10px] font-semibold",
-                                c.status === 'CLOSED' ? "text-emerald-600" : "text-slate-400"
-                              )}>
-                                {c.status === 'CLOSED' ? '✓ Resolved' : c.status === 'OPEN' ? 'Open' : 'Pending'}
-                              </span>
-                            </button>
-                          ))}
+                        <div>
+                          <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>
+                            This channel
+                          </p>
+                          {sameContact.length === 0 ? (
+                            <p className="text-xs text-slate-400 py-2">No previous conversations on this channel</p>
+                          ) : (
+                            <div className="flex flex-col divide-y divide-slate-100">
+                              {sameContact.map(c => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => handleSelectConversation(c)}
+                                  className="flex flex-col gap-1.5 py-2.5 text-left hover:bg-slate-50 transition-colors px-1 rounded-lg"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <ChannelBadge channel={c.channel} compact />
+                                    <span className="text-[10px] text-slate-400">
+                                      {c.last_message_date ? new Date(c.last_message_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-600 truncate">{c.last_message || 'No messages'}</p>
+                                  <span className={cn("text-[10px] font-semibold", c.status === 'CLOSED' ? "text-emerald-600" : "text-slate-400")}>
+                                    {c.status === 'CLOSED' ? '✓ Resolved' : c.status === 'OPEN' ? 'Open' : 'Pending'}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
+
+                    {/* Client history — all channels */}
+                    <div className="border-t border-[#E9ECEF] pt-3">
+                      <p className="text-[10px] font-bold text-[#575f67] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>
+                        Client history
+                      </p>
+                      {!clientAlreadyLinked ? (
+                        <div className="text-center py-3 space-y-1.5">
+                          <p className="text-xs text-slate-400">Link a client to see history across all channels.</p>
+                          <button
+                            onClick={() => setRightPanelTab('contact')}
+                            className="text-[11px] text-indigo-600 hover:underline"
+                          >
+                            + Link client
+                          </button>
+                        </div>
+                      ) : clientHistoryLoading ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                          Loading…
+                        </div>
+                      ) : clientHistory.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-2">First conversation with this client.</p>
+                      ) : (
+                        <div className="flex flex-col divide-y divide-slate-100">
+                          {clientHistory.map(c => {
+                            const ch = (c.channel?.toUpperCase() ?? 'WEB') as ChannelType;
+                            const statusLabel = c.status?.toUpperCase() === 'CLOSED' ? '✓ Resolved'
+                              : c.status?.toUpperCase() === 'OPEN' ? 'Open' : 'Pending';
+                            const isClosed = c.status?.toUpperCase() === 'CLOSED';
+                            return (
+                              <div key={c.id} className="flex flex-col gap-1.5 py-2.5 px-1">
+                                <div className="flex items-center justify-between">
+                                  <ChannelBadge channel={ch} compact />
+                                  <span className="text-[10px] text-slate-400">
+                                    {c.last_message_date ? new Date(c.last_message_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                                  </span>
+                                </div>
+                                {c.contact_name && (
+                                  <p className="text-[10px] text-slate-400 truncate">{c.contact_name} · {c.channel_identifier}</p>
+                                )}
+                                <p className="text-xs text-slate-600 truncate">{c.last_message || 'No messages'}</p>
+                                <span className={cn("text-[10px] font-semibold", isClosed ? "text-emerald-600" : "text-slate-400")}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
