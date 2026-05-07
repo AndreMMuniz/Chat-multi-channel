@@ -624,8 +624,6 @@ class Client(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
-    email = Column(String(255), nullable=True)
-    phone = Column(String(50), nullable=True)
     country = Column(String(2), nullable=False, default="BR")
     client_type = Column(
         Enum(ClientType, values_callable=lambda obj: [e.value for e in obj], name="clienttype"),

@@ -121,7 +121,7 @@ function ClientSelector({
   const filtered = clients.filter((c) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+    return c.name.toLowerCase().includes(q) || (c.company_name ?? "").toLowerCase().includes(q);
   });
 
   return (
@@ -167,7 +167,7 @@ function ClientSelector({
                 className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${value === c.id ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-700"}`}
               >
                 <span className="block truncate">{c.name}</span>
-                <span className="block text-xs text-slate-400 truncate">{c.email}</span>
+                {c.company_name && <span className="block text-xs text-slate-400 truncate">{c.company_name}</span>}
               </button>
             ))}
             {filtered.length === 0 && (

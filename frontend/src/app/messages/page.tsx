@@ -887,7 +887,7 @@ export default function ChatPage() {
   const [clientHistory, setClientHistory] = useState<import('@/lib/api/conversations').ConversationSummary[]>([]);
   const [clientHistoryLoading, setClientHistoryLoading] = useState(false);
   const [showQuickClientForm, setShowQuickClientForm] = useState(false);
-  const [quickClientForm, setQuickClientForm] = useState({ name: '', email: '', phone: '', company_name: '' });
+  const [quickClientForm, setQuickClientForm] = useState({ name: '', company_name: '' });
   const [quickClientSaving, setQuickClientSaving] = useState(false);
   const [quickClientError, setQuickClientError] = useState<string | null>(null);
   const [allQuickReplies, setAllQuickReplies] = useState<import('@/types/quickReply').QuickReply[]>([]);
@@ -2544,8 +2544,6 @@ export default function ChatPage() {
                                 setShowQuickClientForm(true);
                                 setQuickClientForm({
                                   name: activeConversation.contact.name ?? '',
-                                  email: activeConversation.contact.email ?? '',
-                                  phone: activeConversation.contact.phone ?? activeConversation.contact.channel_identifier ?? '',
                                   company_name: '',
                                 });
                                 setQuickClientError(null);
@@ -2570,19 +2568,6 @@ export default function ChatPage() {
                             className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
                           />
                           <input
-                            value={quickClientForm.email}
-                            onChange={e => setQuickClientForm(f => ({ ...f, email: e.target.value }))}
-                            placeholder="Email (optional)"
-                            type="email"
-                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
-                          />
-                          <input
-                            value={quickClientForm.phone}
-                            onChange={e => setQuickClientForm(f => ({ ...f, phone: e.target.value }))}
-                            placeholder="Phone"
-                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
-                          />
-                          <input
                             value={quickClientForm.company_name}
                             onChange={e => setQuickClientForm(f => ({ ...f, company_name: e.target.value }))}
                             placeholder="Company name (optional)"
@@ -2604,13 +2589,11 @@ export default function ChatPage() {
                                 try {
                                   const newClient = await clientsApi.createClient({
                                     name: quickClientForm.name,
-                                    email: quickClientForm.email || null,
-                                    phone: quickClientForm.phone || null,
                                     company_name: quickClientForm.company_name || null,
                                   });
                                   await conversationsApi.linkContactToClient(activeConversation.contact_id, newClient.id);
                                   setClientAlreadyLinked(true);
-                                  setClientMatches([{ id: newClient.id, name: newClient.name, company_name: newClient.company_name ?? null, email: newClient.email, match_field: 'linked' }]);
+                                  setClientMatches([{ id: newClient.id, name: newClient.name, company_name: newClient.company_name ?? null, match_field: 'linked' }]);
                                   setShowQuickClientForm(false);
                                 } catch (err: unknown) {
                                   setQuickClientError(err instanceof Error ? err.message : 'Failed to create client.');
@@ -2634,8 +2617,6 @@ export default function ChatPage() {
                               setShowQuickClientForm(true);
                               setQuickClientForm({
                                 name: activeConversation.contact.name ?? '',
-                                email: activeConversation.contact.email ?? '',
-                                phone: activeConversation.contact.phone ?? activeConversation.contact.channel_identifier ?? '',
                                 company_name: '',
                               });
                               setQuickClientError(null);

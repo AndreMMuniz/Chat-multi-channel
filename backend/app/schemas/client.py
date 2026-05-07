@@ -2,15 +2,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class ClientBase(BaseModel):
     name: str
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
     country: str = "BR"
-    client_type: str = "company"       # individual | company
+    client_type: str = "company"      # individual | company
     tax_id: Optional[str] = None
     tax_id_type: Optional[str] = None  # CPF | CNPJ | VAT | EIN | OTHER
     currency: str = "BRL"
@@ -19,7 +17,7 @@ class ClientBase(BaseModel):
     notes: Optional[str] = None
     contact_id: Optional[UUID] = None
 
-    @field_validator("email", "phone", "company_name", "website", "notes", mode="before")
+    @field_validator("company_name", "website", "notes", "tax_id", mode="before")
     @classmethod
     def empty_str_to_none(cls, v: object) -> object:
         if isinstance(v, str) and v.strip() == "":
@@ -39,8 +37,6 @@ class ClientCreate(ClientBase):
 
 class ClientUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
     country: Optional[str] = None
     client_type: Optional[str] = None
     tax_id: Optional[str] = None
@@ -50,6 +46,13 @@ class ClientUpdate(BaseModel):
     website: Optional[str] = None
     notes: Optional[str] = None
     contact_id: Optional[UUID] = None
+
+    @field_validator("company_name", "website", "notes", "tax_id", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 
 class ClientResponse(ClientBase):
@@ -65,7 +68,6 @@ class ClientResponse(ClientBase):
 class ClientListResponse(BaseModel):
     id: UUID
     name: str
-    email: Optional[str] = None
     company_name: Optional[str] = None
     country: str
     client_type: str

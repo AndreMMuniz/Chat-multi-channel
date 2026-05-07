@@ -3,8 +3,6 @@ export type ClientType = "individual" | "company";
 export interface ClientDto {
   id: string;
   name: string;
-  email: string;
-  phone?: string | null;
   country: string;
   client_type: ClientType;
   tax_id?: string | null;
@@ -23,7 +21,6 @@ export interface ClientDto {
 export interface ClientListDto {
   id: string;
   name: string;
-  email: string;
   company_name?: string | null;
   country: string;
   client_type: ClientType;
@@ -34,8 +31,6 @@ export interface ClientListDto {
 
 export interface ClientCreateRequest {
   name: string;
-  email?: string | null;
-  phone?: string | null;
   country?: string;
   client_type?: ClientType;
   tax_id?: string | null;

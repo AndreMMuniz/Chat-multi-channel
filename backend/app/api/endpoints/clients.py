@@ -1,9 +1,9 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
@@ -68,18 +68,6 @@ async def create_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    # deduplicação por email (apenas quando fornecido)
-    if payload.email:
-        existing = db.query(Client).filter(
-            Client.email == payload.email,
-            Client.deleted_at.is_(None),
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Já existe um cliente com o e-mail {payload.email}",
-            )
-
     client = Client(
         **payload.model_dump(exclude={"contact_id"}),
         contact_id=payload.contact_id,
@@ -246,53 +234,22 @@ async def detect_client_for_conversation(
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
 
     contact = db.query(Contact).filter(Contact.id == conv.contact_id).first()
-    if not contact:
+    if not contact or not contact.client_id:
         return create_response({"matches": [], "already_linked": False})
 
-    # Se o contato já tem cliente vinculado, retorna direto
-    if contact.client_id:
-        client = db.query(Client).filter(
-            Client.id == contact.client_id, Client.deleted_at.is_(None)
-        ).first()
-        if client:
-            return create_response({
-                "already_linked": True,
-                "matches": [{
-                    "id": str(client.id),
-                    "name": client.name,
-                    "company_name": client.company_name,
-                    "email": client.email,
-                    "match_field": "linked",
-                }],
-            })
+    client = db.query(Client).filter(
+        Client.id == contact.client_id, Client.deleted_at.is_(None)
+    ).first()
 
-    # Fallback: busca por email ou phone
-    filters = []
-    if contact.email:
-        filters.append(func.lower(Client.email) == func.lower(contact.email))
-    if contact.phone:
-        filters.append(Client.phone == contact.phone)
-
-    if not filters:
+    if not client:
         return create_response({"matches": [], "already_linked": False})
 
-    candidates = (
-        db.query(Client)
-        .filter(or_(*filters), Client.deleted_at.is_(None))
-        .limit(5)
-        .all()
-    )
-
-    matches = []
-    for c in candidates:
-        match_field = "email" if (contact.email and c.email and
-                                   c.email.lower() == contact.email.lower()) else "phone"
-        matches.append({
-            "id": str(c.id),
-            "name": c.name,
-            "company_name": c.company_name,
-            "email": c.email,
-            "match_field": match_field,
-        })
-
-    return create_response({"matches": matches, "already_linked": False})
+    return create_response({
+        "already_linked": True,
+        "matches": [{
+            "id": str(client.id),
+            "name": client.name,
+            "company_name": client.company_name,
+            "match_field": "linked",
+        }],
+    })

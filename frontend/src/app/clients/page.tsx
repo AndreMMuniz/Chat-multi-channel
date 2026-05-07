@@ -33,8 +33,6 @@ interface ClientFormProps {
 function ClientForm({ initial, onSave, onClose, saving, error }: ClientFormProps) {
   const [form, setForm] = useState<ClientCreateRequest>({
     name: initial?.name ?? "",
-    email: initial?.email ?? "",
-    phone: initial?.phone ?? "",
     country: initial?.country ?? "BR",
     client_type: initial?.client_type ?? "company",
     tax_id: initial?.tax_id ?? "",
@@ -177,31 +175,6 @@ function ClientForm({ initial, onSave, onClose, saving, error }: ClientFormProps
         </div>
       )}
 
-      {/* Email + Phone */}
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Email
-          </span>
-          <input
-            type="email"
-            value={form.email ?? ""}
-            onChange={(e) => set("email", e.target.value)}
-            placeholder="contact@company.com (optional)"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-900/10"
-          />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Phone</span>
-          <input
-            value={form.phone ?? ""}
-            onChange={(e) => set("phone", e.target.value)}
-            placeholder="+1 555 000 0000"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-900/10"
-          />
-        </label>
-      </div>
-
       {/* Trade name + Currency */}
       <div className="grid grid-cols-2 gap-3">
         <label className="block space-y-1">
@@ -307,8 +280,6 @@ function ClientDetail({
         <section>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 mb-3">Information</p>
           <div className="grid grid-cols-2 gap-3">
-            <InfoRow icon="mail"    label="Email"    value={client.email} />
-            <InfoRow icon="phone"   label="Phone"    value={client.phone ?? "—"} />
             <InfoRow icon="public"  label="Country"  value={countryLabel(client.country)} />
             <InfoRow icon="payments" label="Currency" value={client.currency} />
             <InfoRow icon="badge"   label={client.client_type === "company" ? "CNPJ / Tax ID" : "CPF / Tax ID"} value={client.tax_id ?? "Not provided"} />
@@ -434,7 +405,6 @@ export default function ClientsPage() {
     const q = search.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
       (c.company_name ?? "").toLowerCase().includes(q)
     );
   });
@@ -472,7 +442,7 @@ export default function ClientsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, email or company…"
+              placeholder="Search by name or company…"
               className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </label>
@@ -536,7 +506,7 @@ export default function ClientsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-900 truncate">{client.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{client.email}</p>
+                    {client.company_name && <p className="text-xs text-slate-500 truncate">{client.company_name}</p>}
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] text-slate-400">{countryLabel(client.country)}</span>
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">

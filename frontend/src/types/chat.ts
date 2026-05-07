@@ -10,11 +10,10 @@ export interface ClientSummary {
   id: string;
   name: string;
   company_name?: string | null;
-  email?: string | null;
 }
 
 export interface ClientMatch extends ClientSummary {
-  match_field: "email" | "phone" | "linked";
+  match_field: "linked";
 }
 
 export interface Contact {
