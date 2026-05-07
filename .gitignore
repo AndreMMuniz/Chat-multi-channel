@@ -125,6 +125,7 @@ graphify_detect.json
 .graphify_python
 
 #-------------bmad--------------------
+/docs
 _bmad
 _bmad-output
 _bmad/

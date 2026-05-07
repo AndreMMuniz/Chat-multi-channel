@@ -14,21 +14,21 @@ import type { ClientListDto } from "@/types/client";
 // ─── status meta ─────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<ProposalStatus, { label: string; className: string }> = {
-  draft:     { label: "Rascunho",  className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200" },
-  sent:      { label: "Enviada",   className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
-  approved:  { label: "Aprovada",  className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
-  rejected:  { label: "Recusada",  className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
-  archived:  { label: "Arquivada", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-100" },
-  expired:   { label: "Expirada",  className: "bg-orange-50 text-orange-700 ring-1 ring-orange-100" },
-  cancelled: { label: "Cancelada", className: "bg-gray-100 text-gray-500 ring-1 ring-gray-200" },
+  draft:     { label: "Draft",     className: "bg-slate-100 text-slate-700 ring-1 ring-slate-200" },
+  sent:      { label: "Sent",      className: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
+  approved:  { label: "Approved",  className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" },
+  rejected:  { label: "Rejected",  className: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
+  archived:  { label: "Archived",  className: "bg-amber-50 text-amber-700 ring-1 ring-amber-100" },
+  expired:   { label: "Expired",   className: "bg-orange-50 text-orange-700 ring-1 ring-orange-100" },
+  cancelled: { label: "Cancelled", className: "bg-gray-100 text-gray-500 ring-1 ring-gray-200" },
 };
 
 const PAYMENT_PRESETS = [
-  "À vista",
-  "50% na assinatura + 50% na entrega",
-  "30/60/90 dias",
-  "Mensal (recorrente)",
-  "Personalizado",
+  "Upfront (full payment)",
+  "50% upfront + 50% on delivery",
+  "30/60/90 days",
+  "Monthly (recurring)",
+  "Custom",
 ];
 
 // ─── tipos locais ─────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ const EMPTY_FORM: ProposalFormState = {
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(value: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
     maximumFractionDigits: 0,
@@ -67,7 +67,7 @@ function formatCurrency(value: number, currency = "BRL") {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", { month: "short", day: "numeric" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(value));
 }
 
 function proposalToForm(p: ProposalDetailDto): ProposalFormState {
@@ -254,9 +254,9 @@ export default function ProposalsPage() {
       setActionMessage(null);
       await proposalsApi.updateProposal(selectedProposal.id, { status } satisfies Partial<ProposalCreateRequest>);
       await Promise.all([loadProposals(true), loadProposalDetail(selectedProposal.id)]);
-      setActionMessage(`Proposta marcada como ${STATUS_META[status].label}.`);
+      setActionMessage(`Proposal marked as ${STATUS_META[status].label}.`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Falha ao atualizar status.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to update status.");
     } finally {
       setIsUpdating(false);
     }
@@ -269,9 +269,9 @@ export default function ProposalsPage() {
       setActionMessage(null);
       await proposalsApi.updateProposal(selectedProposal.id, formToPayload(proposalForm));
       await Promise.all([loadProposals(true), loadProposalDetail(selectedProposal.id)]);
-      setActionMessage("Proposta atualizada.");
+      setActionMessage("Proposal updated.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Falha ao salvar.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save.");
     } finally {
       setIsUpdating(false);
     }
@@ -301,9 +301,9 @@ export default function ProposalsPage() {
       setSelectedProposal(updated);
       setProposalForm(proposalToForm(updated));
       await loadProposals(true);
-      setActionMessage("Item removido.");
+      setActionMessage("Item removed.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Falha ao remover item.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to remove item.");
     } finally {
       setIsUpdating(false);
     }
@@ -311,7 +311,7 @@ export default function ProposalsPage() {
 
   async function handleCreateProposal() {
     if (!createForm.title.trim()) {
-      setErrorMessage("Título da proposta é obrigatório.");
+      setErrorMessage("Proposal title is required.");
       return;
     }
     try {
@@ -322,9 +322,9 @@ export default function ProposalsPage() {
       setIsCreateModalOpen(false);
       setCreateForm(EMPTY_FORM);
       await Promise.all([loadProposals(true), loadProposalDetail(created.id)]);
-      setActionMessage("Proposta criada como rascunho.");
+      setActionMessage("Draft proposal created.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Falha ao criar proposta.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create proposal.");
     } finally {
       setIsCreating(false);
     }
@@ -361,9 +361,9 @@ export default function ProposalsPage() {
                 </span>
               </div>
               <div className="min-w-0">
-                <h1 className="text-[18px] font-semibold leading-5 text-slate-900">Propostas</h1>
+                <h1 className="text-[18px] font-semibold leading-5 text-slate-900">Proposals</h1>
                 <p className="mt-0.5 text-[13px] text-slate-500">
-                  Propostas comerciais vinculadas a clientes e itens do catálogo.
+                  Draft and reusable commercial proposals linked to clients and catalog items.
                 </p>
               </div>
             </div>
@@ -375,14 +375,14 @@ export default function ProposalsPage() {
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
               >
                 <span className="material-symbols-outlined text-[18px]">add</span>
-                Nova proposta
+                New proposal
               </button>
               <label className="flex min-w-[280px] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 shadow-sm">
                 <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por referência, título ou cliente"
+                  placeholder="Search by reference, title or client"
                   className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 />
               </label>
@@ -391,7 +391,7 @@ export default function ProposalsPage() {
                 onChange={(e) => setStatusFilter(e.target.value as ProposalStatus | "ALL")}
                 className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm outline-none"
               >
-                <option value="ALL">Todos os status</option>
+                <option value="ALL">All statuses</option>
                 {(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => (
                   <option key={s} value={s}>{STATUS_META[s].label}</option>
                 ))}
@@ -401,10 +401,10 @@ export default function ProposalsPage() {
 
           <div className="grid gap-3 border-t border-[#EEF2F7] px-6 py-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              { label: "Total de propostas", value: summary.total, accent: "text-slate-900", icon: "description" },
-              { label: "Rascunhos", value: summary.draft, accent: "text-slate-700", icon: "edit_note" },
-              { label: "Enviadas", value: summary.sent, accent: "text-sky-700", icon: "send" },
-              { label: "Valor em pipeline", value: formatCurrency(summary.value), accent: "text-emerald-700", icon: "payments" },
+              { label: "Total proposals", value: summary.total, accent: "text-slate-900", icon: "description" },
+              { label: "Drafts", value: summary.draft, accent: "text-slate-700", icon: "edit_note" },
+              { label: "Sent", value: summary.sent, accent: "text-sky-700", icon: "send" },
+              { label: "Pipeline value", value: formatCurrency(summary.value), accent: "text-emerald-700", icon: "payments" },
             ].map((card) => (
               <div key={card.label} className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="flex items-center justify-between">
@@ -425,12 +425,12 @@ export default function ProposalsPage() {
         </header>
 
         <div className="grid flex-1 gap-4 px-4 py-4 lg:px-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-          {/* Fila de propostas */}
+          {/* Proposal queue */}
           <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-900">Fila de propostas</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Proposal queue</h2>
               <p className="mt-1 text-xs text-slate-500">
-                {isLoading ? "Carregando..." : `${visibleProposals.length} proposta(s) na visualização atual`}
+                {isLoading ? "Loading…" : `${visibleProposals.length} proposal(s) in current view`}
               </p>
             </div>
             <div className="divide-y divide-slate-100">
@@ -450,7 +450,7 @@ export default function ProposalsPage() {
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{proposal.reference}</p>
                         <p className="truncate text-sm font-semibold text-slate-900">{proposal.title}</p>
                         <p className="mt-1 truncate text-xs text-slate-500">
-                          {clientName ?? proposal.customer_name ?? "Sem cliente"} · {proposal.items_count} item(s)
+                          {clientName ?? proposal.customer_name ?? "No client"} · {proposal.items_count} item(s)
                         </p>
                       </div>
                       <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}>
@@ -471,8 +471,8 @@ export default function ProposalsPage() {
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
                     <span className="material-symbols-outlined">request_quote</span>
                   </div>
-                  <h3 className="mt-4 text-sm font-semibold text-slate-900">Nenhuma proposta encontrada</h3>
-                  <p className="mt-1 text-sm text-slate-500">Crie uma proposta manualmente ou a partir do catálogo.</p>
+                  <h3 className="mt-4 text-sm font-semibold text-slate-900">No proposals found</h3>
+                  <p className="mt-1 text-sm text-slate-500">Create one manually or from the catalog to start the commercial flow.</p>
                 </div>
               )}
             </div>
@@ -506,22 +506,22 @@ export default function ProposalsPage() {
         </div>
       </div>
 
-      {/* Modal nova proposta */}
+      {/* New proposal modal */}
       {isCreateModalOpen && (
-        <Modal title="Nova proposta" onClose={() => !isCreating && setIsCreateModalOpen(false)} maxWidth="max-w-lg">
+        <Modal title="New proposal" onClose={() => !isCreating && setIsCreateModalOpen(false)} maxWidth="max-w-lg">
           <div className="space-y-4">
-            {/* Tipo */}
+            {/* Type */}
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400 mb-2">Tipo de proposta</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400 mb-2">Proposal type</p>
               <div className="grid grid-cols-2 gap-2">
-                {([["product", "📦 Produto"], ["service", "🔧 Serviço"]] as const).map(([type, label]) => (
+                {([["product", "📦 Product"], ["service", "🔧 Service"]] as const).map(([type, label]) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => setCreateForm((f) => ({ ...f, proposal_type: type }))}
                     className={`py-2.5 rounded-2xl text-sm font-medium border transition-colors ${
                       createForm.proposal_type === type
-                        ? "bg-indigo-50 border-indigo-300 text-indigo-700"
+                        ? "bg-slate-900 border-slate-900 text-white"
                         : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                     }`}
                   >
@@ -531,20 +531,20 @@ export default function ProposalsPage() {
               </div>
             </div>
 
-            {/* Título */}
+            {/* Title */}
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Título <span className="text-rose-500">*</span></span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Title <span className="text-rose-500">*</span></span>
               <input
                 value={createForm.title}
                 onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="Ex: Implementação de sistema ERP"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                placeholder="e.g. ERP system implementation"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
               />
             </label>
 
-            {/* Cliente */}
+            {/* Client */}
             <div className="space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Cliente</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Client</span>
               <ClientSelector
                 value={createForm.client_id}
                 onChange={(id) => setCreateForm((f) => ({ ...f, client_id: id }))}
@@ -552,26 +552,26 @@ export default function ProposalsPage() {
               />
             </div>
 
-            {/* Validade */}
+            {/* Valid until */}
             <label className="block space-y-1">
               <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                Validade da proposta
+                Valid until
               </span>
               <input
                 type="date"
                 value={createForm.valid_until}
                 onChange={(e) => setCreateForm((f) => ({ ...f, valid_until: e.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
               />
             </label>
 
-            {/* Notas */}
+            {/* Notes */}
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notas internas</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Internal notes</span>
               <textarea
                 value={createForm.notes}
                 onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Observações internas sobre esta proposta..."
+                placeholder="Optional internal notes for this proposal…"
                 className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none resize-none"
               />
             </label>
@@ -583,15 +583,15 @@ export default function ProposalsPage() {
                 onClick={() => setIsCreateModalOpen(false)}
                 className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 type="button"
                 disabled={isCreating}
                 onClick={handleCreateProposal}
-                className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                className="rounded-2xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
               >
-                {isCreating ? "Criando..." : "Criar rascunho"}
+                {isCreating ? "Creating…" : "Create draft"}
               </button>
             </div>
           </div>
@@ -697,7 +697,7 @@ function ServiceDetailsSection({
   }
 
   async function handleSave() {
-    if (!form.service_name.trim()) { setError("Nome do serviço é obrigatório."); return; }
+    if (!form.service_name.trim()) { setError("Service name is required."); return; }
     setSaving(true);
     setError(null);
     try {
@@ -709,7 +709,7 @@ function ServiceDetailsSection({
       }
       onSaved(sd);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erro ao salvar detalhes.");
+      setError(err instanceof Error ? err.message : "Failed to save service details.");
     } finally {
       setSaving(false);
     }
@@ -722,11 +722,11 @@ function ServiceDetailsSection({
     <div className="border-b border-slate-100 px-5 py-4 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-          🔧 Detalhes do Serviço
+          🔧 Service Details
         </p>
         {initial && (
           <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-            Salvo
+            Saved
           </span>
         )}
       </div>
@@ -739,23 +739,23 @@ function ServiceDetailsSection({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Nome do serviço <span className="text-rose-400">*</span>
+            Service name <span className="text-rose-400">*</span>
           </span>
           <input
             value={form.service_name}
             onChange={(e) => set("service_name", e.target.value)}
-            placeholder="Ex: Desenvolvimento de sistema"
+            placeholder="e.g. System development"
             className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
           />
         </label>
         <label className="space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Metodologia
+            Methodology
           </span>
           <input
             value={form.methodology ?? ""}
             onChange={(e) => set("methodology", e.target.value || null)}
-            placeholder="Ex: Scrum, Kanban..."
+            placeholder="e.g. Scrum, Kanban…"
             className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
           />
         </label>
@@ -763,13 +763,13 @@ function ServiceDetailsSection({
 
       <label className="block space-y-1">
         <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-          Escopo do trabalho
+          Scope of work
         </span>
         <textarea
           value={form.scope_of_work ?? ""}
           onChange={(e) => set("scope_of_work", e.target.value || null)}
           rows={3}
-          placeholder="Descreva detalhadamente o que será executado..."
+          placeholder="Describe in detail what will be delivered…"
           className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none resize-none"
         />
       </label>
@@ -778,20 +778,20 @@ function ServiceDetailsSection({
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Valor/hora (R$)
+            Hourly rate
           </span>
           <input
             type="number"
             min={0}
             value={form.hourly_rate ?? ""}
             onChange={(e) => set("hourly_rate", e.target.value ? Number(e.target.value) : null)}
-            placeholder="0,00"
+            placeholder="0.00"
             className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
           />
         </label>
         <label className="space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Horas estimadas
+            Estimated hours
           </span>
           <input
             type="number"
@@ -802,12 +802,12 @@ function ServiceDetailsSection({
             className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
           />
         </label>
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-3 py-2">
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-indigo-400">
-            Total calculado
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">
+            Calculated total
           </p>
-          <p className="mt-1 text-base font-semibold text-indigo-700">
-            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue)}
+          <p className="mt-1 text-base font-semibold text-slate-900">
+            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(totalValue)}
           </p>
         </div>
       </div>
@@ -816,7 +816,7 @@ function ServiceDetailsSection({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Rodadas de revisão
+            Revision rounds
           </span>
           <input
             type="number"
@@ -829,7 +829,7 @@ function ServiceDetailsSection({
         </label>
         <label className="space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Suporte pós-entrega (dias)
+            Post-delivery support (days)
           </span>
           <input
             type="number"
@@ -844,13 +844,13 @@ function ServiceDetailsSection({
 
       {/* Responsabilidades */}
       <ResponsibilityList
-        label="Responsabilidades do cliente"
+        label="Client responsibilities"
         items={form.client_responsibilities}
         onChange={(items) => set("client_responsibilities", items)}
       />
 
       <ResponsibilityList
-        label="Responsabilidades da entrega"
+        label="Delivery responsibilities"
         items={form.delivery_responsibilities}
         onChange={(items) => set("delivery_responsibilities", items)}
       />
@@ -860,9 +860,9 @@ function ServiceDetailsSection({
           type="button"
           disabled={saving}
           onClick={handleSave}
-          className="rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
+          className="rounded-2xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
         >
-          {saving ? "Salvando..." : initial ? "Atualizar serviço" : "Salvar detalhes do serviço"}
+          {saving ? "Saving…" : initial ? "Update service" : "Save service details"}
         </button>
       </div>
     </div>
@@ -887,7 +887,7 @@ function StatusTimeline({ history }: { history: ProposalStatusHistoryDto[] }) {
   return (
     <div className="border-b border-slate-100 px-5 py-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 mb-4">
-        🕐 Histórico de status
+        🕐 Status history
       </p>
       <div className="relative">
         {/* linha vertical */}
@@ -928,7 +928,7 @@ function StatusTimeline({ history }: { history: ProposalStatusHistoryDto[] }) {
                           <span className="material-symbols-outlined text-[14px] text-slate-300">arrow_forward</span>
                         </>
                       ) : (
-                        <span className="text-xs text-slate-400">Criado como</span>
+                        <span className="text-xs text-slate-400">Created as</span>
                       )}
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         statusMeta?.className ?? "bg-slate-100 text-slate-600"
@@ -992,7 +992,7 @@ function ProposalDetail({
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">{proposal.reference}</p>
             <h2 className="mt-1 text-lg font-semibold text-slate-900">{proposal.title}</h2>
             <p className="mt-1 text-sm text-slate-500">
-              {selectedClient?.name ?? proposal.customer_name ?? "Sem cliente"}
+              {selectedClient?.name ?? proposal.customer_name ?? "No client assigned"}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -1016,16 +1016,16 @@ function ProposalDetail({
       {/* Métricas */}
       <div className="grid gap-3 border-b border-slate-100 px-5 py-4 sm:grid-cols-3">
         <Metric label="Subtotal" value={formatCurrency(proposal.subtotal_amount, proposal.currency)} />
-        <Metric label="Desconto" value={formatCurrency(proposal.discount_amount, proposal.currency)} />
+        <Metric label="Discount" value={formatCurrency(proposal.discount_amount, proposal.currency)} />
         <Metric label="Total" value={formatCurrency(proposal.total_amount, proposal.currency)} />
       </div>
 
       {/* Informações gerais */}
       <div className="border-b border-slate-100 px-5 py-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Informações gerais</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">General info</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Título</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Title</span>
             <input
               value={proposalForm.title}
               onChange={(e) => setField("title", e.target.value)}
@@ -1033,22 +1033,22 @@ function ProposalDetail({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Tipo</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Type</span>
             <select
               value={proposalForm.proposal_type}
               onChange={(e) => setField("proposal_type", e.target.value)}
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
             >
-              <option value="">Não definido</option>
-              <option value="product">📦 Produto</option>
-              <option value="service">🔧 Serviço</option>
+              <option value="">Not defined</option>
+              <option value="product">📦 Product</option>
+              <option value="service">🔧 Service</option>
             </select>
           </label>
         </div>
 
         {/* Cliente */}
         <div className="space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Cliente</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Client</span>
           <ClientSelector
             value={proposalForm.client_id}
             onChange={(id) => onProposalFormChange((f) => ({ ...f, client_id: id }))}
@@ -1057,7 +1057,7 @@ function ProposalDetail({
         </div>
 
         <label className="block space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Notas internas</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Internal notes</span>
           <textarea
             value={proposalForm.notes}
             onChange={(e) => setField("notes", e.target.value)}
@@ -1069,16 +1069,16 @@ function ProposalDetail({
       {/* Termos comerciais */}
       <div className="border-b border-slate-100 px-5 py-4 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-          💳 Termos comerciais
+          💳 Commercial terms
         </p>
 
-        {/* Forma de pagamento */}
+        {/* Payment terms */}
         <div className="space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Forma de pagamento</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Payment terms</span>
           <select
-            value={paymentCustom ? "Personalizado" : (proposalForm.payment_terms || "")}
+            value={paymentCustom ? "Custom" : (proposalForm.payment_terms || "")}
             onChange={(e) => {
-              if (e.target.value === "Personalizado") {
+              if (e.target.value === "Custom") {
                 setPaymentCustom(true);
                 setField("payment_terms", "");
               } else {
@@ -1088,7 +1088,7 @@ function ProposalDetail({
             }}
             className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
           >
-            <option value="">Selecionar...</option>
+            <option value="">Select…</option>
             {PAYMENT_PRESETS.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
@@ -1097,7 +1097,7 @@ function ProposalDetail({
             <input
               value={proposalForm.payment_terms}
               onChange={(e) => setField("payment_terms", e.target.value)}
-              placeholder="Descreva as condições de pagamento..."
+              placeholder="Describe the payment conditions…"
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none mt-2"
             />
           )}
@@ -1106,30 +1106,30 @@ function ProposalDetail({
         {/* Método + Parcelas */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Método</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Method</span>
             <select
               value={proposalForm.payment_method}
               onChange={(e) => setField("payment_method", e.target.value)}
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
             >
-              <option value="">Selecionar...</option>
+              <option value="">Select…</option>
               <option value="pix">PIX</option>
               <option value="boleto">Boleto</option>
-              <option value="credit_card">Cartão de crédito</option>
-              <option value="bank_transfer">Transferência</option>
+              <option value="credit_card">Credit card</option>
+              <option value="bank_transfer">Bank transfer</option>
               <option value="wire_transfer">Wire transfer</option>
-              <option value="check">Cheque</option>
-              <option value="other">Outro</option>
+              <option value="check">Check</option>
+              <option value="other">Other</option>
             </select>
           </div>
           <div className="space-y-1">
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Parcelas</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Installments</span>
             <input
               type="number"
               min={1}
               value={proposalForm.payment_installments}
               onChange={(e) => setField("payment_installments", e.target.value)}
-              placeholder="1 = à vista"
+              placeholder="1 = upfront"
               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
             />
           </div>
@@ -1138,7 +1138,7 @@ function ProposalDetail({
         {/* Prazo de entrega */}
         <div className="space-y-1">
           <div className="flex items-center gap-3 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Prazo de entrega</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Delivery deadline</span>
             <div className="flex gap-2">
               {(["date", "days"] as const).map((mode) => (
                 <button
@@ -1147,11 +1147,11 @@ function ProposalDetail({
                   onClick={() => onProposalFormChange((f) => ({ ...f, delivery_mode: mode }))}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
                     proposalForm.delivery_mode === mode
-                      ? "bg-indigo-100 text-indigo-700"
+                      ? "bg-slate-900 text-white"
                       : "bg-slate-100 text-slate-500"
                   }`}
                 >
-                  {mode === "date" ? "Data específica" : "Prazo relativo"}
+                  {mode === "date" ? "Specific date" : "Relative"}
                 </button>
               ))}
             </div>
@@ -1170,10 +1170,10 @@ function ProposalDetail({
                 min={1}
                 value={proposalForm.delivery_days}
                 onChange={(e) => setField("delivery_days", e.target.value)}
-                placeholder="Ex: 30"
+                placeholder="e.g. 30"
                 className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
               />
-              <span className="text-sm text-slate-500 shrink-0">dias após aprovação</span>
+              <span className="text-sm text-slate-500 shrink-0">days after approval</span>
             </div>
           )}
         </div>
@@ -1181,7 +1181,7 @@ function ProposalDetail({
         {/* Validade */}
         <div className="space-y-1">
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-            Validade da proposta
+            Valid until
           </span>
           <input
             type="date"
@@ -1196,9 +1196,9 @@ function ProposalDetail({
             type="button"
             disabled={isUpdating}
             onClick={onProposalMetaSave}
-            className="rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
+            className="rounded-2xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
           >
-            {isUpdating ? "Salvando..." : "Salvar proposta"}
+            {isUpdating ? "Saving…" : "Save proposal"}
           </button>
         </div>
       </div>
@@ -1216,10 +1216,10 @@ function ProposalDetail({
       <div className="flex-1 space-y-4 px-5 py-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-slate-900">Itens do catálogo</p>
-            <p className="mt-1 text-xs text-slate-500">{proposal.items.length} item(s) preservados do catálogo.</p>
+            <p className="text-sm font-semibold text-slate-900">Catalog items</p>
+            <p className="mt-1 text-xs text-slate-500">{proposal.items.length} item(s) preserved from catalog.</p>
           </div>
-          {isLoading && <span className="text-xs font-medium text-slate-500">Atualizando...</span>}
+          {isLoading && <span className="text-xs font-medium text-slate-500">Refreshing…</span>}
         </div>
         <div className="space-y-3">
           {proposal.items.map((item) => (
@@ -1281,7 +1281,7 @@ function ProposalItemCard({
             onClick={() => onItemRemove(item.id)}
             className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 disabled:opacity-60"
           >
-            Remover
+            Remove
           </button>
         </div>
       </div>
@@ -1289,7 +1289,7 @@ function ProposalItemCard({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Quantidade</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Quantity</span>
           <div className="flex gap-2">
             <input
               value={quantity}
@@ -1308,7 +1308,7 @@ function ProposalItemCard({
           </div>
         </label>
         <label className="space-y-1">
-          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Desconto</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Discount</span>
           <div className="flex gap-2">
             <input
               value={discountAmount}
@@ -1329,9 +1329,9 @@ function ProposalItemCard({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Metric label="Preço unit." value={formatCurrency(item.unit_price, currency)} />
-        <Metric label="Desconto" value={formatCurrency(item.discount_amount, currency)} />
-        <Metric label="Total linha" value={formatCurrency(item.total_amount, currency)} />
+        <Metric label="Unit price" value={formatCurrency(item.unit_price, currency)} />
+        <Metric label="Discount" value={formatCurrency(item.discount_amount, currency)} />
+        <Metric label="Line total" value={formatCurrency(item.total_amount, currency)} />
       </div>
     </article>
   );
