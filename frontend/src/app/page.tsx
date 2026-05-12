@@ -341,81 +341,133 @@ function InboxMock() {
 function DashboardMock() {
   return (
     <div className="overflow-hidden rounded-[20px] border border-[#E9ECEF] bg-white">
-      <div className="border-b border-[#E9ECEF] px-5 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Operational dashboard</p>
-            <p className="mt-1 text-xs text-slate-500">Volume, SLAs, channel mix, and agent load in one view</p>
+      <div className="grid min-h-[520px] grid-cols-[72px_1fr]">
+        <aside className="flex flex-col items-center gap-4 border-r border-[#E9ECEF] bg-white py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f172a] text-white">
+            <div className="h-4 w-4 rounded-full border-2 border-emerald-400 border-r-transparent border-t-indigo-300" />
           </div>
-          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-[#7C4DFF]">Live data</span>
-        </div>
-      </div>
-
-      <div className="space-y-6 bg-[#fbfcff] p-5">
-        <div className="grid gap-4 md:grid-cols-4">
-          {[
-            ["1,284", "Conversations", "up 12%"],
-            ["06m", "First response", "on target"],
-            ["91%", "SLA compliance", "last 7 days"],
-            ["38%", "AI adoption", "team usage"],
-          ].map(([value, label, meta]) => (
-            <div key={label} className="rounded-3xl border border-[#E9ECEF] bg-white p-5">
-              <p className="text-3xl font-semibold tracking-[-0.03em] text-slate-900">{value}</p>
-              <p className="mt-2 text-sm font-medium text-slate-700">{label}</p>
-              <p className="mt-1 text-xs text-slate-400">{meta}</p>
+          {["dashboard", "chat_bubble", "inventory_2", "group", "monitoring", "settings"].map((icon, index) => (
+            <div
+              key={icon}
+              className={`relative flex h-10 w-10 items-center justify-center rounded-xl ${
+                index === 0 ? "bg-indigo-100 text-[#5b3df6]" : "text-slate-400"
+              }`}
+            >
+              {index === 0 ? <span className="absolute -left-[13px] h-6 w-1 rounded-r-full bg-[#5b3df6]" /> : null}
+              <MaterialIcon name={icon} filled={index === 0} className="text-[20px]" />
             </div>
           ))}
-        </div>
+        </aside>
 
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-3xl border border-[#E9ECEF] bg-white p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Weekly conversation trend</p>
-                <p className="mt-1 text-xs text-slate-500">All channels combined</p>
-              </div>
-              <span className="text-xs font-medium text-emerald-600">+18% this week</span>
+        <section className="bg-[#fbfcff]">
+          <div className="flex items-center justify-between border-b border-[#E9ECEF] px-6 py-4">
+            <div>
+              <p className="text-[34px] font-semibold tracking-[-0.04em] text-slate-900">Dashboard</p>
+              <p className="mt-1 text-xs text-slate-500">Overview · Last 7 days</p>
             </div>
-            <div className="mt-6 flex h-[220px] items-end gap-3">
-              {[42, 64, 58, 87, 72, 96, 78].map((height, index) => (
-                <div key={index} className="flex flex-1 flex-col items-center gap-3">
-                  <div
-                    className={`w-full rounded-t-2xl ${index === 5 ? "bg-[#7C4DFF]" : "bg-indigo-100"}`}
-                    style={{ height: `${height}%` }}
-                  />
-                  <span className="text-xs text-slate-400">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}</span>
-                </div>
-              ))}
+            <div className="flex items-center gap-3">
+              <span className="rounded-full border border-[#E9ECEF] bg-white px-4 py-2 text-xs font-medium text-slate-600">Last 7 days</span>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-400">
+                <MaterialIcon name="download" className="text-[18px]" />
+              </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-[#E9ECEF] bg-white p-5">
-            <p className="text-sm font-semibold text-slate-900">Channel distribution</p>
-            <p className="mt-1 text-xs text-slate-500">Current operational mix</p>
-            <div className="mt-6 flex items-center justify-center">
-              <div className="relative h-44 w-44 rounded-full bg-[conic-gradient(#25D366_0_34%,#0088CC_34%_58%,#F97316_58%_79%,#8B5CF6_79%_91%,#64748B_91%_100%)]">
-                <div className="absolute inset-8 rounded-full bg-white" />
-              </div>
-            </div>
-            <div className="mt-6 space-y-3">
+          <div className="space-y-5 p-5">
+            <div className="grid gap-4 md:grid-cols-4">
               {[
-                ["WhatsApp", "34%", "bg-green-100"],
-                ["Telegram", "24%", "bg-sky-100"],
-                ["Email", "21%", "bg-orange-100"],
-                ["SMS", "12%", "bg-violet-100"],
-                ["Web chat", "9%", "bg-slate-200"],
-              ].map(([label, share, swatch]) => (
-                <div key={label} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className={`h-3 w-3 rounded-full ${swatch}`} />
-                    <span className="text-slate-700">{label}</span>
+                ["chat", "247", "Open conversations", "+12.4%", "text-emerald-600", "bg-violet-100 text-[#6d4aff]"],
+                ["timer", "1m 42s", "Avg. response time", "-18%", "text-emerald-600", "bg-emerald-100 text-emerald-600"],
+                ["auto_awesome", "68%", "AI-assisted", "+9.2%", "text-emerald-600", "bg-indigo-100 text-[#6d4aff]"],
+                ["warning", "3", "SLA at risk", "-2", "text-emerald-600", "bg-red-100 text-red-500"],
+              ].map(([icon, value, label, delta, deltaTone, iconTone]) => (
+                <div key={label} className="rounded-[24px] border border-[#E9ECEF] bg-white p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${iconTone}`}>
+                      <MaterialIcon name={icon} filled className="text-[20px]" />
+                    </div>
+                    <span className={`rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold ${deltaTone}`}>{delta}</span>
                   </div>
-                  <span className="font-medium text-slate-900">{share}</span>
+                  <p className="mt-4 text-[18px] font-semibold tracking-[-0.03em] text-slate-900 sm:text-[20px]">{value}</p>
+                  <p className="mt-1 text-sm font-medium text-slate-700">{label}</p>
                 </div>
               ))}
             </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1.35fr_0.95fr]">
+              <div className="rounded-[24px] border border-[#E9ECEF] bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Conversation volume</p>
+                    <p className="mt-1 text-xs text-slate-500">Daily inbound, all channels</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-[#5b4ce6]" />
+                      Inbound
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-indigo-200" />
+                      Resolved
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-8 flex h-[170px] items-end gap-7 px-2">
+                  {[
+                    [52, 38],
+                    [68, 55],
+                    [84, 66],
+                    [64, 52],
+                    [102, 80],
+                    [76, 61],
+                    [60, 48],
+                  ].map(([primary, secondary], index) => (
+                    <div key={index} className="flex flex-1 flex-col items-center gap-3">
+                      <div className="flex h-full w-full items-end justify-center gap-1.5">
+                        <div className="w-6 rounded-t-md bg-[#5b4ce6]" style={{ height: `${primary}%` }} />
+                        <div className="w-6 rounded-t-md bg-indigo-200" style={{ height: `${secondary}%` }} />
+                      </div>
+                      <span className="text-xs text-slate-400">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-[#E9ECEF] bg-white p-5">
+                <p className="text-sm font-semibold text-slate-900">Channel mix</p>
+                <p className="mt-1 text-xs text-slate-500">Share of conversations</p>
+
+                <div className="mt-6 grid items-center gap-4 md:grid-cols-[180px_1fr]">
+                  <div className="flex items-center justify-center">
+                    <div className="relative h-44 w-44 rounded-full bg-[conic-gradient(#22c55e_0_42%,#0ea5e9_42%_66%,#f97316_66%_88%,#8b5cf6_88%_100%)]">
+                      <div className="absolute inset-8 flex flex-col items-center justify-center rounded-full bg-white">
+                        <span className="text-2xl font-semibold tracking-[-0.03em] text-slate-900">2,481</span>
+                        <span className="text-[11px] text-slate-400">conversations</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {[
+                      ["WhatsApp", "42%", "bg-green-500"],
+                      ["Telegram", "24%", "bg-sky-500"],
+                      ["Email", "22%", "bg-orange-500"],
+                      ["SMS", "12%", "bg-violet-500"],
+                    ].map(([label, share, swatch]) => (
+                      <div key={label} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-3">
+                          <span className={`h-2.5 w-2.5 rounded-full ${swatch}`} />
+                          <span className="text-slate-700">{label}</span>
+                        </div>
+                        <span className="font-medium text-slate-900">{share}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
