@@ -1,0 +1,263 @@
+/**
+ * Omnichat Design System — Colors & Typography
+ * Source: Chat-multi-channel/frontend/src/app/globals.css
+ * Font: Inter (Google Fonts)
+ */
+
+/* ── Google Fonts ──────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+/* ── Color Tokens ──────────────────────────────────────────────────────────── */
+:root {
+
+  /* ── Primary (Indigo / Purple) ── */
+  --color-primary: #4338ca;             /* indigo-700 — active states */
+  --color-primary-container: #4f46e5;   /* indigo-600 — primary buttons, active nav */
+  --color-primary-hover: #632ce5;       /* hover on primary buttons */
+  --color-primary-accent: #7C4DFF;      /* brand accent — KPIs, avatars */
+  --color-primary-fixed: #e0e7ff;       /* indigo-100 — lightest tint */
+  --color-primary-fixed-dim: #c7d2fe;   /* indigo-200 — badge bg, focus ring */
+  --color-on-primary-container: #eef2ff;/* indigo-50 — text on primary container */
+  --color-on-primary: #ffffff;
+  --color-on-primary-fixed: #20005f;    /* darkest purple text */
+  --color-on-primary-fixed-variant: #3730a3; /* indigo-800 */
+  --color-inverse-primary: #c7d2fe;
+  --color-surface-tint: #4f46e5;
+
+  /* ── Login / Brand Gradient ── */
+  --color-brand-gradient-from: #4A1DB5;
+  --color-brand-gradient-via: #632ce5;
+  --color-brand-gradient-to: #7C4DFF;
+
+  /* ── Surface / Background ── */
+  --color-background: #f8fafc;           /* page background */
+  --color-surface: #f8fafc;
+  --color-surface-bright: #f8fafc;
+  --color-surface-dim: #e2e8f0;
+  --color-surface-container-lowest: #ffffff;   /* cards, modals, sidebar */
+  --color-surface-container-low: #f5f7ff;
+  --color-surface-container: #eef2ff;          /* selected conversation, fills */
+  --color-surface-container-high: #e8ecf8;     /* conversation hover */
+  --color-surface-container-highest: #dfe6f5;
+  --color-surface-variant: #e5e7eb;
+  --color-inverse-surface: #322f3a;
+  --color-inverse-on-surface: #eff6ff;
+
+  /* ── Neutral Text ── */
+  --color-on-background: #1d1a24;        /* primary text */
+  --color-on-surface: #1d1a24;           /* primary text on surface */
+  --color-on-surface-variant: #494455;   /* secondary text */
+  --color-secondary: #575f67;            /* tertiary text */
+  --color-outline: #7a7487;              /* placeholder, subtle icons */
+  --color-outline-variant: #E9ECEF;      /* borders, dividers */
+
+  /* ── Secondary (slate/cool-grey) ── */
+  --color-secondary-container: #d8e1ea;
+  --color-secondary-fixed: #dbe4ed;
+  --color-secondary-fixed-dim: #bfc8d0;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #5b646b;
+  --color-on-secondary-fixed: #141d23;
+  --color-on-secondary-fixed-variant: #3f484f;
+
+  /* ── Tertiary (orange / warm accent) ── */
+  --color-tertiary: #904500;
+  --color-tertiary-container: #b55800;
+  --color-tertiary-fixed: #ffdbc7;
+  --color-tertiary-fixed-dim: #ffb688;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #fff7f4;
+  --color-on-tertiary-fixed: #311300;
+  --color-on-tertiary-fixed-variant: #733600;
+
+  /* ── Error ── */
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  /* ── Semantic Status ── */
+  --color-status-open: #7C4DFF;         /* purple */
+  --color-status-closed: #10B981;       /* emerald */
+  --color-status-pending: #F59E0B;      /* amber */
+  --color-status-sla-risk: #EF4444;     /* red */
+  --color-status-unread: #22C55E;       /* green dot */
+
+  /* ── Channel Colors ── */
+  --color-channel-telegram: #0088CC;
+  --color-channel-telegram-bg: #f0f9ff;   /* sky-50 */
+  --color-channel-whatsapp: #25D366;
+  --color-channel-whatsapp-bg: #f0fdf4;   /* green-50 */
+  --color-channel-email: #F97316;
+  --color-channel-email-bg: #fff7ed;      /* orange-50 */
+  --color-channel-sms: #8B5CF6;
+  --color-channel-sms-bg: #f5f3ff;        /* violet-50 */
+  --color-channel-web: #64748B;
+  --color-channel-web-bg: #f8fafc;        /* slate-50 */
+
+  /* ── Spacing ── */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-gutter: 16px;
+  --spacing-container-padding: 24px;
+
+  /* ── Border Radius ── */
+  --radius-sm: 8px;      /* calc(0.75rem - 4px) */
+  --radius-md: 10px;     /* calc(0.75rem - 2px) */
+  --radius-lg: 12px;     /* 0.75rem */
+  --radius-xl: 12px;     /* rounded-xl */
+  --radius-2xl: 16px;    /* rounded-2xl — large cards, modals */
+  --radius-full: 9999px; /* pill */
+
+  /* ── Shadows ── */
+  --shadow-none: none;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-primary: 0 10px 15px -3px rgb(124 77 255 / 0.2);  /* purple button shadow */
+}
+
+/* ── Typography System ─────────────────────────────────────────────────────── */
+:root {
+  /* Font families */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* All fonts use Inter */
+  --font-h1: var(--font-sans);
+  --font-h2: var(--font-sans);
+  --font-body-md: var(--font-sans);
+  --font-body-sm: var(--font-sans);
+  --font-label-caps: var(--font-sans);
+
+  /* H1 — Page titles */
+  --text-h1-size: 24px;
+  --text-h1-line-height: 32px;
+  --text-h1-weight: 600;
+  --text-h1-letter-spacing: -0.02em;
+
+  /* H2 — Card headings, chat contact name */
+  --text-h2-size: 18px;
+  --text-h2-line-height: 24px;
+  --text-h2-weight: 600;
+  --text-h2-letter-spacing: -0.01em;
+
+  /* Body MD — Default body text */
+  --text-body-md-size: 14px;
+  --text-body-md-line-height: 20px;
+  --text-body-md-weight: 400;
+
+  /* Body SM — Secondary text, timestamps */
+  --text-body-sm-size: 13px;
+  --text-body-sm-line-height: 18px;
+  --text-body-sm-weight: 400;
+
+  /* Label Caps — Table headers, section labels */
+  --text-label-caps-size: 11px;
+  --text-label-caps-line-height: 16px;
+  --text-label-caps-weight: 700;
+  --text-label-caps-letter-spacing: 0.05em;
+  --text-label-caps-transform: uppercase;
+}
+
+/* ── Semantic Typography Classes ───────────────────────────────────────────── */
+
+.om-h1 {
+  font-family: var(--font-h1);
+  font-size: var(--text-h1-size);
+  line-height: var(--text-h1-line-height);
+  font-weight: var(--text-h1-weight);
+  letter-spacing: var(--text-h1-letter-spacing);
+  color: var(--color-on-surface);
+}
+
+.om-h2 {
+  font-family: var(--font-h2);
+  font-size: var(--text-h2-size);
+  line-height: var(--text-h2-line-height);
+  font-weight: var(--text-h2-weight);
+  letter-spacing: var(--text-h2-letter-spacing);
+  color: var(--color-on-surface);
+}
+
+.om-body-md {
+  font-family: var(--font-body-md);
+  font-size: var(--text-body-md-size);
+  line-height: var(--text-body-md-line-height);
+  font-weight: var(--text-body-md-weight);
+  color: var(--color-on-surface);
+}
+
+.om-body-sm {
+  font-family: var(--font-body-sm);
+  font-size: var(--text-body-sm-size);
+  line-height: var(--text-body-sm-line-height);
+  font-weight: var(--text-body-sm-weight);
+  color: var(--color-on-surface-variant);
+}
+
+.om-label-caps {
+  font-family: var(--font-label-caps);
+  font-size: var(--text-label-caps-size);
+  line-height: var(--text-label-caps-line-height);
+  font-weight: var(--text-label-caps-weight);
+  letter-spacing: var(--text-label-caps-letter-spacing);
+  text-transform: var(--text-label-caps-transform);
+  color: var(--color-secondary);
+}
+
+/* ── Base Reset ─────────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-body-md-size);
+  line-height: var(--text-body-md-line-height);
+  font-weight: var(--text-body-md-weight);
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* ── Utility: Material Symbols Outlined ────────────────────────────────────── */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ── Brand Gradient Utility ─────────────────────────────────────────────────── */
+.om-brand-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-gradient-from) 0%,
+    var(--color-brand-gradient-via) 50%,
+    var(--color-brand-gradient-to) 100%
+  );
+}
+
+/* ── Scrollbar Hide ──────────────────────────────────────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
