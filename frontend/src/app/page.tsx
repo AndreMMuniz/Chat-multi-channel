@@ -475,8 +475,8 @@ function DashboardMock() {
 
 function HowItWorksVisual() {
   return (
-    <div className="rounded-[20px] border border-[#E9ECEF] bg-white p-5 shadow-sm">
-      <div className="rounded-3xl border border-[#E9ECEF] bg-[#fbfcff] p-4">
+    <div className="max-h-[400px] overflow-hidden rounded-[20px] border border-[#E9ECEF] bg-white p-4 shadow-sm">
+      <div className="h-full rounded-3xl border border-[#E9ECEF] bg-[#fbfcff] p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-slate-900">Reply workflow</p>
@@ -484,7 +484,7 @@ function HowItWorksVisual() {
           </div>
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-[#7C4DFF]">AI ready</span>
         </div>
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-4">
           <div className="rounded-2xl border border-[#E9ECEF] bg-white p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-slate-900">Connected channels</p>
@@ -504,7 +504,7 @@ function HowItWorksVisual() {
               <p className="text-sm font-semibold text-slate-900">Queues and SLAs</p>
               <span className="text-xs text-emerald-600">Healthy</span>
             </div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 space-y-3">
               {[
                 ["Billing", "06 min first response", "82 open"],
                 ["Support", "04 min first response", "131 open"],
@@ -523,7 +523,7 @@ function HowItWorksVisual() {
 
           <div className="rounded-2xl border border-indigo-100 bg-[#faf7ff] p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7C4DFF]">Draft + quick reply</p>
-            <p className="mt-2 text-sm text-slate-700">
+            <p className="mt-2 text-sm leading-7 text-slate-700">
               “I can help with your plan update right away. I&apos;ll guide you through billing and seats in one flow.”
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
