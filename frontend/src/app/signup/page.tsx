@@ -302,7 +302,6 @@ function SuccessCard({ email }: { email: string }) {
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [workspaceName, setWorkspaceName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -326,7 +325,7 @@ export default function SignupPage() {
     event.preventDefault();
     setError("");
 
-    if (!fullName || !email || !workspaceName || !password || !confirmPassword) {
+    if (!fullName || !email || !password || !confirmPassword) {
       setError("Fill in all fields to continue.");
       return;
     }
@@ -420,15 +419,6 @@ export default function SignupPage() {
                   placeholder="you@company.com"
                   value={email}
                   onChange={setEmail}
-                />
-
-                <Field
-                  label="Workspace name"
-                  icon="domain"
-                  placeholder="Acme Support"
-                  value={workspaceName}
-                  onChange={setWorkspaceName}
-                  hint="This helps your team identify the workspace inside omnicrm.chat."
                 />
 
                 <div>
