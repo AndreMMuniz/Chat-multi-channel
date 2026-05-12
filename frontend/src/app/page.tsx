@@ -145,6 +145,53 @@ function Wordmark() {
   );
 }
 
+function ChannelBadge({
+  kind,
+  compact = false,
+}: {
+  kind: "whatsapp" | "telegram" | "email";
+  compact?: boolean;
+}) {
+  const styles = {
+    whatsapp: {
+      wrap: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      dot: "bg-emerald-500",
+      label: "WA",
+    },
+    telegram: {
+      wrap: "border-sky-200 bg-sky-50 text-sky-700",
+      dot: "bg-sky-500",
+      label: "TG",
+    },
+    email: {
+      wrap: "border-orange-200 bg-orange-50 text-orange-700",
+      dot: "bg-orange-500",
+      label: "@",
+    },
+  } as const;
+
+  const current = styles[kind];
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-full border font-semibold ${current.wrap} ${
+        compact ? "h-8 w-8 text-[11px]" : "gap-2 px-3 py-1.5 text-[11px]"
+      }`}
+      aria-label={kind}
+      title={kind}
+    >
+      {compact ? (
+        <span className="leading-none">{current.label}</span>
+      ) : (
+        <>
+          <span className={`h-1.5 w-1.5 rounded-full ${current.dot}`} />
+          <span className="leading-none">{current.label}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
 function InboxMock() {
   return (
     <div className="h-[540px] w-full max-w-[640px] overflow-hidden rounded-[24px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
@@ -179,17 +226,13 @@ function InboxMock() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2 px-4">
-            {[
-              ["All", "border-indigo-200 bg-indigo-50 text-[#5b3df6]"],
-              ["WhatsApp", "border-emerald-200 bg-emerald-50 text-emerald-700"],
-              ["Telegram", "border-sky-200 bg-sky-50 text-sky-700"],
-              ["Email", "border-orange-200 bg-orange-50 text-orange-700"],
-            ].map(([item, tone]) => (
-              <span key={item} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${tone}`}>
-                {item}
-              </span>
-            ))}
+          <div className="mt-4 flex flex-wrap items-center gap-2 px-4">
+            <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-[#5b3df6]">
+              All
+            </span>
+            <ChannelBadge kind="whatsapp" compact />
+            <ChannelBadge kind="telegram" compact />
+            <ChannelBadge kind="email" compact />
           </div>
 
           <div className="mt-4">
@@ -199,7 +242,7 @@ function InboxMock() {
                 initials: "RO",
                 time: "14:32",
                 preview: "Hi, I need help with my order #4821...",
-                tags: ["Billing", "SLA"],
+                tags: ["Billing"],
                 active: true,
                 tone: "bg-violet-500",
               },
@@ -255,16 +298,14 @@ function InboxMock() {
                           className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
                             tag === "Billing"
                               ? "bg-orange-50 text-orange-700"
-                              : tag === "SLA"
-                                ? "text-red-500"
-                                : tag === "Support"
+                              : tag === "Support"
                                   ? "bg-blue-50 text-blue-700"
                                   : tag === "Feedback"
                                     ? "bg-fuchsia-50 text-fuchsia-700"
                                     : "bg-emerald-50 text-emerald-700"
                           }`}
                         >
-                          {tag === "SLA" ? "▲ SLA" : tag}
+                          {tag}
                         </span>
                       ))}
                     </div>
@@ -279,14 +320,13 @@ function InboxMock() {
           <div className="flex items-center justify-between border-b border-[#E9ECEF] px-5 py-3">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500 text-sm font-bold text-white">RO</div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Rafael Oliveira</p>
-                <p className="text-xs text-slate-500">+55 11 9421-xxxx</p>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold leading-5 text-slate-900">Rafael Oliveira</p>
+                <p className="truncate text-[11px] leading-4 text-slate-500">+55 11 9421-xxxx</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">• WhatsApp</span>
-              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600">SLA: 12m left</span>
+            <div className="flex items-center gap-2">
+              <ChannelBadge kind="whatsapp" />
               <MaterialIcon name="more_horiz" className="text-[18px] text-slate-400" />
             </div>
           </div>
@@ -308,17 +348,9 @@ function InboxMock() {
           </div>
 
           <div className="border-t border-[#E9ECEF] bg-white px-4 py-3">
-            <div className="ml-auto max-w-[340px] rounded-[20px] border border-[#E9ECEF] bg-white p-4 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.18)]">
-              <div className="text-center text-[13px] leading-7 text-slate-400">
-                Type a
-                <br />
-                message
-                <br />
-                or / for
-                <br />
-                quick
-                <br />
-                replies...
+            <div className="ml-auto max-w-[340px] rounded-[20px] border border-[#E9ECEF] bg-white p-3 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.18)]">
+              <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-400">
+                Type a message or use / for quick replies...
               </div>
               <div className="mt-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 text-slate-400">
