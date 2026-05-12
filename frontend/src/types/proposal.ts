@@ -118,6 +118,7 @@ export interface ProposalFromCatalogRequest {
   title?: string | null;
   customer_name?: string | null;
   notes?: string | null;
+  client_id?: string | null;
   quantity?: number;
 }
 

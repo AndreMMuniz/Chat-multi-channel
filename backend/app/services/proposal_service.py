@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 import uuid as _uuid
-from app.models.models import CatalogItem, CatalogItemStatus, Proposal, ProposalItem, ProposalServiceDetails, ProposalStatus, ProposalStatusHistory, User
+from app.models.models import CatalogItem, CatalogItemStatus, Client, Proposal, ProposalItem, ProposalServiceDetails, ProposalStatus, ProposalStatusHistory, User
 from app.repositories.catalog_repo import CatalogItemRepository
 from app.repositories.proposal_repo import ProposalItemRepository, ProposalRepository
 from app.schemas.common import create_error_response
@@ -42,6 +42,29 @@ class ProposalService:
             raise HTTPException(status_code=status, detail=error_response)
         return item
 
+    def ensure_active_client(self, client_id: Optional[UUID]) -> Client:
+        if not client_id:
+            error_response, status = create_error_response(
+                code="CLIENT_REQUIRED",
+                message="Client is required to create a proposal",
+                status_code=422,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        client = (
+            self.db.query(Client)
+            .filter(Client.id == client_id, Client.deleted_at.is_(None))
+            .first()
+        )
+        if not client:
+            error_response, status = create_error_response(
+                code="CLIENT_NOT_FOUND",
+                message="Client not found or archived",
+                status_code=422,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+        return client
+
     def _record_status(self, proposal_id, from_status, to_status, user_id, reason=None):
         entry = ProposalStatusHistory(
             id=_uuid.uuid4(),
@@ -54,6 +77,7 @@ class ProposalService:
         self.db.add(entry)
 
     async def create_proposal(self, payload: ProposalCreate, current_user: User) -> Proposal:
+        self.ensure_active_client(payload.client_id)
         proposal = await self.proposals.create(
             {
                 **payload.model_dump(exclude={"service_details"}),
@@ -96,11 +120,13 @@ class ProposalService:
         current_user: User,
     ) -> Proposal:
         item = await self.ensure_catalog_item_quotable(await self.catalog.find_catalog_item(catalog_item_id))
+        self.ensure_active_client(payload.client_id)
         proposal = await self.proposals.create(
             {
                 "title": payload.title or f"Proposal for {item.commercial_name}",
                 "customer_name": payload.customer_name,
                 "notes": payload.notes,
+                "client_id": payload.client_id,
                 "status": ProposalStatus.DRAFT,
                 "created_by_user_id": current_user.id,
             }

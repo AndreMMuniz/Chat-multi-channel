@@ -314,6 +314,10 @@ export default function ProposalsPage() {
       setErrorMessage("Proposal title is required.");
       return;
     }
+    if (!createForm.client_id) {
+      setErrorMessage("Client is required.");
+      return;
+    }
     try {
       setIsCreating(true);
       setErrorMessage(null);
@@ -544,7 +548,7 @@ export default function ProposalsPage() {
 
             {/* Client */}
             <div className="space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Client</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Client <span className="text-rose-500">*</span></span>
               <ClientSelector
                 value={createForm.client_id}
                 onChange={(id) => setCreateForm((f) => ({ ...f, client_id: id }))}
@@ -587,7 +591,7 @@ export default function ProposalsPage() {
               </button>
               <button
                 type="button"
-                disabled={isCreating}
+                disabled={isCreating || !createForm.client_id}
                 onClick={handleCreateProposal}
                 className="rounded-2xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 transition-colors"
               >

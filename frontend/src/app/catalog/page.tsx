@@ -3,8 +3,9 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/shared/Modal";
-import { catalogApi, proposalsApi } from "@/lib/api/index";
+import { catalogApi, clientsApi, proposalsApi } from "@/lib/api/index";
 import type { CatalogItemCreateRequest, CatalogItemDto, CatalogItemStatus, CatalogItemType, CatalogItemUpdateRequest } from "@/types/catalog";
+import type { ClientListDto } from "@/types/client";
 import type { ProposalDto } from "@/types/proposal";
 
 type CatalogType = CatalogItemType;
@@ -148,6 +149,8 @@ export default function CatalogPage() {
   const [isProposalSubmitting, setIsProposalSubmitting] = useState(false);
   const [isProposalPickerOpen, setIsProposalPickerOpen] = useState(false);
   const [draftProposals, setDraftProposals] = useState<ProposalDto[]>([]);
+  const [clients, setClients] = useState<ClientListDto[]>([]);
+  const [selectedProposalClientId, setSelectedProposalClientId] = useState("");
   const [proposalPickerItem, setProposalPickerItem] = useState<CatalogItem | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formState, setFormState] = useState<CatalogFormState>(() => buildFormState());
@@ -180,6 +183,27 @@ export default function CatalogPage() {
     }
 
     void loadCatalog();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadClients() {
+      try {
+        const response = await clientsApi.listClients({ limit: 200 });
+        if (!isMounted) return;
+        setClients(response.data);
+      } catch (error) {
+        if (!isMounted) return;
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load clients.");
+      }
+    }
+
+    void loadClients();
 
     return () => {
       isMounted = false;
@@ -270,6 +294,11 @@ export default function CatalogPage() {
       incomplete: items.filter((item) => item.status === "under_review" || !item.canBeQuoted).length,
     }),
     [items]
+  );
+
+  const visibleDraftProposals = useMemo(
+    () => draftProposals.filter((proposal) => proposal.client_id && proposal.client_id === selectedProposalClientId),
+    [draftProposals, selectedProposalClientId]
   );
 
   function openCreateModal() {
@@ -379,6 +408,7 @@ export default function CatalogPage() {
       setActionMessage(null);
       const response = await proposalsApi.listProposals({ limit: 50, status: "draft" });
       setDraftProposals(response.data);
+      setSelectedProposalClientId("");
       setProposalPickerItem(item);
       setIsProposalPickerOpen(true);
     } catch (error) {
@@ -387,14 +417,20 @@ export default function CatalogPage() {
   }
 
   async function handleCreateNewProposal(item: CatalogItem) {
+    if (!selectedProposalClientId) {
+      setErrorMessage("Select a client before creating a proposal.");
+      return;
+    }
     try {
       setIsProposalSubmitting(true);
       setActionMessage(null);
       const proposal = await proposalsApi.createProposalFromCatalog(item.id, {
         title: `Proposal for ${item.commercialName}`,
+        client_id: selectedProposalClientId,
         quantity: 1,
       });
       setIsProposalPickerOpen(false);
+      setSelectedProposalClientId("");
       setActionMessage(`Draft proposal ${proposal.reference} created.`);
       router.push(`/proposals?proposalId=${proposal.id}`);
     } catch (error) {
@@ -412,6 +448,7 @@ export default function CatalogPage() {
         quantity: 1,
       });
       setIsProposalPickerOpen(false);
+      setSelectedProposalClientId("");
       setActionMessage(`Item added to proposal ${proposal.reference}.`);
       router.push(`/proposals?proposalId=${proposal.id}`);
     } catch (error) {
@@ -904,6 +941,7 @@ export default function CatalogPage() {
           onClose={() => {
             if (isProposalSubmitting) return;
             setIsProposalPickerOpen(false);
+            setSelectedProposalClientId("");
             setProposalPickerItem(null);
           }}
           maxWidth="max-w-2xl"
@@ -914,11 +952,32 @@ export default function CatalogPage() {
               <p className="mt-1 text-sm text-slate-500">{proposalPickerItem.sku} · {formatCurrency(proposalPickerItem.basePrice)}</p>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                Client <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={selectedProposalClientId}
+                onChange={(event) => setSelectedProposalClientId(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-300"
+              >
+                <option value="">Select a client</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500">
+                Proposals now require a linked client before any catalog item can be added.
+              </p>
+            </div>
+
             <div className="space-y-3">
               <button
                 type="button"
                 onClick={() => void handleCreateNewProposal(proposalPickerItem)}
-                disabled={isProposalSubmitting}
+                disabled={isProposalSubmitting || !selectedProposalClientId}
                 className="flex w-full items-center justify-between rounded-3xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:bg-slate-50 disabled:opacity-60"
               >
                 <div>
@@ -930,8 +989,12 @@ export default function CatalogPage() {
 
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Or add to an existing draft</p>
-                {draftProposals.length > 0 ? (
-                  draftProposals.map((proposal) => (
+                {!selectedProposalClientId ? (
+                  <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    Select a client first to view compatible draft proposals.
+                  </div>
+                ) : visibleDraftProposals.length > 0 ? (
+                  visibleDraftProposals.map((proposal) => (
                     <button
                       key={proposal.id}
                       type="button"
@@ -950,7 +1013,7 @@ export default function CatalogPage() {
                   ))
                 ) : (
                   <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                    No draft proposals available yet.
+                    No draft proposals available for the selected client yet.
                   </div>
                 )}
               </div>

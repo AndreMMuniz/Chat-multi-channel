@@ -127,6 +127,7 @@ class ProposalFromCatalogCreate(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=255)
     customer_name: Optional[str] = Field(default=None, max_length=255)
     notes: Optional[str] = None
+    client_id: Optional[UUID] = None
     quantity: int = Field(default=1, ge=1)
 
 
