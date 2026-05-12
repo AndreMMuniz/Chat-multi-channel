@@ -66,7 +66,7 @@ const channels = [
 const steps = [
   {
     title: "Connect your channels",
-    body: "Bring WhatsApp, Telegram, Email, SMS, and web chat into one operational shell without rebuilding your process.",
+    body: "Bring WhatsApp, Telegram, Email, and SMS into one operational shell without rebuilding your process.",
   },
   {
     title: "Invite your team and define rules",
@@ -147,51 +147,127 @@ function Wordmark() {
 
 function InboxMock() {
   return (
-    <div className="overflow-hidden rounded-[20px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
-      <div className="grid min-h-[520px] grid-cols-[240px_1fr] md:grid-cols-[250px_1fr]">
-        <aside className="border-r border-[#E9ECEF] bg-[#fbfcff] p-4">
-          <div className="rounded-2xl border border-[#E9ECEF] bg-white px-4 py-3 text-sm text-slate-400">
-            Search conversations...
+    <div className="overflow-hidden rounded-[24px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
+      <div className="grid min-h-[540px] grid-cols-[64px_280px_1fr]">
+        <aside className="flex flex-col items-center gap-5 border-r border-[#E9ECEF] bg-white py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f172a] text-white">
+            <div className="h-4 w-4 rounded-full border-2 border-emerald-400 border-r-transparent border-t-indigo-300" />
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {["All", "WhatsApp", "Telegram", "Email"].map((item, index) => (
-              <span
-                key={item}
-                className={`rounded-full border px-3 py-1.5 text-[11px] font-medium ${
-                  index === 0
-                    ? "border-indigo-200 bg-indigo-50 text-[#7C4DFF]"
-                    : "border-[#E9ECEF] bg-white text-slate-600"
-                }`}
-              >
+          {["grid_view", "chat", "inventory_2", "group", "monitoring", "settings"].map((icon, index) => (
+            <div
+              key={icon}
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                index === 1 ? "bg-indigo-100 text-[#5b3df6]" : "text-slate-400"
+              }`}
+            >
+              <MaterialIcon name={icon} filled={index === 1} className="text-[20px]" />
+            </div>
+          ))}
+        </aside>
+
+        <aside className="border-r border-[#E9ECEF] bg-[#fbfcff]">
+          <div className="flex items-center justify-between px-4 py-4">
+            <p className="text-[30px] font-semibold tracking-[-0.03em] text-slate-900">Inbox</p>
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-indigo-100 px-2 text-[11px] font-bold text-[#5b3df6]">
+              12
+            </span>
+          </div>
+          <div className="px-4">
+            <div className="flex items-center gap-3 rounded-xl border border-[#E9ECEF] bg-white px-4 py-3 text-sm text-slate-400">
+              <MaterialIcon name="search" className="text-[18px]" />
+              Search conversations...
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2 px-4">
+            {[
+              ["All", "border-indigo-200 bg-indigo-50 text-[#5b3df6]"],
+              ["WhatsApp", "border-emerald-200 bg-emerald-50 text-emerald-700"],
+              ["Telegram", "border-sky-200 bg-sky-50 text-sky-700"],
+              ["Email", "border-orange-200 bg-orange-50 text-orange-700"],
+            ].map(([item, tone]) => (
+              <span key={item} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${tone}`}>
                 {item}
               </span>
             ))}
           </div>
-          <div className="mt-5 space-y-3">
+
+          <div className="mt-4">
             {[
-              { name: "Andre", preview: "Sure, I'm here to help with your demands...", active: true, channel: "Telegram" },
-              { name: "Maya", preview: "Can we review the contract details today?", active: false, channel: "Email" },
-              { name: "Rafael", preview: "Need an update on the proposal timeline.", active: false, channel: "WhatsApp" },
+              {
+                name: "Rafael Oliveira",
+                initials: "RO",
+                time: "14:32",
+                preview: "Hi, I need help with my order #4821...",
+                tags: ["Billing", "SLA"],
+                active: true,
+                tone: "bg-violet-500",
+              },
+              {
+                name: "Ana Lima",
+                initials: "AL",
+                time: "14:08",
+                preview: "Ainda não recebi o reembolso, p...",
+                tags: ["Support"],
+                active: false,
+                tone: "bg-sky-500",
+              },
+              {
+                name: "Carlos Mendez",
+                initials: "CM",
+                time: "11:55",
+                preview: "Thanks for the help, much appre...",
+                tags: ["Feedback"],
+                active: false,
+                tone: "bg-orange-500",
+              },
+              {
+                name: "Sofia Carvalho",
+                initials: "SC",
+                time: "Yest.",
+                preview: "What are the pricing options for ...",
+                tags: ["Sales"],
+                active: false,
+                tone: "bg-violet-500",
+              },
             ].map((item) => (
               <div
                 key={item.name}
-                className={`rounded-2xl border p-4 ${
-                  item.active ? "border-indigo-200 bg-indigo-50" : "border-[#E9ECEF] bg-white"
+                className={`border-t border-[#E9ECEF] px-4 py-4 ${
+                  item.active ? "border-l-4 border-l-[#6d4aff] bg-indigo-50/80 pl-3" : "bg-white"
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
-                    {item.name[0]}
+                  <div className={`relative flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${item.tone}`}>
+                    {item.initials}
+                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-slate-900">{item.name}</p>
-                      <span className="text-[11px] text-slate-400">now</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold text-slate-900">{item.name}</p>
+                      <span className={`text-xs ${item.active ? "font-semibold text-red-500" : "text-slate-400"}`}>{item.time}</span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-slate-500">{item.preview}</p>
-                    <span className="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                      {item.channel}
-                    </span>
+                    <p className="mt-1 truncate text-sm text-slate-500">{item.preview}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {item.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                            tag === "Billing"
+                              ? "bg-orange-50 text-orange-700"
+                              : tag === "SLA"
+                                ? "text-red-500"
+                                : tag === "Support"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : tag === "Feedback"
+                                    ? "bg-fuchsia-50 text-fuchsia-700"
+                                    : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {tag === "SLA" ? "▲ SLA" : tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -199,79 +275,60 @@ function InboxMock() {
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-col">
-          <div className="flex items-center justify-between border-b border-[#E9ECEF] px-5 py-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Andre</p>
-              <div className="mt-1 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
-                Telegram
+        <section className="flex min-w-0 flex-col bg-white">
+          <div className="flex items-center justify-between border-b border-[#E9ECEF] px-5 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500 text-sm font-bold text-white">RO</div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Rafael Oliveira</p>
+                <p className="text-xs text-slate-500">+55 11 9421-xxxx</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-600">Open</span>
-              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-[#7C4DFF]">AI on</span>
+            <div className="flex items-center gap-3">
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">• WhatsApp</span>
+              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600">SLA: 12m left</span>
+              <MaterialIcon name="more_horiz" className="text-[18px] text-slate-400" />
             </div>
           </div>
 
-          <div className="flex-1 space-y-5 bg-white px-5 py-5">
-            <div className="max-w-[280px] rounded-2xl border border-[#E9ECEF] bg-white px-4 py-3 text-sm text-slate-800 shadow-sm">
-              Hi, I need help changing my current plan.
+          <div className="flex-1 space-y-5 bg-[#fbfcff] px-5 py-5">
+            <div className="max-w-[260px] rounded-2xl border border-[#E9ECEF] bg-white px-4 py-3 text-sm leading-7 text-slate-800 shadow-sm">
+              Hi, I need help with my order #4821. It&apos;s been 5 days and still no tracking update.
             </div>
-            <div className="ml-auto max-w-[360px] rounded-2xl bg-[#7C4DFF] px-4 py-3 text-sm text-white shadow-sm">
-              Of course. I can help with that. What would you like to update first?
+            <p className="text-xs text-slate-400">14:10</p>
+
+            <div className="ml-auto max-w-[310px] rounded-2xl bg-[#6d4aff] px-4 py-4 text-sm leading-7 text-white shadow-sm">
+              Hello Rafael! Let me look into that right away. Can you confirm your email so I can pull up the order?
             </div>
-            <div className="max-w-[320px] rounded-2xl border border-[#E9ECEF] bg-white px-4 py-3 text-sm text-slate-800 shadow-sm">
-              Billing cycle and a new user seat.
-            </div>
-            <div className="ml-auto max-w-[380px] rounded-2xl bg-[#7C4DFF] px-4 py-3 text-sm text-white shadow-sm">
-              Great. I already have a quick path for plan changes and can prepare the next steps for you.
-            </div>
-            <div className="max-w-[250px] rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-700 shadow-sm">
-              Tagged as Billing • SLA on track
+            <p className="text-right text-xs text-slate-400">14:14 · Sent</p>
+
+            <div className="max-w-[210px] rounded-2xl border border-[#E9ECEF] bg-white px-4 py-3 text-sm leading-7 text-slate-800 shadow-sm">
+              Sure, it&apos;s rafael@email.com
             </div>
           </div>
 
-          <div className="border-t border-[#E9ECEF] px-4 py-4">
-            <div className="mb-3 flex flex-wrap gap-2">
-              {["/plan-change", "/billing-help", "priority:high"].map((item, index) => (
-                <span
-                  key={item}
-                  className={`rounded-full border px-3 py-1.5 text-[11px] font-medium ${
-                    index === 0
-                      ? "border-indigo-200 bg-indigo-50 text-[#7C4DFF]"
-                      : "border-[#E9ECEF] bg-white text-slate-600"
-                  }`}
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-            <div className="rounded-2xl border border-[#E9ECEF] bg-slate-50 px-4 py-3 text-sm text-slate-400">
-              Type a message or use AI-powered suggestions...
-            </div>
-            <div className="mt-4 rounded-2xl border border-indigo-100 bg-[#faf7ff] p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7C4DFF]">AI suggestions</p>
-                  <p className="mt-1 text-[11px] text-slate-400">Cached • just now</p>
+          <div className="border-t border-[#E9ECEF] bg-white px-4 py-4">
+            <div className="ml-auto max-w-[340px] rounded-[20px] border border-[#E9ECEF] bg-white p-4 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.18)]">
+              <div className="text-center text-[13px] leading-7 text-slate-400">
+                Type a
+                <br />
+                message
+                <br />
+                or / for
+                <br />
+                quick
+                <br />
+                replies...
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 text-slate-400">
+                  <MaterialIcon name="sentiment_satisfied" className="text-[18px]" />
+                  <MaterialIcon name="attach_file" className="text-[18px]" />
                 </div>
-                <span className="rounded-full border border-indigo-200 px-3 py-1 text-[11px] font-medium text-[#7C4DFF]">
-                  Generate
-                </span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  ["I can help update your billing cycle and add a new seat right away.", "97%"],
-                  ["Let me prepare the plan-change flow and confirm your preferred billing cycle.", "89%"],
-                ].map(([text, confidence]) => (
-                  <div key={text} className="rounded-2xl border border-indigo-100 bg-white px-4 py-3">
-                    <p className="text-sm text-slate-700">{text}</p>
-                    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Confidence</span>
-                      <span className="font-semibold text-[#7C4DFF]">{confidence}</span>
-                    </div>
-                  </div>
-                ))}
+                <span className="rounded-full bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-[#5b3df6]">✦ AI draft</span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6d4aff] text-white">
+                  <MaterialIcon name="send" filled className="text-[18px]" />
+                </div>
               </div>
             </div>
           </div>
@@ -464,21 +521,20 @@ export default function LandingPage() {
       </nav>
 
       <section className="overflow-hidden py-20 lg:py-24">
-        <div className="mx-auto grid max-w-7xl gap-14 px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-10">
+        <div className="mx-auto grid max-w-7xl gap-14 px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-10">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700">
               <span className="h-1.5 w-1.5 rounded-full bg-[#7C4DFF] shadow-[0_0_0_4px_rgba(124,77,255,0.18)]" />
               Multi-channel customer support
             </span>
 
-            <h1 className="mt-6 max-w-[12ch] text-5xl font-bold leading-[0.98] tracking-[-0.04em] text-slate-900 sm:text-6xl">
+            <h1 className="mt-6 max-w-[10ch] text-5xl font-bold leading-[0.98] tracking-[-0.04em] text-slate-900 sm:text-6xl">
               Every customer conversation,
               <span className="block text-[#7C4DFF]">in one calm inbox.</span>
             </h1>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              WhatsApp, Telegram, Email, SMS, and web chat handled in one workspace, with AI suggestions, quick replies,
-              tags, SLAs, and operational clarity built into the product shell.
+            <p className="mt-6 max-w-xl text-[17px] leading-8 text-slate-600 sm:text-lg">
+              WhatsApp, Telegram, Email and SMS — handled by your team in a single workspace, with AI ready when you need it.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -506,7 +562,7 @@ export default function LandingPage() {
               <span className="h-1 w-1 rounded-full bg-slate-300" />
               <span className="inline-flex items-center gap-2">
                 <MaterialIcon name="check_circle" filled className="text-[18px] text-emerald-600" />
-                Product-aligned demo experience
+                14-day trial on all plans
               </span>
             </div>
           </div>
@@ -675,10 +731,6 @@ export default function LandingPage() {
 
       <section className="px-6 pb-24 lg:px-10">
         <div className="mx-auto max-w-6xl overflow-hidden rounded-[28px] bg-gradient-to-br from-[#4A1DB5] via-[#632ce5] to-[#7C4DFF] px-8 py-14 text-white sm:px-12">
-          <div
-            className="pointer-events-none absolute hidden"
-            aria-hidden="true"
-          />
           <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl">
               <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-white/75">Ready to move?</p>
