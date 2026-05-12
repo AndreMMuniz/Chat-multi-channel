@@ -187,6 +187,9 @@ export default function ProposalsPage() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const requestedProposalId = searchParams.get("proposalId");
+  const shouldOpenCreate = searchParams.get("create") === "1";
+  const prefillClientId = searchParams.get("clientId") ?? "";
+  const prefillTitle = searchParams.get("title") ?? "";
 
   const [proposals, setProposals] = useState<ProposalDto[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<ProposalDetailDto | null>(null);
@@ -205,6 +208,7 @@ export default function ProposalsPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "ALL">("ALL");
+  const [appliedCreatePrefill, setAppliedCreatePrefill] = useState(false);
   const canDeleteProposal = useMemo(() => {
     const role = user?.user_type?.base_role;
     return role === "ADMIN" || role === "MANAGER";
@@ -214,6 +218,17 @@ export default function ProposalsPage() {
   useEffect(() => {
     clientsApi.listClients({ limit: 500 }).then((r: { data: ClientListDto[] }) => setClients(r.data ?? [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!shouldOpenCreate || appliedCreatePrefill) return;
+    setCreateForm((current) => ({
+      ...current,
+      title: prefillTitle || current.title,
+      client_id: prefillClientId || current.client_id,
+    }));
+    setIsCreateModalOpen(true);
+    setAppliedCreatePrefill(true);
+  }, [appliedCreatePrefill, prefillClientId, prefillTitle, shouldOpenCreate]);
 
   const loadProposals = useCallback(async (preserveSelection: boolean) => {
     try {

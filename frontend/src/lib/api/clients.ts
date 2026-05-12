@@ -1,5 +1,5 @@
 import { apiGet, apiGetList, apiMutate } from "@/lib/apiClient";
-import type { ClientCreateRequest, ClientDto, ClientListDto, ClientUpdateRequest } from "@/types/client";
+import type { ClientContactDto, ClientCreateRequest, ClientDto, ClientListDto, ClientUpdateRequest } from "@/types/client";
 
 export async function listClients(params?: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
@@ -12,6 +12,10 @@ export async function listClients(params?: Record<string, string | number | unde
 
 export async function getClient(clientId: string): Promise<ClientDto> {
   return apiGet<ClientDto>(`/admin/clients/${clientId}`);
+}
+
+export async function listClientContacts(clientId: string): Promise<ClientContactDto[]> {
+  return apiGet<ClientContactDto[]>(`/admin/clients/${clientId}/contacts`);
 }
 
 export async function createClient(body: ClientCreateRequest): Promise<ClientDto> {

@@ -10,7 +10,13 @@ from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.core.limiter import limiter
 from app.models.models import Client, Contact, Conversation, User
-from app.schemas.client import ClientCreate, ClientListResponse, ClientResponse, ClientUpdate
+from app.schemas.client import (
+    ClientContactListResponse,
+    ClientCreate,
+    ClientListResponse,
+    ClientResponse,
+    ClientUpdate,
+)
 from app.schemas.common import create_error_response, create_paginated_response, create_response
 
 router = APIRouter()
@@ -89,6 +95,24 @@ async def get_client(
 ) -> Dict[str, Any]:
     client = _get_client_or_404(client_id, db)
     return create_response(ClientResponse.model_validate(client))
+
+
+@router.get("/clients/{client_id}/contacts")
+@limiter.limit("60/minute")
+async def list_client_contacts(
+    request: Request,
+    client_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    _get_client_or_404(client_id, db)
+    contacts = (
+        db.query(Contact)
+        .filter(Contact.client_id == client_id)
+        .order_by(func.coalesce(Contact.name, Contact.channel_identifier, Contact.email, Contact.phone))
+        .all()
+    )
+    return create_response([ClientContactListResponse.model_validate(contact) for contact in contacts])
 
 
 @router.patch("/clients/{client_id}")

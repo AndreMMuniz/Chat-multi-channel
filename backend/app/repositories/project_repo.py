@@ -26,7 +26,12 @@ class ProjectRepository(BaseRepository[Project]):
     ) -> List[Project]:
         stmt = (
             select(Project)
-            .options(joinedload(Project.owner), joinedload(Project.source_conversation))
+            .options(
+                joinedload(Project.owner),
+                joinedload(Project.source_conversation),
+                joinedload(Project.client),
+                joinedload(Project.contact),
+            )
             .order_by(Project.created_at.desc())
         )
 
@@ -94,7 +99,12 @@ class ProjectRepository(BaseRepository[Project]):
     async def find_project(self, project_id: str) -> Optional[Project]:
         stmt = (
             select(Project)
-            .options(joinedload(Project.owner), joinedload(Project.source_conversation))
+            .options(
+                joinedload(Project.owner),
+                joinedload(Project.source_conversation),
+                joinedload(Project.client),
+                joinedload(Project.contact),
+            )
             .where(Project.id == project_id)
         )
         result = self.session.execute(stmt)

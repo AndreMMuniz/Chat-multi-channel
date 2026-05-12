@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timezone
 
 from app.models.models import (
+    Client,
+    Contact,
     Conversation,
     Message,
     Project,
@@ -69,11 +71,78 @@ class ProjectService:
             )
             raise HTTPException(status_code=status, detail=error_response)
 
+    async def ensure_client_exists(self, client_id: Optional[UUID]) -> None:
+        if not client_id:
+            return
+        client = self.db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
+        if not client:
+            error_response, status = create_error_response(
+                code="CLIENT_NOT_FOUND",
+                message="Client not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+    async def ensure_contact_exists(self, contact_id: Optional[UUID]) -> Optional[Contact]:
+        if not contact_id:
+            return None
+        contact = self.db.query(Contact).filter(Contact.id == contact_id).first()
+        if not contact:
+            error_response, status = create_error_response(
+                code="CONTACT_NOT_FOUND",
+                message="Contact not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+        return contact
+
+    async def resolve_contact_assignment(
+        self,
+        *,
+        client_id: Optional[UUID],
+        contact_id: Optional[UUID],
+        contact_name: Optional[str],
+    ) -> tuple[Optional[UUID], Optional[UUID], Optional[str]]:
+        contact = await self.ensure_contact_exists(contact_id)
+        resolved_client_id = client_id
+        resolved_contact_name = contact_name.strip() if isinstance(contact_name, str) and contact_name.strip() else None
+
+        if contact:
+            if resolved_client_id and contact.client_id and contact.client_id != resolved_client_id:
+                error_response, status = create_error_response(
+                    code="CONTACT_CLIENT_MISMATCH",
+                    message="Selected contact does not belong to the linked client",
+                    status_code=422,
+                )
+                raise HTTPException(status_code=status, detail=error_response)
+            if resolved_client_id is None:
+                resolved_client_id = contact.client_id
+            resolved_contact_name = (
+                contact.name
+                or contact.channel_identifier
+                or contact.email
+                or contact.phone
+                or resolved_contact_name
+            )
+
+        if resolved_client_id:
+            await self.ensure_client_exists(resolved_client_id)
+
+        if not contact and resolved_contact_name is None:
+            resolved_contact_name = None
+
+        return resolved_client_id, contact_id, resolved_contact_name
+
     async def validate_payload(self, payload: ProjectCreate | ProjectUpdate) -> None:
         if payload.stage:
             await self.ensure_stage_exists(payload.stage)
         if payload.owner_user_id:
             await self.ensure_owner_exists(payload.owner_user_id)
+        await self.resolve_contact_assignment(
+            client_id=getattr(payload, "client_id", None),
+            contact_id=getattr(payload, "contact_id", None),
+            contact_name=getattr(payload, "contact_name", None),
+        )
         project_context_id = getattr(payload, "project_context_id", None)
         if project_context_id:
             await self.ensure_project_context_exists(project_context_id)
@@ -87,9 +156,17 @@ class ProjectService:
 
     async def create_project(self, payload: ProjectCreate, current_user: User) -> Project:
         await self.validate_payload(payload)
+        client_id, contact_id, contact_name = await self.resolve_contact_assignment(
+            client_id=payload.client_id,
+            contact_id=payload.contact_id,
+            contact_name=payload.contact_name,
+        )
         project = await self.projects.create(
             {
                 **payload.model_dump(),
+                "client_id": client_id,
+                "contact_id": contact_id,
+                "contact_name": contact_name,
                 "created_by_user_id": current_user.id,
             }
         )
@@ -97,7 +174,17 @@ class ProjectService:
 
     async def update_project(self, project: Project, payload: ProjectUpdate) -> Project:
         await self.validate_payload(payload)
-        updated = await self.projects.update(project.id, payload.model_dump(exclude_unset=True))
+        updates = payload.model_dump(exclude_unset=True)
+        client_id, contact_id, contact_name = await self.resolve_contact_assignment(
+            client_id=updates.get("client_id", project.client_id),
+            contact_id=updates.get("contact_id", project.contact_id),
+            contact_name=updates.get("contact_name", project.contact_name),
+        )
+        if "client_id" in updates or "contact_id" in updates or "contact_name" in updates:
+            updates["client_id"] = client_id
+            updates["contact_id"] = contact_id
+            updates["contact_name"] = contact_name
+        updated = await self.projects.update(project.id, updates)
         return await self.projects.find_project(updated.id)
 
     async def move_stage(self, project: Project, stage_key: str) -> Project:
@@ -114,6 +201,8 @@ class ProjectService:
         await self.ensure_stage_exists(payload.stage)
         if payload.owner_user_id:
             await self.ensure_owner_exists(payload.owner_user_id)
+        if payload.client_id:
+            await self.ensure_client_exists(payload.client_id)
         if payload.project_context_id:
             await self.ensure_project_context_exists(payload.project_context_id)
 
@@ -144,8 +233,22 @@ class ProjectService:
             raise HTTPException(status_code=status, detail=error_response)
 
         contact_name = None
+        client_id = payload.client_id
+        contact_id = payload.contact_id
         if conversation.contact:
-            contact_name = conversation.contact.name or conversation.contact.email or conversation.contact.phone
+            contact_name = (
+                conversation.contact.name
+                or conversation.contact.channel_identifier
+                or "Linked contact"
+            )
+            client_id = client_id or conversation.contact.client_id
+            contact_id = contact_id or conversation.contact.id
+
+        client_id, contact_id, contact_name = await self.resolve_contact_assignment(
+            client_id=client_id,
+            contact_id=contact_id,
+            contact_name=contact_name,
+        )
 
         title = payload.title or (contact_name and f"{contact_name} demand") or "Message demand"
         description = payload.description or message.content
@@ -162,6 +265,8 @@ class ProjectService:
                 "source_message_id": message.id,
                 "source_conversation_id": conversation.id,
                 "project_context_id": project_context_id,
+                "client_id": client_id,
+                "contact_id": contact_id,
                 "contact_name": contact_name,
                 "channel": conversation.channel,
                 "tag": payload.tag,
@@ -262,8 +367,22 @@ class ProjectService:
             raise HTTPException(status_code=status, detail=error_response)
 
         contact_name = None
+        client_id = None
+        contact_id = None
         if conversation.contact:
-            contact_name = conversation.contact.name or conversation.contact.email or conversation.contact.phone
+            contact_name = (
+                conversation.contact.name
+                or conversation.contact.channel_identifier
+                or "Linked contact"
+            )
+            client_id = client_id or conversation.contact.client_id
+            contact_id = conversation.contact.id
+
+        client_id, contact_id, contact_name = await self.resolve_contact_assignment(
+            client_id=client_id,
+            contact_id=contact_id,
+            contact_name=contact_name,
+        )
 
         project_context_id = payload.project_context_id or conversation.project_context_id
         project = None
@@ -282,6 +401,8 @@ class ProjectService:
                     "source_type": ProjectSourceType.MESSAGE,
                     "source_message_id": message.id,
                     "source_conversation_id": conversation.id,
+                    "client_id": client_id,
+                    "contact_id": contact_id,
                     "contact_name": contact_name,
                     "channel": conversation.channel,
                     "tag": None,
@@ -351,6 +472,34 @@ def serialize_project(project: Project) -> dict:
         "source_message_id": project.source_message_id,
         "conversation_id": project.source_conversation_id,
         "project_context_id": project.project_context_id,
+        "client_id": project.client_id,
+        "client": (
+            {
+                "id": project.client.id,
+                "name": project.client.name,
+                "company_name": project.client.company_name,
+                "country": project.client.country,
+                "client_type": project.client.client_type,
+                "currency": project.client.currency,
+                "created_at": project.client.created_at,
+                "deleted_at": project.client.deleted_at,
+            }
+            if project.client
+            else None
+        ),
+        "contact_id": project.contact_id,
+        "contact": (
+            {
+                "id": project.contact.id,
+                "name": project.contact.name,
+                "email": project.contact.email,
+                "phone": project.contact.phone,
+                "channel_identifier": project.contact.channel_identifier,
+                "created_at": project.contact.created_at,
+            }
+            if project.contact
+            else None
+        ),
         "contact_name": project.contact_name,
         "channel": project.channel,
         "tag": project.tag,

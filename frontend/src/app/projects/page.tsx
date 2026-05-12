@@ -8,7 +8,8 @@ import { FaGlobe, FaTelegram } from "react-icons/fa6";
 import { MdOutlineEmail, MdSms } from "react-icons/md";
 import Modal from "@/components/shared/Modal";
 import { useAuth } from "@/hooks/useAuth";
-import { projectsApi } from "@/lib/api/index";
+import { clientsApi, projectsApi } from "@/lib/api/index";
+import type { ClientContactDto, ClientListDto } from "@/types/client";
 import type {
   ProjectCreateRequest,
   ProjectDto,
@@ -39,6 +40,9 @@ type ProjectCard = {
   id: string;
   reference: string;
   title: string;
+  clientId?: string;
+  clientName?: string;
+  contactId?: string;
   contact: string;
   workType: string;
   stage: StageId;
@@ -102,6 +106,8 @@ type ProjectFormState = {
   id: string | null;
   reference: string;
   title: string;
+  clientId: string;
+  contactId: string;
   contact: string;
   workType: string;
   stage: StageId;
@@ -321,7 +327,10 @@ function adaptProject(project: ProjectDto): ProjectCard {
     id: project.id,
     reference: project.reference,
     title: project.title,
-    contact: project.contact_name?.trim() || "No contact",
+    clientId: project.client_id ?? undefined,
+    clientName: project.client?.name ?? undefined,
+    contactId: project.contact_id ?? undefined,
+    contact: project.contact?.name?.trim() || project.contact_name?.trim() || "No contact",
     workType: project.tag ? normalizeTagLabel(project.tag) : project.source_type === "message" ? "Demand" : "Project",
     stage: project.stage,
     channel: fromApiChannel(project.channel),
@@ -369,6 +378,8 @@ function toFormState(card: ProjectCard): ProjectFormState {
     id: card.id,
     reference: card.reference,
     title: card.title,
+    clientId: card.clientId ?? "",
+    contactId: card.contactId ?? "",
     contact: card.contact,
     workType: card.workType,
     stage: card.stage,
@@ -391,6 +402,8 @@ function createEmptyForm(cards: ProjectCard[], owners: Owner[], overrides?: Part
     id: null,
     reference: getNextReference(cards),
     title: "",
+    clientId: "",
+    contactId: "",
     contact: "",
     workType: "",
     stage: "lead",
@@ -447,6 +460,8 @@ function fromFormState(form: ProjectFormState): ProjectCard {
     id: form.id ?? `project-${Date.now()}`,
     reference: form.reference,
     title: form.title.trim(),
+    clientId: form.clientId || undefined,
+    contactId: form.contactId || undefined,
     contact: form.contact.trim(),
     workType: form.workType.trim(),
     stage: form.stage,
@@ -878,12 +893,14 @@ function ProjectCardView({
   owner,
   onOpen,
   onDragStart,
+  onOpenProposalFlow,
 }: {
   card: ProjectCard;
   taskSummary?: { open: number; overdue: number };
   owner?: Owner;
   onOpen: (card: ProjectCard) => void;
   onDragStart: (cardId: string, stageId: StageId) => void;
+  onOpenProposalFlow: (card: ProjectCard) => void;
 }) {
   const priority = PRIORITY_META[card.priority];
   const origin = ORIGIN_META[card.origin];
@@ -926,6 +943,24 @@ function ProjectCardView({
           {origin.label}
         </span>
       </div>
+
+      {card.stage === "proposal" ? (
+        <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">Linked client</p>
+          <p className="mt-1 text-xs font-medium text-slate-700">{card.clientName ?? "No client linked yet"}</p>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenProposalFlow(card);
+            }}
+            className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 transition hover:text-amber-900"
+          >
+            <span className="material-symbols-outlined text-[14px]">request_quote</span>
+            Create / link proposal
+          </button>
+        </div>
+      ) : null}
 
       {card.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -982,6 +1017,7 @@ function ProjectModal({
   taskDraft,
   setTaskDraft,
   tasks,
+  clients,
   onClose,
   onSave,
   onTaskSave,
@@ -989,6 +1025,7 @@ function ProjectModal({
   onTaskToggle,
   onTaskCancel,
   onOpenConversation,
+  onOpenProposalFlow,
   onDelete,
   owners,
   isEditing,
@@ -1002,6 +1039,7 @@ function ProjectModal({
   taskDraft: ProjectTaskDraft;
   setTaskDraft: React.Dispatch<React.SetStateAction<ProjectTaskDraft>>;
   tasks: ProjectTask[];
+  clients: ClientListDto[];
   onClose: () => void;
   onSave: () => void;
   onTaskSave: () => void;
@@ -1009,6 +1047,7 @@ function ProjectModal({
   onTaskToggle: (task: ProjectTask) => void;
   onTaskCancel: () => void;
   onOpenConversation?: () => void;
+  onOpenProposalFlow: (project: { clientId?: string; clientName?: string; title: string }) => void;
   onDelete?: () => void;
   owners: Owner[];
   isEditing: boolean;
@@ -1017,6 +1056,60 @@ function ProjectModal({
   isTasksLoading: boolean;
   isTaskSaving: boolean;
 }) {
+  const [clientContacts, setClientContacts] = useState<ClientContactDto[]>([]);
+  const [isContactsLoading, setIsContactsLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!form.clientId) {
+      setClientContacts([]);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    async function loadClientContacts() {
+      try {
+        setIsContactsLoading(true);
+        const contacts = await clientsApi.listClientContacts(form.clientId);
+        if (!isMounted) return;
+        setClientContacts(contacts);
+      } catch {
+        if (!isMounted) return;
+        setClientContacts([]);
+      } finally {
+        if (isMounted) setIsContactsLoading(false);
+      }
+    }
+
+    void loadClientContacts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [form.clientId]);
+
+  useEffect(() => {
+    if (!form.clientId || !form.contactId) return;
+    const selected = clientContacts.find((contact) => contact.id === form.contactId);
+    if (selected) return;
+    if (isContactsLoading) return;
+    setForm((current) => (
+      current
+        ? {
+            ...current,
+            contactId: "",
+            contact: "",
+          }
+        : current
+    ));
+  }, [clientContacts, form.clientId, form.contactId, isContactsLoading, setForm]);
+
+  const hasLinkedClient = form.clientId.length > 0;
+  const selectedClient = clients.find((client) => client.id === form.clientId);
+  const selectedContact = clientContacts.find((contact) => contact.id === form.contactId);
+
   return (
     <Modal title={isEditing ? "Edit Project" : "New Project"} onClose={onClose} maxWidth="max-w-3xl">
       <div className="space-y-6">
@@ -1047,12 +1140,95 @@ function ProjectModal({
           </label>
 
           <label className="flex flex-col gap-2">
+            <FieldLabel label="Linked client" />
+            <FieldSelect
+              value={form.clientId}
+              onChange={(e) =>
+                setForm((current) =>
+                  current
+                    ? {
+                        ...current,
+                        clientId: e.target.value,
+                        contactId: "",
+                        contact: e.target.value ? "" : current.contact,
+                      }
+                    : current
+                )
+              }
+            >
+              <option value="">No linked client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </FieldSelect>
+          </label>
+
+          <label className="flex flex-col gap-2">
             <FieldLabel label="Contact" />
-            <FieldInput
-              value={form.contact}
-              onChange={(e) => setForm((current) => current ? { ...current, contact: e.target.value } : current)}
-              placeholder="Customer or account name"
-            />
+            {hasLinkedClient ? (
+              <>
+                <FieldSelect
+                  value={form.contactId}
+                  onChange={(e) => {
+                    const nextContactId = e.target.value;
+                    const nextContact = clientContacts.find((contact) => contact.id === nextContactId);
+                    setForm((current) =>
+                      current
+                        ? {
+                            ...current,
+                            contactId: nextContactId,
+                            contact: nextContact
+                              ? nextContact.name?.trim()
+                                || nextContact.channel_identifier?.trim()
+                                || nextContact.email?.trim()
+                                || nextContact.phone?.trim()
+                                || ""
+                              : "",
+                          }
+                        : current
+                    );
+                  }}
+                  disabled={isContactsLoading || clientContacts.length === 0}
+                >
+                  <option value="">
+                    {isContactsLoading
+                      ? "Loading contacts..."
+                      : clientContacts.length === 0
+                        ? "No contacts linked to this client"
+                        : "Select a client contact"}
+                  </option>
+                  {clientContacts.map((contact) => {
+                    const secondary = contact.channel_identifier || contact.email || contact.phone || "No identifier";
+                    const label = contact.name?.trim() ? `${contact.name} · ${secondary}` : secondary;
+                    return (
+                      <option key={contact.id} value={contact.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </FieldSelect>
+                <p className="text-xs leading-5 text-slate-500">
+                  {selectedContact
+                    ? `Selected contact from ${selectedClient?.name ?? "linked client"}.`
+                    : clientContacts.length === 0
+                      ? "This client has no linked contacts yet. Link contacts in Messages or Clients before saving this project."
+                      : "Projects linked to a client now use one of that client's registered contacts."}
+                </p>
+              </>
+            ) : (
+              <>
+                <FieldInput
+                  value={form.contact}
+                  onChange={(e) => setForm((current) => current ? { ...current, contact: e.target.value } : current)}
+                  placeholder="Customer or account name"
+                />
+                <p className="text-xs leading-5 text-slate-500">
+                  Use free text only when the project is not linked to a client yet.
+                </p>
+              </>
+            )}
           </label>
 
           <label className="flex flex-col gap-2">
@@ -1164,6 +1340,36 @@ function ProjectModal({
                 </p>
               ) : null}
             </label>
+          ) : null}
+
+          {form.stage === "proposal" ? (
+            <div className="rounded-[20px] border border-amber-100 bg-amber-50/70 p-4 md:col-span-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Proposal stage</p>
+                  <p className="mt-1 text-sm font-medium text-slate-800">
+                    {clients.find((client) => client.id === form.clientId)?.name ?? "No client linked yet"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Use the linked client to open the proposals workspace with this project prefilled.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenProposalFlow({
+                      clientId: form.clientId || undefined,
+                      clientName: clients.find((client) => client.id === form.clientId)?.name,
+                      title: form.title,
+                    })
+                  }
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-white px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                >
+                  <span className="material-symbols-outlined text-[16px]">request_quote</span>
+                  Create / link proposal
+                </button>
+              </div>
+            </div>
           ) : null}
         </div>
 
@@ -1336,6 +1542,7 @@ export default function ProjectsPage() {
   const { user } = useAuth();
   const [activeView, setActiveView] = useState<ViewId>("kanban");
   const [cards, setCards] = useState<ProjectCard[]>([]);
+  const [clients, setClients] = useState<ClientListDto[]>([]);
   const [projectTasksByProjectId, setProjectTasksByProjectId] = useState<Record<string, ProjectTask[]>>({});
   const [stageOptions, setStageOptions] = useState<StageOption[]>(STAGES);
   const [form, setForm] = useState<ProjectFormState | null>(null);
@@ -1388,9 +1595,10 @@ export default function ProjectsPage() {
         setIsLoading(true);
         setErrorMessage(null);
 
-        const [stagesResponse, projectsResponse] = await Promise.all([
+        const [stagesResponse, projectsResponse, clientsResponse] = await Promise.all([
           projectsApi.getProjectStages(),
           projectsApi.listProjects(),
+          clientsApi.listClients({ limit: 500 }),
         ]);
 
         if (!isMounted) return;
@@ -1407,6 +1615,7 @@ export default function ProjectsPage() {
 
         setStageOptions(mapStageOptions(stagesResponse));
         setCards(adaptedProjects);
+        setClients(clientsResponse.data ?? []);
         setProjectTasksByProjectId(Object.fromEntries(taskEntries));
       } catch (error) {
         if (!isMounted) return;
@@ -1439,6 +1648,7 @@ export default function ProjectsPage() {
         [
           card.reference,
           card.title,
+          card.clientName ?? "",
           card.contact,
           card.workType,
           card.sourceMessage ?? "",
@@ -1554,6 +1764,20 @@ export default function ProjectsPage() {
     router.push(`/?conversationId=${form.sourceConversationId}`);
   };
 
+  const openProposalFlow = (project: { clientId?: string; clientName?: string; title: string }) => {
+    if (!project.clientId) {
+      setErrorMessage("Link a client to this project before creating a proposal.");
+      return;
+    }
+    const query = new URLSearchParams({
+      create: "1",
+      clientId: project.clientId,
+      title: `${project.title} proposal`,
+    });
+    if (project.clientName) query.set("clientName", project.clientName);
+    router.push(`/proposals?${query.toString()}`);
+  };
+
   const closeProjectModal = () => {
     setForm(null);
     setTaskDraft(createEmptyTaskDraft(defaultTaskOwnerId));
@@ -1616,6 +1840,7 @@ export default function ProjectsPage() {
     const primaryTag = normalized.tags[0] ?? normalizeTagValue(form.workType || "");
 
     if (!normalized.title || !normalized.contact || !normalized.workType) {
+      setErrorMessage("Title, contact and work type are required.");
       return;
     }
 
@@ -1633,6 +1858,8 @@ export default function ProjectsPage() {
       source_type: normalized.origin,
       source_message_id: normalized.sourceMessageId ?? null,
       source_conversation_id: normalized.sourceConversationId ?? null,
+      client_id: normalized.clientId ?? null,
+      contact_id: normalized.contactId ?? null,
       contact_name: normalized.contact,
       channel: toApiChannel(normalized.channel),
       tag: primaryTag || null,
@@ -2097,6 +2324,7 @@ export default function ProjectsPage() {
                             owner={owners.find((item) => item.id === card.ownerId)}
                             onOpen={openExistingProject}
                             onDragStart={handleDragStart}
+                            onOpenProposalFlow={openProposalFlow}
                           />
                         ))}
                       </div>
@@ -2178,6 +2406,7 @@ export default function ProjectsPage() {
           taskDraft={taskDraft}
           setTaskDraft={setTaskDraft}
           tasks={activeProjectTasks}
+          clients={clients}
           owners={owners}
           setForm={setForm}
           onClose={closeProjectModal}
@@ -2187,6 +2416,7 @@ export default function ProjectsPage() {
           onTaskToggle={handleTaskToggle}
           onTaskCancel={handleTaskCancel}
           onOpenConversation={openSourceConversation}
+          onOpenProposalFlow={openProposalFlow}
           onDelete={isEditing ? handleDelete : undefined}
           isEditing={isEditing}
           stages={stageOptions}

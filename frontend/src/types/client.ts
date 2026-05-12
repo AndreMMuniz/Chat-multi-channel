@@ -29,6 +29,15 @@ export interface ClientListDto {
   deleted_at?: string | null;
 }
 
+export interface ClientContactDto {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  channel_identifier?: string | null;
+  created_at: string;
+}
+
 export interface ClientCreateRequest {
   name: string;
   country?: string;

@@ -26,6 +26,26 @@ export interface ProjectDto {
   source_message_id?: string | null;
   conversation_id?: string | null;
   project_context_id?: string | null;
+  client_id?: string | null;
+  contact_id?: string | null;
+  client?: {
+    id: string;
+    name: string;
+    company_name?: string | null;
+    country: string;
+    client_type: string;
+    currency: string;
+    created_at: string;
+    deleted_at?: string | null;
+  } | null;
+  contact?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    channel_identifier?: string | null;
+    created_at: string;
+  } | null;
   contact_name?: string | null;
   channel?: ProjectChannel | null;
   tag?: string | null;
@@ -48,6 +68,8 @@ export interface ProjectCreateRequest {
   source_message_id?: string | null;
   source_conversation_id?: string | null;
   project_context_id?: string | null;
+  client_id?: string | null;
+  contact_id?: string | null;
   contact_name?: string | null;
   channel?: ProjectChannel | null;
   tag?: string | null;
@@ -66,6 +88,8 @@ export interface ProjectFromMessageRequest {
   priority: ProjectPriority;
   owner_user_id?: string | null;
   project_context_id?: string | null;
+  client_id?: string | null;
+  contact_id?: string | null;
   attach_conversation_to_project?: boolean;
   due_date?: string | null;
   value?: number | null;

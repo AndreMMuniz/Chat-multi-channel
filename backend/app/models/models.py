@@ -392,6 +392,8 @@ class Project(Base):
     source_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
     source_conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=True)
     project_context_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True, index=True)
+    contact_id = Column(UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True, index=True)
     contact_name = Column(String(255), nullable=True)
     channel = Column(
         Enum(ChannelType, values_callable=lambda obj: [e.value for e in obj], name="projectchanneltype"),
@@ -409,6 +411,8 @@ class Project(Base):
     stage_definition = relationship("ProjectStage", back_populates="projects")
     owner = relationship("User", foreign_keys=[owner_user_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    client = relationship("Client")
+    contact = relationship("Contact", foreign_keys=[contact_id])
     source_conversation = relationship(
         "Conversation",
         back_populates="source_projects",

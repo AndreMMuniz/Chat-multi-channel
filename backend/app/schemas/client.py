@@ -76,3 +76,14 @@ class ClientListResponse(BaseModel):
     deleted_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class ClientContactListResponse(BaseModel):
+    id: UUID
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    channel_identifier: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

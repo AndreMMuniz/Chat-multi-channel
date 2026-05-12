@@ -13,6 +13,7 @@ from app.models.models import (
     ProjectTaskAutomationType,
     ProjectTaskStatus,
 )
+from app.schemas.client import ClientContactListResponse, ClientListResponse
 
 
 class ProjectBase(BaseModel):
@@ -25,6 +26,8 @@ class ProjectBase(BaseModel):
     source_message_id: Optional[UUID] = None
     source_conversation_id: Optional[UUID] = None
     project_context_id: Optional[UUID] = None
+    client_id: Optional[UUID] = None
+    contact_id: Optional[UUID] = None
     contact_name: Optional[str] = None
     channel: Optional[ChannelType] = None
     tag: Optional[str] = None
@@ -55,6 +58,8 @@ class ProjectUpdate(BaseModel):
     source_message_id: Optional[UUID] = None
     source_conversation_id: Optional[UUID] = None
     project_context_id: Optional[UUID] = None
+    client_id: Optional[UUID] = None
+    contact_id: Optional[UUID] = None
     contact_name: Optional[str] = None
     channel: Optional[ChannelType] = None
     tag: Optional[str] = None
@@ -84,6 +89,8 @@ class ProjectFromMessageCreate(BaseModel):
     priority: ProjectPriority = ProjectPriority.MEDIUM
     owner_user_id: Optional[UUID] = None
     project_context_id: Optional[UUID] = None
+    client_id: Optional[UUID] = None
+    contact_id: Optional[UUID] = None
     attach_conversation_to_project: bool = False
     due_date: Optional[datetime] = None
     value: Optional[int] = None
@@ -118,6 +125,10 @@ class ProjectResponse(BaseModel):
     source_message_id: Optional[UUID] = None
     conversation_id: Optional[UUID] = None
     project_context_id: Optional[UUID] = None
+    client_id: Optional[UUID] = None
+    client: Optional[ClientListResponse] = None
+    contact_id: Optional[UUID] = None
+    contact: Optional[ClientContactListResponse] = None
     contact_name: Optional[str] = None
     channel: Optional[ChannelType] = None
     tag: Optional[str] = None
