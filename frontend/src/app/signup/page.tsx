@@ -101,7 +101,7 @@ export default function SignupPage() {
   if (submitted) {
     return (
       <div className="flex h-screen bg-white">
-        <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#4A1DB5] via-[#632ce5] to-[#7C4DFF] p-12 lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
+        <div className="relative hidden min-w-[520px] overflow-hidden bg-gradient-to-br from-[#4A1DB5] via-[#632ce5] to-[#7C4DFF] p-12 lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
           <div
             className="absolute inset-0 opacity-10"
             style={{
@@ -116,12 +116,14 @@ export default function SignupPage() {
             <span className="text-lg font-bold tracking-tight text-white">omnicrm.chat</span>
           </div>
 
-          <div className="relative max-w-xl">
+          <div className="relative max-w-[560px] min-w-0">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white/80">
               <span className="h-1.5 w-1.5 rounded-full bg-green-300 animate-pulse" />
               Access request submitted
             </div>
-            <h1 className="mb-4 text-4xl font-bold leading-tight text-white">Your onboarding request is already in motion.</h1>
+            <h1 className="mb-4 max-w-[14ch] text-4xl font-bold leading-tight text-white">
+              Your onboarding request is already in motion.
+            </h1>
             <p className="text-lg leading-relaxed text-white/75">
               The team will review your request and release access so you can continue evaluating the branded CRM environment.
             </p>
@@ -179,7 +181,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex h-screen bg-white">
-      <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#4A1DB5] via-[#632ce5] to-[#7C4DFF] p-12 lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
+      <div className="relative hidden min-w-[520px] overflow-hidden bg-gradient-to-br from-[#4A1DB5] via-[#632ce5] to-[#7C4DFF] p-12 lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
         <div
           className="absolute inset-0 opacity-10"
           style={{
@@ -194,12 +196,14 @@ export default function SignupPage() {
           <span className="text-lg font-bold tracking-tight text-white">omnicrm.chat</span>
         </div>
 
-        <div className="relative max-w-xl">
+        <div className="relative max-w-[560px] min-w-0">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white/80">
             <span className="h-1.5 w-1.5 rounded-full bg-green-300 animate-pulse" />
             Workspace onboarding
           </div>
-          <h1 className="mb-4 text-4xl font-bold leading-tight text-white">Request access to the same product experience your team will evaluate.</h1>
+          <h1 className="mb-4 max-w-[13ch] text-4xl font-bold leading-tight text-white">
+            Request access to the same product experience your team will evaluate.
+          </h1>
           <p className="text-lg leading-relaxed text-white/75">
             This flow stays aligned with the product language: clear workspace access, branded CRM onboarding, and a path into the real environment.
           </p>
