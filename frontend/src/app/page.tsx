@@ -147,8 +147,8 @@ function Wordmark() {
 
 function InboxMock() {
   return (
-    <div className="w-full max-w-[640px] overflow-hidden rounded-[24px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
-      <div className="grid min-h-[540px] grid-cols-[64px_280px_minmax(0,1fr)]">
+    <div className="h-[540px] w-full max-w-[640px] overflow-hidden rounded-[24px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
+      <div className="grid h-full grid-cols-[64px_280px_minmax(0,1fr)]">
         <aside className="flex flex-col items-center gap-5 border-r border-[#E9ECEF] bg-white py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f172a] text-white">
             <div className="h-4 w-4 rounded-full border-2 border-emerald-400 border-r-transparent border-t-indigo-300" />
@@ -165,7 +165,7 @@ function InboxMock() {
           ))}
         </aside>
 
-        <aside className="border-r border-[#E9ECEF] bg-[#fbfcff]">
+        <aside className="overflow-hidden border-r border-[#E9ECEF] bg-[#fbfcff]">
           <div className="flex items-center justify-between px-4 py-4">
             <p className="text-[30px] font-semibold tracking-[-0.03em] text-slate-900">Inbox</p>
             <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-indigo-100 px-2 text-[11px] font-bold text-[#5b3df6]">
@@ -275,7 +275,7 @@ function InboxMock() {
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-col bg-white">
+        <section className="flex min-w-0 flex-col overflow-hidden bg-white">
           <div className="flex items-center justify-between border-b border-[#E9ECEF] px-5 py-3">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500 text-sm font-bold text-white">RO</div>
@@ -291,7 +291,7 @@ function InboxMock() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-5 bg-[#fbfcff] px-5 py-5">
+          <div className="flex-1 space-y-4 overflow-hidden bg-[#fbfcff] px-5 py-5">
             <div className="max-w-[260px] rounded-2xl border border-[#E9ECEF] bg-white px-4 py-3 text-sm leading-7 text-slate-800 shadow-sm">
               Hi, I need help with my order #4821. It&apos;s been 5 days and still no tracking update.
             </div>
@@ -307,7 +307,7 @@ function InboxMock() {
             </div>
           </div>
 
-          <div className="border-t border-[#E9ECEF] bg-white px-4 py-4">
+          <div className="border-t border-[#E9ECEF] bg-white px-4 py-3">
             <div className="ml-auto max-w-[340px] rounded-[20px] border border-[#E9ECEF] bg-white p-4 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.18)]">
               <div className="text-center text-[13px] leading-7 text-slate-400">
                 Type a
