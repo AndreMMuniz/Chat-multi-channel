@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en" style="height:100%">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Request access — omnicrm.chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #f8fafc; color: #1d1a24; -webkit-font-smoothing: antialiased; }
+.mso { font-family: 'Material Symbols Outlined'; line-height: 1; user-select: none; display: inline-block; }
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #1d1a24;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: #dde1ec; border-radius: 4px; }
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-8px) rotate(var(--r, 0deg)); }
+}
+@keyframes pulseDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes shineBar {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes stepIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+.fade-in { animation: fadeIn 0.3s ease; }
+.float-1 { animation: floatY 6s ease-in-out infinite; }
+.float-2 { animation: floatY 7s ease-in-out infinite -2s; }
+.float-3 { animation: floatY 8s ease-in-out infinite -4s; }
+
+.dot-grid {
+  background-image: radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.shine-bar::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+  transform: translateX(-120%);
+  animation: shineBar 2.6s ease-in-out infinite 1s;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+// omnicrm.chat — Signup / Workspace onboarding
+const { useState, useEffect, useMemo } = React;
+
+// ── Tokens ─────────────────────────────────────────────────────────────────
+const C = {
+  primary: '#4338ca', primaryContainer: '#4f46e5', primaryHover: '#632ce5',
+  accent: '#7C4DFF',
+  gradFrom: '#4A1DB5', gradVia: '#632ce5', gradTo: '#7C4DFF',
+  surface: '#f8fafc', surfaceLowest: '#ffffff',
+  surfaceContainer: '#eef2ff', surfaceContainerHigh: '#e8ecf8',
+  outline: '#7a7487', outlineVariant: '#E9ECEF',
+  onSurface: '#1d1a24', secondary: '#575f67',
+  error: '#ba1a1a', errorBg: '#ffdad6',
+  success: '#10B981', successBg: '#ecfdf5',
+};
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "brandPanel": "onboarding",
+  "showSSO": true,
+  "showWorkspace": true,
+  "accent": "purple"
+}/*EDITMODE-END*/;
+
+const ACCENT_MAP = {
+  purple: { from: '#4A1DB5', via: '#632ce5', to: '#7C4DFF',  btn: '#7C4DFF', btnHover: '#632ce5' },
+  indigo: { from: '#312e81', via: '#4338ca', to: '#6366f1',  btn: '#4f46e5', btnHover: '#4338ca' },
+  ocean:  { from: '#0c4a6e', via: '#1d4ed8', to: '#0ea5e9',  btn: '#2563eb', btnHover: '#1d4ed8' },
+};
+
+// ── Icons / atoms ──────────────────────────────────────────────────────────
+function Mso({ name, size = 20, fill = 0, weight = 400, style }) {
+  return (
+    <span className="mso" style={{
+      fontSize: size,
+      fontVariationSettings: `'FILL' ${fill}, 'wght' ${weight}, 'GRAD' 0, 'opsz' 24`,
+      ...style,
+    }}>{name}</span>
+  );
+}
+
+function BrandMark({ size = 36 }) {
+  return (
+    <svg viewBox="0 0 40 40" width={size} height={size} style={{ display: 'block' }}>
+      <rect width="40" height="40" rx="11" fill="rgba(255,255,255,0.14)" />
+      <rect x="1.5" y="1.5" width="37" height="37" rx="9.5" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.75"/>
+      <path d="M 20 9 A 12 12 0 0 1 31.2 26.2" fill="none" stroke="#ffffff" strokeWidth="4.2" strokeLinecap="round"/>
+      <path d="M 31.2 26.2 A 12 12 0 0 1 8.8 26.2" fill="none" stroke="#c7d2fe" strokeWidth="4.2" strokeLinecap="round"/>
+      <path d="M 8.8 26.2 A 12 12 0 0 1 20 9" fill="none" stroke="#ffffff" strokeWidth="4.2" strokeLinecap="round" opacity="0.55"/>
+    </svg>
+  );
+}
+
+// ── Brand panel: Onboarding (default) ──────────────────────────────────────
+function BrandPanelOnboarding() {
+  const steps = [
+    { n: '01', t: 'Request access',     d: 'Tell us about you and your team.', active: true },
+    { n: '02', t: 'Verify your email',  d: 'Confirm the address you signed up with.' },
+    { n: '03', t: 'Workspace review',   d: 'Our team validates the request — usually under 24h.' },
+    { n: '04', t: 'Start using',        d: 'Connect WhatsApp, Telegram, Email and SMS.' },
+  ];
+
+  return (
+    <div style={{ position: 'relative', flex: 1, padding: '40px 56px', display: 'flex', flexDirection: 'column', gap: 24, color: '#fff', overflow: 'hidden' }}>
+      {/* Decorative blobs */}
+      <div style={{ position: 'absolute', top: -120, right: -100, width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.18), transparent 60%)', filter: 'blur(8px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: -180, left: -80, width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(199,210,254,0.18), transparent 60%)', filter: 'blur(12px)', pointerEvents: 'none' }} />
+      <div className="dot-grid" style={{ position: 'absolute', inset: 0, opacity: 0.45, pointerEvents: 'none' }} />
+
+      {/* Top: logo + back link */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <BrandMark size={40} />
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em' }}>omnicrm.chat</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 600 }}>Workspace onboarding</div>
+          </div>
+        </div>
+        <a href="#" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 12px', borderRadius: 999,
+          background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)',
+          fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'none',
+        }}>
+          <Mso name="arrow_back" size={14} />
+          Back to landing
+        </a>
+      </div>
+
+      {/* Headline */}
+      <div style={{ position: 'relative', marginTop: 4 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', fontSize: 12, fontWeight: 600, marginBottom: 18 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', animation: 'pulseDot 2s ease-in-out infinite' }} />
+          Now accepting new workspaces
+        </div>
+        <h1 style={{ fontSize: 36, lineHeight: 1.1, fontWeight: 700, letterSpacing: '-0.025em', maxWidth: 460 }}>
+          Bring every customer<br/>
+          conversation<br/>
+          <span style={{ color: '#e0e7ff', fontStyle: 'italic', fontWeight: 600 }}>into one workspace.</span>
+        </h1>
+        <p style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6, color: 'rgba(255,255,255,0.78)', maxWidth: 440 }}>
+          WhatsApp, Telegram, Email and SMS — centralized with AI-assisted replies and a built-in sales pipeline.
+        </p>
+      </div>
+
+      {/* Steps timeline */}
+      <div style={{ position: 'relative', flex: 1, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
+          What happens next
+        </div>
+        {steps.map((s, i) => (
+          <div key={s.n} style={{
+            position: 'relative', display: 'flex', gap: 14, alignItems: 'flex-start',
+            paddingBottom: i < steps.length - 1 ? 14 : 0,
+            animation: `stepIn 0.4s ease ${i * 0.08}s both`,
+          }}>
+            <div style={{
+              flexShrink: 0, width: 32, height: 32, borderRadius: 10,
+              background: s.active ? '#fff' : 'rgba(255,255,255,0.1)',
+              border: s.active ? 'none' : '1px solid rgba(255,255,255,0.22)',
+              color: s.active ? C.accent : 'rgba(255,255,255,0.85)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, letterSpacing: '-0.01em',
+              boxShadow: s.active ? '0 4px 14px -4px rgba(255,255,255,0.6)' : 'none',
+            }}>
+              {s.n}
+            </div>
+            {i < steps.length - 1 && (
+              <div style={{
+                position: 'absolute', left: 16, top: 32, width: 1,
+                height: 'calc(100% - 12px)',
+                background: 'rgba(255,255,255,0.18)',
+              }} />
+            )}
+            <div style={{ flex: 1, paddingTop: 2 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                {s.t}
+                {s.active && (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.18)', padding: '2px 6px', borderRadius: 999, letterSpacing: '0.04em', textTransform: 'uppercase' }}>You're here</span>
+                )}
+              </div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.5, color: 'rgba(255,255,255,0.72)', marginTop: 2 }}>
+                {s.d}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer trust */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Mso name="shield" size={14} fill={1} /> SOC 2 Type II
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Mso name="lock" size={14} fill={1} /> GDPR / LGPD
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Mso name="bolt" size={14} fill={1} /> 99.98% uptime
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>© 2026 omnicrm.chat</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Brand panel: Preview variant ───────────────────────────────────────────
+function BrandPanelPreview() {
+  return (
+    <div style={{ position: 'relative', flex: 1, padding: '40px 56px', display: 'flex', flexDirection: 'column', gap: 24, color: '#fff', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: -120, right: -100, width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.18), transparent 60%)', filter: 'blur(8px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: -180, left: -80, width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(199,210,254,0.18), transparent 60%)', filter: 'blur(12px)', pointerEvents: 'none' }} />
+      <div className="dot-grid" style={{ position: 'absolute', inset: 0, opacity: 0.45, pointerEvents: 'none' }} />
+
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <BrandMark size={40} />
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em' }}>omnicrm.chat</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 600 }}>Workspace onboarding</div>
+        </div>
+      </div>
+
+      <div style={{ position: 'relative', marginTop: 8 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', fontSize: 12, fontWeight: 600, marginBottom: 20 }}>
+          <Mso name="auto_awesome" size={14} fill={1} style={{ color: '#c7d2fe' }} />
+          AI-powered platform
+        </div>
+        <h1 style={{ fontSize: 38, lineHeight: 1.1, fontWeight: 700, letterSpacing: '-0.025em', maxWidth: 460 }}>
+          Every conversation<br/>
+          your customers start,<br/>
+          <span style={{ color: '#e0e7ff', fontStyle: 'italic', fontWeight: 600 }}>in one place.</span>
+        </h1>
+        <p style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6, color: 'rgba(255,255,255,0.78)', maxWidth: 440 }}>
+          WhatsApp, Telegram, Email and SMS — centralized with AI-assisted replies and a built-in sales pipeline.
+        </p>
+      </div>
+
+      <div style={{ position: 'relative', flex: 1, marginTop: 8, minHeight: 240 }}>
+        <PreviewInboxCard />
+        <PreviewSuggestionCard />
+        <PreviewKanbanCard />
+      </div>
+
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.14)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Mso name="shield" size={14} fill={1} /> SOC 2 Type II</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Mso name="lock" size={14} fill={1} /> GDPR / LGPD</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Mso name="bolt" size={14} fill={1} /> 99.98% uptime</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>© 2026 omnicrm.chat</div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewInboxCard() {
+  return (
+    <div className="float-1" style={{
+      position: 'absolute', top: 0, left: 0, width: 320,
+      background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(8px)',
+      borderRadius: 14, padding: 14,
+      boxShadow: '0 24px 48px -16px rgba(20, 8, 60, 0.45), 0 8px 16px -8px rgba(0,0,0,0.18)',
+      color: C.onSurface, transform: 'rotate(-1.5deg)', '--r': '-1.5deg',
+      border: '1px solid rgba(255,255,255,0.6)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#15803d', position: 'relative' }}>
+          <Mso name="chat" size={16} fill={1} />
+          <span style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: '50%', background: '#25D366', border: '2px solid #fff' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Mariana Costa</div>
+            <div style={{ fontSize: 10, color: C.secondary }}>now</div>
+          </div>
+          <div style={{ fontSize: 12, color: C.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Hey! Can I move my invoice payment up?
+          </div>
+        </div>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7C4DFF' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <span style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, borderRadius: 999, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>Billing</span>
+        <span style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, borderRadius: 999, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>VIP</span>
+      </div>
+    </div>
+  );
+}
+
+function PreviewSuggestionCard() {
+  return (
+    <div className="float-2 shine-bar" style={{
+      position: 'absolute', top: 90, right: 0, width: 280,
+      background: 'linear-gradient(160deg, #1d1238, #2d1c5c)',
+      borderRadius: 14, padding: 14,
+      boxShadow: '0 24px 48px -16px rgba(20, 8, 60, 0.55), 0 8px 16px -8px rgba(0,0,0,0.2)',
+      color: '#fff', transform: 'rotate(2deg)', '--r': '2deg',
+      border: '1px solid rgba(124,77,255,0.4)', overflow: 'hidden',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(124,77,255,0.25)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#c7d2fe' }}>
+          <Mso name="auto_awesome" size={14} fill={1} />
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#c7d2fe' }}>AI suggestion</div>
+      </div>
+      <div style={{ fontSize: 12.5, lineHeight: 1.5, color: 'rgba(255,255,255,0.92)' }}>
+        Sure! I can generate a new invoice with an adjusted date. Which date works best for you?
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+        <button style={{ flex: 1, padding: '6px 10px', fontSize: 11, fontWeight: 600, borderRadius: 8, background: '#7C4DFF', color: '#fff', border: 'none', cursor: 'pointer' }}>Insert</button>
+        <button style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, borderRadius: 8, background: 'transparent', color: '#c7d2fe', border: '1px solid rgba(199,210,254,0.3)', cursor: 'pointer' }}>Refine</button>
+      </div>
+    </div>
+  );
+}
+
+function PreviewKanbanCard() {
+  return (
+    <div className="float-3" style={{
+      position: 'absolute', bottom: 0, left: 60, width: 300,
+      background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(8px)',
+      borderRadius: 14, padding: 12,
+      boxShadow: '0 24px 48px -16px rgba(20, 8, 60, 0.45), 0 8px 16px -8px rgba(0,0,0,0.18)',
+      color: C.onSurface, transform: 'rotate(-1deg)', '--r': '-1deg',
+      border: '1px solid rgba(255,255,255,0.6)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.secondary }}>Pipeline</div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: '#7C4DFF' }}>$142.8k</div>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[
+          { l: 'New', n: 8, c: '#7C4DFF' },
+          { l: 'Qual.', n: 5, c: '#0088CC' },
+          { l: 'Negot.', n: 3, c: '#F59E0B' },
+          { l: 'Closed', n: 12, c: '#10B981' },
+        ].map(s => (
+          <div key={s.l} style={{ flex: 1, padding: '8px 8px', borderRadius: 8, background: '#f8fafc', border: '1px solid #eef2ff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.c }} />
+              <span style={{ fontSize: 9, fontWeight: 600, color: C.secondary }}>{s.l}</span>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.onSurface, letterSpacing: '-0.02em' }}>{s.n}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Brand panel: Testimonial variant ────────────────────────────────────────
+function BrandPanelTestimonial() {
+  return (
+    <div style={{ position: 'relative', flex: 1, padding: '48px 56px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', color: '#fff', overflow: 'hidden' }}>
+      <div className="dot-grid" style={{ position: 'absolute', inset: 0, opacity: 0.4 }} />
+      <div style={{ position: 'absolute', bottom: -160, right: -120, width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.16), transparent 60%)' }} />
+
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <BrandMark size={40} />
+        <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>omnicrm.chat</div>
+      </div>
+
+      <div style={{ position: 'relative', maxWidth: 520 }}>
+        <Mso name="format_quote" size={56} fill={1} style={{ color: 'rgba(255,255,255,0.25)', marginBottom: 12, marginLeft: -8 }} />
+        <p style={{ fontSize: 24, lineHeight: 1.4, fontWeight: 500, letterSpacing: '-0.015em' }}>
+          We cut first-response time by <span style={{ color: '#e0e7ff', fontWeight: 700 }}>68%</span> and centralized four channels that used to live in separate tabs.
+        </p>
+        <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #fce7f3, #f9a8d4)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#be185d', fontWeight: 700, fontSize: 16 }}>CR</div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Carla Ramos</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>Head of Customer Ops · Riverstone</div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 32, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.16)' }}>
+          {[
+            { k: '4.8M+', l: 'messages / mo.' },
+            { k: '99.98%', l: 'uptime' },
+            { k: '1,200+', l: 'active teams' },
+          ].map(s => (
+            <div key={s.l}>
+              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>{s.k}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.66)', marginTop: 2 }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ position: 'relative', fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>© 2026 omnicrm.chat</div>
+    </div>
+  );
+}
+
+// ── Password strength helpers ───────────────────────────────────────────────
+function evaluatePassword(pw) {
+  const checks = {
+    length: pw.length >= 8,
+    upper: /[A-Z]/.test(pw),
+    lower: /[a-z]/.test(pw),
+    number: /\d/.test(pw),
+    symbol: /[^A-Za-z0-9]/.test(pw),
+  };
+  const score = Object.values(checks).filter(Boolean).length;
+  let label = 'Too short', color = '#cbd5e1';
+  if (pw.length === 0) { label = '', color = '#cbd5e1'; }
+  else if (score <= 2) { label = 'Weak', color = '#EF4444'; }
+  else if (score === 3) { label = 'Fair', color = '#F59E0B'; }
+  else if (score === 4) { label = 'Good', color = '#7C4DFF'; }
+  else { label = 'Strong', color = '#10B981'; }
+  return { checks, score, label, color };
+}
+
+// ── Form ────────────────────────────────────────────────────────────────────
+function SignupForm({ showSSO, showWorkspace, accent }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [workspace, setWorkspace] = useState('');
+  const [pass, setPass] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [terms, setTerms] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const tone = ACCENT_MAP[accent] || ACCENT_MAP.purple;
+  const strength = useMemo(() => evaluatePassword(pass), [pass]);
+  const mismatch = confirm.length > 0 && confirm !== pass;
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!name || !email || !pass || !confirm) {
+      setError('Fill in all fields to continue.');
+      return;
+    }
+    if (strength.score < 3) {
+      setError('Please choose a stronger password (at least 8 chars + mixed case + number).');
+      return;
+    }
+    if (mismatch) {
+      setError('Passwords don\u2019t match.');
+      return;
+    }
+    if (!terms) {
+      setError('You need to accept the terms to continue.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setSubmitted(true);
+    }, 1400);
+  };
+
+  if (submitted) {
+    return (
+      <div className="fade-in" style={{ width: '100%', maxWidth: 420 }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 56, height: 56, borderRadius: 18,
+          background: C.successBg, color: C.success, marginBottom: 18,
+        }}>
+          <Mso name="mark_email_read" size={28} fill={1} />
+        </div>
+        <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: C.onSurface, marginBottom: 8 }}>
+          Request received
+        </h2>
+        <p style={{ fontSize: 14, color: C.secondary, lineHeight: 1.55, marginBottom: 20 }}>
+          We sent a confirmation link to <strong style={{ color: C.onSurface }}>{email || 'your inbox'}</strong>.
+          Once you verify your address, our team will review your workspace and release access — usually within 24 hours.
+        </p>
+        <div style={{
+          padding: 14, borderRadius: 12,
+          background: '#f8fafc', border: `1px solid ${C.outlineVariant}`,
+          display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 18,
+        }}>
+          <Mso name="info" size={18} fill={1} style={{ color: tone.btn, marginTop: 1 }} />
+          <div style={{ fontSize: 13, color: C.secondary, lineHeight: 1.5 }}>
+            Didn\u2019t get the email? Check your spam folder or{' '}
+            <a href="#" style={{ color: tone.btn, fontWeight: 600, textDecoration: 'none' }}>resend it</a>.
+          </div>
+        </div>
+        <a href="Login.html" style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          width: '100%', height: 46, borderRadius: 12,
+          background: tone.btn, color: '#fff', fontSize: 14, fontWeight: 600,
+          textDecoration: 'none',
+          boxShadow: '0 10px 20px -8px rgba(124,77,255,0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+        }}>
+          Go to sign in
+          <Mso name="arrow_forward" size={18} weight={500} />
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 420 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: C.onSurface, marginBottom: 6 }}>
+          Request workspace access
+        </h2>
+        <p style={{ fontSize: 14, color: C.secondary, lineHeight: 1.55 }}>
+          Tell us about you and your team so we can review and release platform access.
+        </p>
+      </div>
+
+      {showSSO && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            <SsoButton provider="google" label="Sign up with Google" />
+            <SsoButton provider="microsoft" label="Sign up with Microsoft" />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0 16px', color: C.secondary, fontSize: 12 }}>
+            <div style={{ flex: 1, height: 1, background: C.outlineVariant }} />
+            <span style={{ fontWeight: 500 }}>or sign up with email</span>
+            <div style={{ flex: 1, height: 1, background: C.outlineVariant }} />
+          </div>
+        </>
+      )}
+
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field
+          label="Full name"
+          icon="person"
+          placeholder="Jane Doe"
+          value={name}
+          onChange={setName}
+          accent={tone}
+        />
+
+        <Field
+          label="Work email"
+          icon="mail"
+          type="email"
+          placeholder="you@company.com"
+          value={email}
+          onChange={setEmail}
+          accent={tone}
+        />
+
+        {showWorkspace && (
+          <Field
+            label="Workspace name"
+            icon="domain"
+            placeholder="Acme Support"
+            hint="This is how your team will identify the workspace inside Omnichat."
+            value={workspace}
+            onChange={setWorkspace}
+            accent={tone}
+          />
+        )}
+
+        <div>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.onSurface, marginBottom: 6 }}>Password</label>
+          <PasswordField
+            value={pass}
+            onChange={setPass}
+            show={showPass}
+            toggle={() => setShowPass(s => !s)}
+            placeholder="Create a strong password"
+            accent={tone}
+          />
+          {pass.length > 0 && (
+            <PasswordStrength strength={strength} />
+          )}
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.onSurface, marginBottom: 6 }}>Confirm password</label>
+          <PasswordField
+            value={confirm}
+            onChange={setConfirm}
+            show={showPass}
+            toggle={() => setShowPass(s => !s)}
+            placeholder="Repeat your password"
+            accent={tone}
+            error={mismatch}
+          />
+          {mismatch && (
+            <div style={{ marginTop: 6, fontSize: 12, color: C.error, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Mso name="error" size={14} fill={1} />
+              Passwords don\u2019t match
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, background: C.errorBg, color: '#93000a', fontSize: 13, fontWeight: 500 }}>
+            <Mso name="error" size={16} fill={1} />
+            {error}
+          </div>
+        )}
+
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: C.secondary, cursor: 'pointer', userSelect: 'none', marginTop: 2, lineHeight: 1.5 }}>
+          <span style={{ position: 'relative', display: 'inline-block', width: 16, height: 16, marginTop: 2, flexShrink: 0 }}>
+            <input
+              type="checkbox"
+              checked={terms}
+              onChange={(e) => setTerms(e.target.checked)}
+              style={{ position: 'absolute', opacity: 0, width: 16, height: 16, margin: 0, cursor: 'pointer' }}
+            />
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 16, height: 16, borderRadius: 4,
+              background: terms ? tone.btn : '#fff',
+              border: `1.5px solid ${terms ? tone.btn : '#cbd5e1'}`,
+              transition: 'all 0.15s',
+            }}>
+              {terms && <Mso name="check" size={12} fill={1} weight={700} style={{ color: '#fff' }} />}
+            </span>
+          </span>
+          <span>
+            I agree to the <a href="#" style={{ color: tone.btn, fontWeight: 600, textDecoration: 'none' }}>Terms of Service</a> and{' '}
+            <a href="#" style={{ color: tone.btn, fontWeight: 600, textDecoration: 'none' }}>Privacy Policy</a>.
+          </span>
+        </label>
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            marginTop: 4, height: 46, borderRadius: 12,
+            background: loading ? tone.btnHover : tone.btn,
+            color: '#fff', fontSize: 14, fontWeight: 600,
+            border: 'none', cursor: loading ? 'wait' : 'pointer',
+            boxShadow: '0 10px 20px -8px rgba(124,77,255,0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            transition: 'transform 0.08s, background 0.15s',
+            fontFamily: 'inherit',
+          }}
+          onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+          onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          {loading ? (
+            <>
+              <Mso name="progress_activity" size={18} style={{ animation: 'spin 0.9s linear infinite' }} />
+              Submitting…
+            </>
+          ) : (
+            <>
+              Submit request
+              <Mso name="arrow_forward" size={18} weight={500} />
+            </>
+          )}
+        </button>
+      </form>
+
+      <div style={{ marginTop: 20, paddingTop: 18, borderTop: `1px solid ${C.outlineVariant}`, fontSize: 13, color: C.secondary, textAlign: 'center' }}>
+        Already have an account?{' '}
+        <a href="Login.html" style={{ color: tone.btn, fontWeight: 600, textDecoration: 'none' }}>Sign in</a>
+      </div>
+    </div>
+  );
+}
+
+function PasswordStrength({ strength }) {
+  const segments = 4;
+  const filled = Math.min(segments, Math.max(1, strength.score - 1));
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+        {Array.from({ length: segments }).map((_, i) => (
+          <div key={i} style={{
+            flex: 1, height: 4, borderRadius: 4,
+            background: i < filled ? strength.color : '#eef2f6',
+            transition: 'background 0.2s',
+          }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5 }}>
+        <span style={{ color: C.secondary }}>
+          Use 8+ chars with mixed case, numbers and symbols.
+        </span>
+        <span style={{ color: strength.color, fontWeight: 600 }}>{strength.label}</span>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, icon, type = 'text', placeholder, value, onChange, accent, hint }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.onSurface, marginBottom: 6 }}>{label}</label>
+      <div style={{
+        position: 'relative',
+        display: 'flex', alignItems: 'center',
+        height: 46, borderRadius: 12,
+        background: focused ? '#fff' : '#f8fafc',
+        border: `1.5px solid ${focused ? accent.btn : C.outlineVariant}`,
+        boxShadow: focused ? `0 0 0 4px ${accent.btn}1f` : 'none',
+        transition: 'all 0.15s',
+      }}>
+        <Mso name={icon} size={18} style={{ color: focused ? accent.btn : C.outline, marginLeft: 14 }} />
+        <input
+          type={type}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            flex: 1, height: '100%',
+            border: 'none', outline: 'none', background: 'transparent',
+            padding: '0 14px', fontSize: 14, color: C.onSurface,
+            fontFamily: 'inherit',
+          }}
+        />
+      </div>
+      {hint && (
+        <div style={{ marginTop: 6, fontSize: 11.5, color: C.secondary, lineHeight: 1.4 }}>
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PasswordField({ value, onChange, show, toggle, accent, placeholder, error }) {
+  const [focused, setFocused] = useState(false);
+  const borderColor = error ? C.error : (focused ? accent.btn : C.outlineVariant);
+  const ringColor = error ? `${C.error}26` : `${accent.btn}1f`;
+  return (
+    <div style={{
+      position: 'relative',
+      display: 'flex', alignItems: 'center',
+      height: 46, borderRadius: 12,
+      background: focused ? '#fff' : '#f8fafc',
+      border: `1.5px solid ${borderColor}`,
+      boxShadow: (focused || error) ? `0 0 0 4px ${ringColor}` : 'none',
+      transition: 'all 0.15s',
+    }}>
+      <Mso name="lock" size={18} style={{ color: error ? C.error : (focused ? accent.btn : C.outline), marginLeft: 14 }} />
+      <input
+        type={show ? 'text' : 'password'}
+        placeholder={placeholder || '••••••••'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={{
+          flex: 1, height: '100%',
+          border: 'none', outline: 'none', background: 'transparent',
+          padding: '0 14px', fontSize: 14, color: C.onSurface,
+          fontFamily: 'inherit', letterSpacing: show || value.length === 0 ? 'normal' : '0.18em',
+        }}
+      />
+      <button
+        type="button"
+        onClick={toggle}
+        style={{
+          width: 38, height: 32, marginRight: 6,
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          color: C.secondary, borderRadius: 8,
+        }}
+        title={show ? 'Hide password' : 'Show password'}
+      >
+        <Mso name={show ? 'visibility_off' : 'visibility'} size={18} />
+      </button>
+    </div>
+  );
+}
+
+function SsoButton({ provider, label }) {
+  const logos = {
+    google: (
+      <svg viewBox="0 0 24 24" width="18" height="18">
+        <path fill="#EA4335" d="M12 5.04c1.62 0 3.07.56 4.21 1.65l3.15-3.15C17.45 1.7 14.97.62 12 .62 7.7.62 3.99 3.08 2.18 6.67l3.66 2.84C6.7 6.91 9.13 5.04 12 5.04z"/>
+        <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.28 1.4-1.04 2.59-2.21 3.42v2.77h3.57c2.08-1.92 3.66-4.74 3.66-8.43z"/>
+        <path fill="#FBBC05" d="M5.84 14.09a7.06 7.06 0 0 1 0-4.18L2.18 7.07a11.94 11.94 0 0 0 0 9.86l3.66-2.84z"/>
+        <path fill="#34A853" d="M12 23.38c3.24 0 5.95-1.07 7.93-2.91l-3.57-2.77c-.99.67-2.27 1.07-4.36 1.07-2.87 0-5.3-1.88-6.16-4.51l-3.66 2.84C3.99 20.92 7.7 23.38 12 23.38z"/>
+      </svg>
+    ),
+    microsoft: (
+      <svg viewBox="0 0 24 24" width="16" height="16">
+        <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+        <rect x="13" y="1" width="10" height="10" fill="#7FBA00"/>
+        <rect x="1" y="13" width="10" height="10" fill="#00A4EF"/>
+        <rect x="13" y="13" width="10" height="10" fill="#FFB900"/>
+      </svg>
+    ),
+  };
+  return (
+    <button
+      type="button"
+      style={{
+        height: 44, borderRadius: 12,
+        background: '#fff', border: `1.5px solid ${C.outlineVariant}`,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+        fontSize: 14, fontWeight: 600, color: C.onSurface,
+        cursor: 'pointer', transition: 'all 0.15s',
+        fontFamily: 'inherit',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = C.outlineVariant; }}
+    >
+      {logos[provider]}
+      {label}
+    </button>
+  );
+}
+
+// ── App ─────────────────────────────────────────────────────────────────────
+function App() {
+  const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+  const tone = ACCENT_MAP[t.accent] || ACCENT_MAP.purple;
+
+  const BrandPanel = t.brandPanel === 'preview' ? BrandPanelPreview
+                  : t.brandPanel === 'testimonial' ? BrandPanelTestimonial
+                  : BrandPanelOnboarding;
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: C.surface }}>
+      {/* Brand panel */}
+      <div style={{
+        flex: '0 0 54%',
+        background: `linear-gradient(135deg, ${tone.from} 0%, ${tone.via} 50%, ${tone.to} 100%)`,
+        display: 'flex',
+      }}>
+        <BrandPanel />
+      </div>
+
+      {/* Form panel */}
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 56px', position: 'relative',
+      }}>
+        {/* Top-right help */}
+        <div style={{ position: 'absolute', top: 28, right: 40, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: C.secondary }}>Need help?</span>
+          <a href="#" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 999,
+            background: '#fff', border: `1px solid ${C.outlineVariant}`,
+            fontSize: 13, fontWeight: 600, color: C.onSurface, textDecoration: 'none',
+          }}>
+            <Mso name="support_agent" size={16} fill={1} style={{ color: tone.btn }} />
+            Contact support
+          </a>
+        </div>
+
+        <SignupForm showSSO={t.showSSO} showWorkspace={t.showWorkspace} accent={t.accent} />
+
+        {/* Bottom-right language */}
+        <div style={{ position: 'absolute', bottom: 28, right: 40, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.secondary }}>
+          <Mso name="language" size={14} />
+          English (US)
+          <Mso name="expand_more" size={14} />
+        </div>
+      </div>
+
+      <window.TweaksPanel>
+        <window.TweakSection label="Layout">
+          <window.TweakRadio
+            label="Brand panel"
+            value={t.brandPanel}
+            onChange={(v) => setTweak('brandPanel', v)}
+            options={[
+              { value: 'onboarding',  label: 'Onboarding' },
+              { value: 'preview',     label: 'Preview' },
+              { value: 'testimonial', label: 'Testimonial' },
+            ]}
+          />
+          <window.TweakRadio
+            label="Brand tone"
+            value={t.accent}
+            onChange={(v) => setTweak('accent', v)}
+            options={[
+              { value: 'purple', label: 'Purple' },
+              { value: 'indigo', label: 'Indigo' },
+              { value: 'ocean',  label: 'Ocean' },
+            ]}
+          />
+        </window.TweakSection>
+        <window.TweakSection label="Form">
+          <window.TweakToggle
+            label="Show social signup (Google / Microsoft)"
+            value={t.showSSO}
+            onChange={(v) => setTweak('showSSO', v)}
+          />
+          <window.TweakToggle
+            label="Ask for workspace name"
+            value={t.showWorkspace}
+            onChange={(v) => setTweak('showWorkspace', v)}
+          />
+        </window.TweakSection>
+      </window.TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+</script>
+</body>
+</html>
