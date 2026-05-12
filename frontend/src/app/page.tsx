@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import HowItWorksSection from "@/components/landing/HowItWorksSection";
 
 export const metadata: Metadata = {
   title: "omnicrm.chat | Every customer conversation, in one inbox",
@@ -61,21 +62,6 @@ const channels = [
   { name: "Email", icon: "mail", tone: "bg-orange-50 text-orange-600" },
   { name: "SMS", icon: "sms", tone: "bg-violet-50 text-violet-600" },
   { name: "Web chat", icon: "language", tone: "bg-slate-100 text-slate-600" },
-];
-
-const steps = [
-  {
-    title: "Connect your channels",
-    body: "Bring WhatsApp, Telegram, Email, and SMS into one operational shell without rebuilding your process.",
-  },
-  {
-    title: "Invite your team and define rules",
-    body: "Configure queues, roles, SLAs, and tags so the workspace reflects the way your support team already runs.",
-  },
-  {
-    title: "Reply with AI in the wings",
-    body: "Use one composer for every channel, with quick replies and AI suggestions available on every conversation.",
-  },
 ];
 
 const faqs = [
@@ -509,73 +495,6 @@ function DashboardMock() {
   );
 }
 
-function HowItWorksVisual() {
-  return (
-    <div className="max-h-[400px] overflow-hidden rounded-[20px] border border-[#E9ECEF] bg-white p-4 shadow-sm">
-      <div className="h-full rounded-3xl border border-[#E9ECEF] bg-[#fbfcff] p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Reply workflow</p>
-            <p className="mt-1 text-xs text-slate-500">One shell, multiple operational layers</p>
-          </div>
-          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-[#7C4DFF]">AI ready</span>
-        </div>
-        <div className="mt-4 space-y-4">
-          <div className="rounded-2xl border border-[#E9ECEF] bg-white p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-900">Connected channels</p>
-              <span className="text-xs text-slate-400">5 active</span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {channels.map((channel) => (
-                <span key={channel.name} className={`rounded-full px-3 py-1.5 text-[11px] font-medium ${channel.tone}`}>
-                  {channel.name}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[#E9ECEF] bg-white p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-900">Queues and SLAs</p>
-              <span className="text-xs text-emerald-600">Healthy</span>
-            </div>
-            <div className="mt-3 space-y-3">
-              {[
-                ["Billing", "06 min first response", "82 open"],
-                ["Support", "04 min first response", "131 open"],
-                ["Commercial", "10 min first response", "37 open"],
-              ].map(([name, sla, count]) => (
-                <div key={name} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
-                  <div>
-                    <p className="font-medium text-slate-900">{name}</p>
-                    <p className="text-xs text-slate-500">{sla}</p>
-                  </div>
-                  <span className="text-xs font-medium text-slate-600">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-indigo-100 bg-[#faf7ff] p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7C4DFF]">Draft + quick reply</p>
-            <p className="mt-2 text-sm leading-7 text-slate-700">
-              “I can help with your plan update right away. I&apos;ll guide you through billing and seats in one flow.”
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["/plan-change", "/renewal", "tag:billing"].map((item) => (
-                <span key={item} className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-medium text-[#7C4DFF]">
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function LandingPage() {
   return (
     <main className="bg-white text-slate-900">
@@ -770,29 +689,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="mt-14 grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-            <div className="space-y-3">
-              {steps.map((step, index) => (
-                <article key={step.title} className={`rounded-[24px] border p-6 ${index === 0 ? "border-indigo-200 bg-white shadow-sm" : "border-transparent bg-transparent"}`}>
-                  <div className="flex gap-5">
-                    <div
-                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                        index === 0 ? "bg-[#7C4DFF] text-white" : "bg-indigo-100 text-indigo-700"
-                      }`}
-                    >
-                      {String(index + 1).padStart(2, "0")}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold tracking-[-0.01em] text-slate-900">{step.title}</h3>
-                      <p className="mt-2 text-sm leading-7 text-slate-600">{step.body}</p>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <HowItWorksVisual />
-          </div>
+          <HowItWorksSection />
         </div>
       </section>
 
