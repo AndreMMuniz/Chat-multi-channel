@@ -147,8 +147,8 @@ function Wordmark() {
 
 function InboxMock() {
   return (
-    <div className="overflow-hidden rounded-[24px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
-      <div className="grid min-h-[540px] grid-cols-[64px_280px_1fr]">
+    <div className="w-full max-w-[640px] overflow-hidden rounded-[24px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
+      <div className="grid min-h-[540px] grid-cols-[64px_280px_minmax(0,1fr)]">
         <aside className="flex flex-col items-center gap-5 border-r border-[#E9ECEF] bg-white py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f172a] text-white">
             <div className="h-4 w-4 rounded-full border-2 border-emerald-400 border-r-transparent border-t-indigo-300" />
@@ -573,8 +573,8 @@ export default function LandingPage() {
       </nav>
 
       <section className="overflow-hidden py-20 lg:py-24">
-        <div className="mx-auto grid max-w-7xl gap-14 px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-10">
-          <div>
+        <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[minmax(0,520px)_minmax(0,640px)] lg:justify-between lg:items-center lg:px-10">
+          <div className="min-w-0 max-w-[520px]">
             <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700">
               <span className="h-1.5 w-1.5 rounded-full bg-[#7C4DFF] shadow-[0_0_0_4px_rgba(124,77,255,0.18)]" />
               Multi-channel customer support
@@ -585,7 +585,7 @@ export default function LandingPage() {
               <span className="block text-[#7C4DFF]">in one calm inbox.</span>
             </h1>
 
-            <p className="mt-6 max-w-xl text-[17px] leading-8 text-slate-600 sm:text-lg">
+            <p className="mt-6 max-w-[520px] text-[17px] leading-8 text-slate-600 sm:text-lg">
               WhatsApp, Telegram, Email and SMS — handled by your team in a single workspace, with AI ready when you need it.
             </p>
 
@@ -619,7 +619,9 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <InboxMock />
+          <div className="min-w-0 lg:justify-self-end">
+            <InboxMock />
+          </div>
         </div>
 
         <div className="mx-auto mt-16 max-w-7xl px-6 lg:px-10">
