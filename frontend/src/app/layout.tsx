@@ -3,7 +3,7 @@ import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
-  title: "Omnichat",
+  title: "omnicrm.chat",
   description: "Multi-channel customer support platform",
   icons: {
     icon: "/icon.svg",

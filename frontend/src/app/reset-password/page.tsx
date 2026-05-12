@@ -83,7 +83,7 @@ function ResetPasswordPageInner() {
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
             <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
           </div>
-          <span className="font-bold text-lg text-white tracking-tight">Omnichat</span>
+          <span className="font-bold text-lg text-white tracking-tight">omnicrm.chat</span>
         </div>
 
         <div className="relative">
@@ -99,7 +99,7 @@ function ResetPasswordPageInner() {
           </p>
         </div>
 
-        <p className="relative text-white/35 text-xs">© 2026 Omnichat. All rights reserved.</p>
+        <p className="relative text-white/35 text-xs">© 2026 omnicrm.chat. All rights reserved.</p>
       </div>
 
       {/* Form panel */}
@@ -110,7 +110,7 @@ function ResetPasswordPageInner() {
             <div className="w-8 h-8 bg-[#632ce5] rounded-lg flex items-center justify-center">
               <span className="material-symbols-outlined text-white text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
             </div>
-            <span className="font-bold text-slate-900">Omnichat</span>
+            <span className="font-bold text-slate-900">omnicrm.chat</span>
           </div>
 
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Reset password</h2>

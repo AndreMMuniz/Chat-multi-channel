@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Omnichat | Every customer conversation, in one inbox",
+  title: "omnicrm.chat | Every customer conversation, in one inbox",
   description:
     "A multi-channel customer support platform for WhatsApp, Telegram, Email, SMS, and web chat with AI suggestions, quick replies, and operational visibility.",
 };
@@ -92,8 +92,8 @@ const faqs = [
     a: "Yes. The workspace is designed so quick replies, channel filters, and tag-based organization reinforce each other in one flow.",
   },
   {
-    q: "Is Omnichat built for internal support teams?",
-    a: "Yes. The landing and the product both position Omnichat as an operational workspace for real internal business teams.",
+    q: "Is omnicrm.chat built for internal support teams?",
+    a: "Yes. The landing and the product both position omnicrm.chat as an operational workspace for real internal business teams.",
   },
   {
     q: "Can this evolve into broader CRM and commercial workflows?",
@@ -138,7 +138,7 @@ function Wordmark() {
         <MaterialIcon name="support_agent" filled className="text-[22px]" />
       </div>
       <div>
-        <div className="text-base font-semibold tracking-[-0.02em] text-slate-900">Omnichat</div>
+        <div className="text-base font-semibold tracking-[-0.02em] text-slate-900">omnicrm.chat</div>
         <div className="text-xs text-slate-500">Multi-channel customer support</div>
       </div>
     </div>
@@ -536,7 +536,7 @@ export default function LandingPage() {
       <section id="product" className="py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
           <div className="max-w-3xl">
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#7C4DFF]">Why teams switch to Omnichat</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#7C4DFF]">Why teams switch to omnicrm.chat</p>
             <h2 className="mt-3 text-4xl font-bold tracking-[-0.03em] text-slate-900 sm:text-5xl">
               A workspace built around your customer, not your tabs.
             </h2>
@@ -749,7 +749,7 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-14 flex flex-col gap-4 border-t border-[#E9ECEF] pt-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-            <p>© 2026 Omnichat. All rights reserved.</p>
+            <p>© 2026 omnicrm.chat. All rights reserved.</p>
             <div className="flex flex-wrap gap-5">
               {["Privacy", "Terms", "Security", "Status"].map((item) => (
                 <a key={item} href="#" className="transition hover:text-slate-900">

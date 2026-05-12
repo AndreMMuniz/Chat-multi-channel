@@ -117,7 +117,7 @@ export default function SignupPage() {
                 support_agent
               </span>
             </div>
-            <span className="text-lg font-bold tracking-tight text-white">Omnichat</span>
+            <span className="text-lg font-bold tracking-tight text-white">omnicrm.chat</span>
           </div>
 
           <div className="relative max-w-xl">
@@ -131,7 +131,7 @@ export default function SignupPage() {
             </p>
           </div>
 
-          <p className="relative text-xs text-white/35">© 2026 Omnichat. All rights reserved.</p>
+          <p className="relative text-xs text-white/35">© 2026 omnicrm.chat. All rights reserved.</p>
         </div>
 
         <div className="flex flex-1 items-center justify-center px-8">
@@ -199,7 +199,7 @@ export default function SignupPage() {
               support_agent
             </span>
           </div>
-          <span className="text-lg font-bold tracking-tight text-white">Omnichat</span>
+          <span className="text-lg font-bold tracking-tight text-white">omnicrm.chat</span>
         </div>
 
         <div className="relative max-w-xl">
@@ -230,7 +230,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <p className="relative text-xs text-white/35">© 2026 Omnichat. All rights reserved.</p>
+        <p className="relative text-xs text-white/35">© 2026 omnicrm.chat. All rights reserved.</p>
       </div>
 
       <div className="flex flex-1 items-center justify-center px-8">
@@ -241,7 +241,7 @@ export default function SignupPage() {
                 support_agent
               </span>
             </div>
-            <span className="font-bold text-slate-900">Omnichat</span>
+            <span className="font-bold text-slate-900">omnicrm.chat</span>
           </div>
 
           <h2 className="mb-1 text-2xl font-bold text-slate-900">Request workspace access</h2>

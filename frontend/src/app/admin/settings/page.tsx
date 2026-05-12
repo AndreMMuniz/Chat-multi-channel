@@ -253,7 +253,7 @@ export default function SettingsPage() {
                 <SectionCard title="General Information">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <Field label="Application Name">
-                      <TextInput value={s.app_name} onChange={set("app_name")} placeholder="Omnichat" />
+                      <TextInput value={s.app_name} onChange={set("app_name")} placeholder="omnicrm.chat" />
                     </Field>
                     <Field label="Support Email">
                       <TextInput type="email" value={s.app_email} onChange={set("app_email")} placeholder="support@company.com" />
