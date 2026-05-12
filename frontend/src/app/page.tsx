@@ -764,10 +764,10 @@ export default function LandingPage() {
 
       <footer className="border-t border-[#E9ECEF] bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
-          <div className="grid gap-12 lg:grid-cols-[1.3fr_repeat(4,1fr)]">
-            <div>
+          <div className="grid gap-12 lg:grid-cols-[minmax(280px,1.55fr)_repeat(4,minmax(120px,1fr))]">
+            <div className="min-w-0">
               <Wordmark />
-              <p className="mt-4 max-w-xs text-sm leading-7 text-slate-600">
+              <p className="mt-4 max-w-[290px] text-sm leading-7 text-slate-600">
                 A multi-channel customer support platform for WhatsApp, Telegram, Email, SMS, and web chat, with AI on
                 every conversation.
               </p>
