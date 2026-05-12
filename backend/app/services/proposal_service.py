@@ -242,6 +242,33 @@ class ProposalService:
             raise HTTPException(status_code=status, detail=error_response)
         await self.recalculate_totals(proposal_id)
 
+    async def delete_proposal(self, proposal_id: UUID) -> None:
+        proposal = await self.proposals.find_proposal(proposal_id)
+        if not proposal:
+            error_response, status = create_error_response(
+                code="PROPOSAL_NOT_FOUND",
+                message="Proposal not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        if proposal.status == ProposalStatus.APPROVED:
+            error_response, status = create_error_response(
+                code="PROPOSAL_DELETE_BLOCKED",
+                message="Approved proposals cannot be deleted",
+                status_code=409,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
+        deleted = await self.proposals.delete(proposal_id)
+        if not deleted:
+            error_response, status = create_error_response(
+                code="PROPOSAL_NOT_FOUND",
+                message="Proposal not found",
+                status_code=404,
+            )
+            raise HTTPException(status_code=status, detail=error_response)
+
     async def recalculate_totals(self, proposal_id: UUID) -> None:
         proposal = await self.proposals.find_proposal(proposal_id)
         if not proposal:

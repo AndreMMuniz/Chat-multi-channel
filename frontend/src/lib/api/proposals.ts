@@ -78,6 +78,13 @@ export async function deleteProposalItem(
   );
 }
 
+export async function deleteProposal(proposalId: string): Promise<{ deleted: boolean; proposal_id: string }> {
+  return apiMutate<undefined, { deleted: boolean; proposal_id: string }>(
+    `/admin/proposals/${proposalId}`,
+    "DELETE",
+  );
+}
+
 export async function createServiceDetails(
   proposalId: string,
   body: ProposalServiceDetailsRequest,

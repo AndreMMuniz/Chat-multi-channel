@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Modal from "@/components/shared/Modal";
+import { useAuth } from "@/hooks/useAuth";
 import { clientsApi, proposalsApi } from "@/lib/api/index";
 import type {
   ProposalCreateRequest, ProposalDetailDto, ProposalDto, ProposalItemDto,
@@ -184,6 +185,7 @@ function ClientSelector({
 
 export default function ProposalsPage() {
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const requestedProposalId = searchParams.get("proposalId");
 
   const [proposals, setProposals] = useState<ProposalDto[]>([]);
@@ -198,10 +200,15 @@ export default function ProposalsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "ALL">("ALL");
+  const canDeleteProposal = useMemo(() => {
+    const role = user?.user_type?.base_role;
+    return role === "ADMIN" || role === "MANAGER";
+  }, [user]);
 
   // carrega clientes para o seletor
   useEffect(() => {
@@ -331,6 +338,26 @@ export default function ProposalsPage() {
       setErrorMessage(error instanceof Error ? error.message : "Failed to create proposal.");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleDeleteProposal() {
+    if (!selectedProposal) return;
+    try {
+      setIsUpdating(true);
+      setErrorMessage(null);
+      await proposalsApi.deleteProposal(selectedProposal.id);
+      const nextProposals = proposals.filter((proposal) => proposal.id !== selectedProposal.id);
+      setProposals(nextProposals);
+      setSelectedProposal(null);
+      setProposalForm(EMPTY_FORM);
+      setSelectedProposalId(nextProposals[0]?.id ?? null);
+      setIsDeleteModalOpen(false);
+      setActionMessage("Proposal deleted.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete proposal.");
+    } finally {
+      setIsUpdating(false);
     }
   }
 
@@ -491,11 +518,13 @@ export default function ProposalsPage() {
                 clients={clients}
                 isLoading={isDetailLoading}
                 isUpdating={isUpdating}
+                canDeleteProposal={canDeleteProposal}
                 onProposalFormChange={setProposalForm}
                 onProposalMetaSave={handleProposalMetaSave}
                 onStatusChange={handleStatusChange}
                 onItemUpdate={handleItemUpdate}
                 onItemRemove={handleItemRemove}
+                onDeleteProposal={() => setIsDeleteModalOpen(true)}
               />
             ) : (
               <div className="flex h-full min-h-[320px] flex-col items-center justify-center px-6 text-center">
@@ -601,6 +630,38 @@ export default function ProposalsPage() {
           </div>
         </Modal>
       )}
+
+      {isDeleteModalOpen && selectedProposal ? (
+        <Modal title="Delete proposal" onClose={() => !isUpdating && setIsDeleteModalOpen(false)} maxWidth="max-w-md">
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-slate-600">
+              Delete this proposal permanently? This action cannot be undone.
+            </p>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3">
+              <p className="text-sm font-semibold text-slate-900">{selectedProposal.title}</p>
+              <p className="mt-1 text-xs text-slate-500">{selectedProposal.reference}</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={handleDeleteProposal}
+                className="rounded-2xl bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:opacity-60"
+              >
+                {isUpdating ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </main>
   );
 }
@@ -961,18 +1022,20 @@ function StatusTimeline({ history }: { history: ProposalStatusHistoryDto[] }) {
 
 function ProposalDetail({
   proposal, proposalForm, clients, isLoading, isUpdating,
-  onProposalFormChange, onProposalMetaSave, onStatusChange, onItemUpdate, onItemRemove,
+  canDeleteProposal, onProposalFormChange, onProposalMetaSave, onStatusChange, onItemUpdate, onItemRemove, onDeleteProposal,
 }: {
   proposal: ProposalDetailDto;
   proposalForm: ProposalFormState;
   clients: ClientListDto[];
   isLoading: boolean;
   isUpdating: boolean;
+  canDeleteProposal: boolean;
   onProposalFormChange: React.Dispatch<React.SetStateAction<ProposalFormState>>;
   onProposalMetaSave: () => void;
   onStatusChange: (status: ProposalStatus) => void;
   onItemUpdate: (proposalItemId: string, payload: { quantity?: number; discount_amount?: number }) => void;
   onItemRemove: (proposalItemId: string) => void;
+  onDeleteProposal: () => void;
 }) {
   const statusMeta = STATUS_META[proposal.status] ?? STATUS_META.draft;
   const selectedClient = clients.find((c) => c.id === proposalForm.client_id);
@@ -1003,16 +1066,29 @@ function ProposalDetail({
             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.className}`}>
               {statusMeta.label}
             </span>
-            <select
-              value={proposal.status}
-              onChange={(e) => onStatusChange(e.target.value as ProposalStatus)}
-              disabled={isUpdating}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm outline-none disabled:opacity-60"
-            >
-              {(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => (
-                <option key={s} value={s}>{STATUS_META[s].label}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={proposal.status}
+                onChange={(e) => onStatusChange(e.target.value as ProposalStatus)}
+                disabled={isUpdating}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm outline-none disabled:opacity-60"
+              >
+                {(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => (
+                  <option key={s} value={s}>{STATUS_META[s].label}</option>
+                ))}
+              </select>
+              {canDeleteProposal ? (
+                <button
+                  type="button"
+                  onClick={onDeleteProposal}
+                  disabled={isUpdating}
+                  className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  Delete proposal
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
