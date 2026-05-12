@@ -131,12 +131,20 @@ function MaterialIcon({
   );
 }
 
+function BrandIcon({
+  className,
+  size = 40,
+}: {
+  className?: string;
+  size?: number;
+}) {
+  return <img src="/icon.svg" alt="omnicrm.chat" width={size} height={size} className={className} />;
+}
+
 function Wordmark() {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#7C4DFF] text-white shadow-[0_10px_25px_rgba(124,77,255,0.25)]">
-        <MaterialIcon name="support_agent" filled className="text-[22px]" />
-      </div>
+      <BrandIcon className="h-10 w-10 rounded-2xl shadow-[0_10px_25px_rgba(15,23,42,0.18)]" />
       <div>
         <div className="text-base font-semibold tracking-[-0.02em] text-slate-900">omnicrm.chat</div>
         <div className="text-xs text-slate-500">Multi-channel customer support</div>
@@ -197,9 +205,7 @@ function InboxMock() {
     <div className="h-[540px] w-full max-w-[640px] overflow-hidden rounded-[24px] border border-[#E9ECEF] bg-white shadow-[0_32px_64px_-24px_rgba(67,56,202,0.28),0_12px_24px_-12px_rgba(15,23,42,0.08)]">
       <div className="grid h-full grid-cols-[64px_280px_minmax(0,1fr)]">
         <aside className="flex flex-col items-center gap-5 border-r border-[#E9ECEF] bg-white py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f172a] text-white">
-            <div className="h-4 w-4 rounded-full border-2 border-emerald-400 border-r-transparent border-t-indigo-300" />
-          </div>
+          <BrandIcon className="h-9 w-9 rounded-xl" size={36} />
           {["grid_view", "chat", "inventory_2", "group", "monitoring", "settings"].map((icon, index) => (
             <div
               key={icon}
@@ -375,9 +381,7 @@ function DashboardMock() {
     <div className="overflow-hidden rounded-[20px] border border-[#E9ECEF] bg-white">
       <div className="grid min-h-[520px] grid-cols-[72px_1fr]">
         <aside className="flex flex-col items-center gap-4 border-r border-[#E9ECEF] bg-white py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f172a] text-white">
-            <div className="h-4 w-4 rounded-full border-2 border-emerald-400 border-r-transparent border-t-indigo-300" />
-          </div>
+          <BrandIcon className="h-9 w-9 rounded-xl" size={36} />
           {["dashboard", "chat_bubble", "inventory_2", "group", "monitoring", "settings"].map((icon, index) => (
             <div
               key={icon}

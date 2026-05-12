@@ -106,9 +106,7 @@ export default function RecoveryPage() {
         <div className="absolute inset-0 opacity-10"
           style={{ backgroundImage: "radial-gradient(circle at 20% 80%, #fff 1px, transparent 1px), radial-gradient(circle at 80% 20%, #fff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
         <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-            <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
-          </div>
+          <img src="/icon.svg" alt="omnicrm.chat" className="w-10 h-10 rounded-xl" />
           <span className="font-bold text-lg text-white tracking-tight">omnicrm.chat</span>
         </div>
         <div className="relative">
@@ -126,9 +124,7 @@ export default function RecoveryPage() {
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-[#632ce5] rounded-lg flex items-center justify-center">
-              <span className="material-symbols-outlined text-white text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
-            </div>
+            <img src="/icon.svg" alt="omnicrm.chat" className="w-8 h-8 rounded-lg" />
             <span className="font-bold text-slate-900">omnicrm.chat</span>
           </div>
 

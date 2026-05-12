@@ -112,11 +112,7 @@ export default function SignupPage() {
           />
 
           <div className="relative flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-              <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
-                support_agent
-              </span>
-            </div>
+            <img src="/icon.svg" alt="omnicrm.chat" className="h-10 w-10 rounded-xl" />
             <span className="text-lg font-bold tracking-tight text-white">omnicrm.chat</span>
           </div>
 
@@ -194,11 +190,7 @@ export default function SignupPage() {
         />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-            <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
-              support_agent
-            </span>
-          </div>
+          <img src="/icon.svg" alt="omnicrm.chat" className="h-10 w-10 rounded-xl" />
           <span className="text-lg font-bold tracking-tight text-white">omnicrm.chat</span>
         </div>
 
@@ -236,11 +228,7 @@ export default function SignupPage() {
       <div className="flex flex-1 items-center justify-center px-8">
         <div className="w-full max-w-[380px]">
           <div className="mb-8 flex items-center gap-2 lg:hidden">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#632ce5]">
-              <span className="material-symbols-outlined text-[18px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
-                support_agent
-              </span>
-            </div>
+            <img src="/icon.svg" alt="omnicrm.chat" className="h-8 w-8 rounded-lg" />
             <span className="font-bold text-slate-900">omnicrm.chat</span>
           </div>
 
