@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="pt-BR" style="height:100%">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline — Omnichat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; overflow: hidden; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #f8fafc; color: #1d1a24; -webkit-font-smoothing: antialiased; }
+.mso { font-family: 'Material Symbols Outlined'; line-height: 1; user-select: none; display: inline-block; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #dde1ec; border-radius: 4px; }
+.card-dragging { opacity: 0.55; transform: rotate(2deg) scale(1.02); box-shadow: 0 12px 30px rgba(79,70,229,0.2) !important; }
+.col-drag-over { background: #eef2ff !important; border-color: #a5b4fc !important; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.fade-in { animation: fadeIn 0.18s ease; }
+.modal-in { animation: modalIn 0.2s cubic-bezier(0.34,1.56,0.64,1); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback, useMemo } = React;
+
+// ─── Design tokens ──────────────────────────────────────────────────────────
+const C = {
+  primary: '#4338ca', primaryContainer: '#4f46e5', primaryHover: '#632ce5',
+  accent: '#7C4DFF', surface: '#f8fafc', surfaceLowest: '#ffffff',
+  surfaceContainer: '#eef2ff', surfaceContainerHigh: '#e8ecf8',
+  outline: '#7a7487', outlineVariant: '#E9ECEF',
+  onSurface: '#1d1a24', secondary: '#575f67',
+};
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "cardStyle": "default",
+  "showProgress": true,
+  "showAvatar": true,
+  "columnColor": "indigo",
+  "density": "comfortable"
+}/*EDITMODE-END*/;
+
+// ─── Sample data ─────────────────────────────────────────────────────────────
+let NEXT_ID = 100;
+const makeId = () => String(++NEXT_ID);
+
+const AGENTS = [
+  { id: 'a1', name: 'Lucas Menezes',   color: '#ede9fe', text: '#7C4DFF' },
+  { id: 'a2', name: 'Carla Ramos',     color: '#fce7f3', text: '#be185d' },
+  { id: 'a3', name: 'Felipe Souza',    color: '#dcfce7', text: '#15803d' },
+  { id: 'a4', name: 'Mariana Costa',   color: '#fef9c3', text: '#854d0e' },
+  { id: 'a5', name: 'Bruno Almeida',   color: '#dbeafe', text: '#1e40af' },
+];
+
+const CHANNEL_META = {
+  WHATSAPP: { label: 'WhatsApp', bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0', dot: '#25D366' },
+  TELEGRAM: { label: 'Telegram', bg: '#f0f9ff', text: '#0369a1', border: '#bae6fd', dot: '#0088CC' },
+  EMAIL:    { label: 'Email',    bg: '#fff7ed', text: '#c2410c', border: '#fed7aa', dot: '#F97316' },
+  SMS:      { label: 'SMS',      bg: '#f5f3ff', text: '#6d28d9', border: '#ddd6fe', dot: '#8B5CF6' },
+};
+
+const PRIORITY_META = {
+  alta:   { label: 'Alta',   bg: '#fff1f2', text: '#be123c', border: '#fecdd3', dot: '#f43f5e' },
+  media:  { label: 'Média',  bg: '#fffbeb', text: '#92400e', border: '#fde68a', dot: '#f59e0b' },
+  baixa:  { label: 'Baixa',  bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0', dot: '#22c55e' },
+};
+
+const TAG_META = {
+  'upsell':    { bg: '#faf5ff', text: '#7e22ce', border: '#e9d5ff' },
+  'renovação': { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+  'novo':      { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
+  'enterprise':{ bg: '#fff7ed', text: '#c2410c', border: '#fed7aa' },
+  'churning':  { bg: '#fff1f2', text: '#be123c', border: '#fecdd3' },
+  'parceiro':  { bg: '#fdf4ff', text: '#7e22ce', border: '#e9d5ff' },
+};
+
+const INITIAL_COLUMNS = [
+  { id: 'lead',         label: 'Lead',         color: '#94a3b8' },
+  { id: 'qualificacao', label: 'Qualificação',  color: '#7C4DFF' },
+  { id: 'proposta',     label: 'Proposta',      color: '#F59E0B' },
+  { id: 'negociacao',   label: 'Negociação',    color: '#F97316' },
+  { id: 'fechado',      label: 'Fechado',       color: '#10B981' },
+];
+
+const INITIAL_CARDS = {
+  lead: [
+    { id: 'c1', title: 'TechCorp Ltda', ticket: '#00421', value: 24000, agent: AGENTS[0], channel: 'WHATSAPP', priority: 'alta', tags: ['enterprise','novo'], progress: 10, dueDate: '2026-05-15', desc: 'Empresa de 200 funcionários buscando solução de atendimento omnichannel.' },
+    { id: 'c2', title: 'Supermercado Bom Preço', ticket: '#00422', value: 8500, agent: AGENTS[2], channel: 'EMAIL', priority: 'baixa', tags: ['novo'], progress: 5, dueDate: '2026-05-28', desc: 'Interesse inicial via formulário do site.' },
+    { id: 'c3', title: 'Clínica Saúde+', ticket: '#00423', value: 5200, agent: AGENTS[1], channel: 'TELEGRAM', priority: 'media', tags: ['novo'], progress: 15, dueDate: '2026-06-01', desc: 'Encaminhamento via parceiro.' },
+  ],
+  qualificacao: [
+    { id: 'c4', title: 'Fintech Pagar.me', ticket: '#00418', value: 48000, agent: AGENTS[3], channel: 'EMAIL', priority: 'alta', tags: ['enterprise','upsell'], progress: 35, dueDate: '2026-05-10', desc: 'Empresa de fintech com grande volume de atendimentos via SMS e email.' },
+    { id: 'c5', title: 'Varejo Online S/A', ticket: '#00419', value: 15000, agent: AGENTS[0], channel: 'WHATSAPP', priority: 'media', tags: ['renovação'], progress: 40, dueDate: '2026-05-18', desc: 'Renovação de contrato com expansão de canais.' },
+  ],
+  proposta: [
+    { id: 'c6', title: 'LogisTech Brasil', ticket: '#00415', value: 32000, agent: AGENTS[4], channel: 'EMAIL', priority: 'alta', tags: ['enterprise'], progress: 60, dueDate: '2026-05-08', desc: 'Proposta enviada. Aguardando aprovação do board.' },
+    { id: 'c7', title: 'Rede de Farmácias Vida', ticket: '#00416', value: 21000, agent: AGENTS[1], channel: 'SMS', priority: 'media', tags: ['parceiro'], progress: 55, dueDate: '2026-05-12', desc: 'Solução focada em SMS marketing e atendimento ativo.' },
+  ],
+  negociacao: [
+    { id: 'c8', title: 'Banco Digital Now', ticket: '#00410', value: 96000, agent: AGENTS[3], channel: 'EMAIL', priority: 'alta', tags: ['enterprise','churning'], progress: 80, dueDate: '2026-05-06', desc: 'Em negociação de contrato anual. Departamento jurídico revisando.' },
+    { id: 'c9', title: 'EduTech Aprenda+', ticket: '#00411', value: 18000, agent: AGENTS[2], channel: 'WHATSAPP', priority: 'media', tags: ['upsell'], progress: 75, dueDate: '2026-05-09', desc: 'Negociando desconto para contrato 2 anos.' },
+  ],
+  fechado: [
+    { id: 'c10', title: 'Restaurantes GeloBom', ticket: '#00405', value: 12000, agent: AGENTS[0], channel: 'WHATSAPP', priority: 'baixa', tags: ['novo'], progress: 100, dueDate: '2026-04-30', desc: 'Contrato assinado. Onboarding agendado.' },
+  ],
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function Icon({ name, size = 20, fill = 0, color, style = {} }) {
+  return <span className="mso" style={{ fontSize: size, fontVariationSettings: `'FILL' ${fill}`, color, ...style }}>{name}</span>;
+}
+
+function Avatar({ name, size = 26, agent }) {
+  const a = agent || { name: name || 'U', color: '#ede9fe', text: '#7C4DFF' };
+  const initials = (a.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  return (
+    <div title={a.name} style={{
+      width: size, height: size, borderRadius: '50%', background: a.color, color: a.text,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.36, fontWeight: 700, flexShrink: 0, border: '1.5px solid white',
+    }}>{initials}</div>
+  );
+}
+
+function ChannelBadge({ channel }) {
+  const m = CHANNEL_META[channel];
+  if (!m) return null;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      background: m.bg, color: m.text, border: `1px solid ${m.border}`,
+      borderRadius: 100, padding: '2px 7px', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: m.dot, flexShrink: 0 }} />
+      {m.label}
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }) {
+  const m = PRIORITY_META[priority];
+  if (!m) return null;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      background: m.bg, color: m.text, border: `1px solid ${m.border}`,
+      borderRadius: 100, padding: '2px 7px', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: m.dot, flexShrink: 0 }} />
+      {m.label}
+    </span>
+  );
+}
+
+function TagBadge({ tag }) {
+  const m = TAG_META[tag];
+  if (!m) return null;
+  return (
+    <span style={{
+      background: m.bg, color: m.text, border: `1px solid ${m.border}`,
+      borderRadius: 100, padding: '1px 6px', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+    }}>{tag}</span>
+  );
+}
+
+function ProgressBar({ value, color = '#7C4DFF' }) {
+  return (
+    <div style={{ width: '100%', height: 3, background: '#e9ecef', borderRadius: 99, overflow: 'hidden' }}>
+      <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: 99, transition: 'width 0.3s' }} />
+    </div>
+  );
+}
+
+function formatCurrency(v) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 }).format(v);
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function isOverdue(d) {
+  if (!d) return false;
+  return new Date(d) < new Date();
+}
+
+// ─── Logo / SideNav ──────────────────────────────────────────────────────────
+function OmnichatLogo({ size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+      <path d="M 50 18 A 32 32 0 0 1 77.7 66" fill="none" stroke="white" strokeWidth="13" strokeLinecap="round"/>
+      <path d="M 77.7 66 A 32 32 0 0 1 22.3 66" fill="none" stroke="#c7d2fe" strokeWidth="13" strokeLinecap="round"/>
+      <path d="M 22.3 66 A 32 32 0 0 1 50 18" fill="none" stroke="white" strokeWidth="13" strokeLinecap="round" opacity="0.7"/>
+    </svg>
+  );
+}
+
+function SideNav({ screen, onNav }) {
+  const mainItems = [
+    { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { id: 'messages',  icon: 'chat_bubble', label: 'Mensagens' },
+    { id: 'pipeline',  icon: 'view_kanban', label: 'Pipeline' },
+    { id: 'catalog',   icon: 'inventory_2', label: 'Catálogo' },
+    { id: 'tasks',     icon: 'task', label: 'Tarefas' },
+  ];
+  const adminItems = [
+    { id: 'users',    icon: 'group',    label: 'Usuários' },
+    { id: 'settings', icon: 'settings', label: 'Config' },
+  ];
+  return (
+    <nav style={{
+      width: 64, height: '100%', background: 'white',
+      borderRight: `1px solid ${C.outlineVariant}`,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      padding: '16px 0', flexShrink: 0,
+    }}>
+      <div style={{
+        width: 40, height: 40, background: '#4f46e5', borderRadius: 10,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+      }}><OmnichatLogo size={22} /></div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, width: '100%', padding: '0 8px' }}>
+        {mainItems.map(item => {
+          const active = screen === item.id;
+          return (
+            <button key={item.id} title={item.label} onClick={() => onNav(item.id)}
+              style={{
+                position: 'relative', width: 48, height: 48, borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: active ? '#eef2ff' : 'transparent',
+                color: active ? '#4338ca' : '#94a3b8',
+                border: 'none', cursor: 'pointer', transition: 'all 0.12s',
+              }}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}}
+            >
+              {active && <div style={{ position: 'absolute', left: -8, top: '50%', transform: 'translateY(-50%)', width: 3, height: 24, background: '#4f46e5', borderRadius: '0 4px 4px 0' }} />}
+              <Icon name={item.icon} size={22} fill={active ? 1 : 0} />
+            </button>
+          );
+        })}
+        <div style={{ width: 32, height: 1, background: C.outlineVariant, margin: '4px 0' }} />
+        {adminItems.map(item => {
+          const active = screen === item.id;
+          return (
+            <button key={item.id} title={item.label} onClick={() => onNav(item.id)}
+              style={{
+                position: 'relative', width: 48, height: 48, borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: active ? '#eef2ff' : 'transparent',
+                color: active ? '#4338ca' : '#94a3b8',
+                border: 'none', cursor: 'pointer', transition: 'all 0.12s',
+              }}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}}
+            >
+              <Icon name={item.icon} size={22} fill={active ? 1 : 0} />
+            </button>
+          );
+        })}
+      </div>
+      <button title="Sair" style={{ width: 48, height: 48, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#fff1f2'; e.currentTarget.style.color = '#ef4444'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}
+      ><Icon name="logout" size={20} /></button>
+    </nav>
+  );
+}
+
+// ─── Deal Card ────────────────────────────────────────────────────────────────
+function DealCard({ card, colId, onDragStart, onClick, tweaks = TWEAK_DEFAULTS, colColor }) {
+  const overdue = isOverdue(card.dueDate);
+  const density = tweaks.density;
+  const compact = density === 'compact';
+  const px = compact ? 10 : 12;
+  const py = compact ? 8 : 10;
+
+  return (
+    <div
+      className="fade-in"
+      draggable
+      onDragStart={e => onDragStart(e, card.id, colId)}
+      onClick={() => onClick(card)}
+      style={{
+        background: 'white',
+        border: `1px solid ${C.outlineVariant}`,
+        borderRadius: 12,
+        padding: `${py}px ${px}px`,
+        cursor: 'grab',
+        transition: 'box-shadow 0.12s, transform 0.12s',
+        userSelect: 'none',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(79,70,229,0.1)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
+    >
+      {/* Top row: ticket + priority */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 6 }}>
+        <span style={{ fontSize: 10, color: C.outline, fontWeight: 500 }}>{card.ticket}</span>
+        <PriorityBadge priority={card.priority} />
+      </div>
+
+      {/* Title */}
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.onSurface, marginBottom: compact ? 4 : 6, lineHeight: 1.3 }}>{card.title}</div>
+
+      {/* Value */}
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#4338ca', marginBottom: compact ? 4 : 6 }}>{formatCurrency(card.value)}</div>
+
+      {/* Tags row */}
+      {card.tags && card.tags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: compact ? 4 : 6 }}>
+          {card.tags.map(t => <TagBadge key={t} tag={t} />)}
+        </div>
+      )}
+
+      {/* Channel + due date */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: compact ? 4 : 6, flexWrap: 'wrap' }}>
+        <ChannelBadge channel={card.channel} />
+        {card.dueDate && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 10, fontWeight: 500,
+            color: overdue ? '#dc2626' : C.outline,
+          }}>
+            <Icon name={overdue ? 'warning' : 'schedule'} size={12} color={overdue ? '#dc2626' : C.outline} />
+            {formatDate(card.dueDate)}
+          </span>
+        )}
+      </div>
+
+      {/* Progress + avatar */}
+      {tweaks.showProgress && (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+            <span style={{ fontSize: 10, color: C.outline }}>Progresso</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: C.secondary }}>{card.progress}%</span>
+          </div>
+          <ProgressBar value={card.progress} color={colColor} />
+        </div>
+      )}
+
+      {tweaks.showAvatar && card.agent && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+          <Avatar agent={card.agent} size={24} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Column ───────────────────────────────────────────────────────────────────
+function KanbanColumn({ col, cards, onDragStart, onDrop, onDragOver, onDragLeave, onCardClick, onAddCard, isDragOver, tweaks = TWEAK_DEFAULTS }) {
+  const total = cards.reduce((s, c) => s + c.value, 0);
+  return (
+    <div
+      style={{
+        display: 'flex', flexDirection: 'column', minWidth: 260, maxWidth: 280, flex: '0 0 268px',
+        background: isDragOver ? '#eef2ff' : '#f1f5f9',
+        border: `1.5px solid ${isDragOver ? '#a5b4fc' : '#e2e8f0'}`,
+        borderRadius: 14, overflow: 'hidden', transition: 'background 0.15s, border-color 0.15s',
+      }}
+      onDrop={e => onDrop(e, col.id)}
+      onDragOver={e => onDragOver(e, col.id)}
+      onDragLeave={onDragLeave}
+    >
+      {/* Column header */}
+      <div style={{ padding: '10px 12px 8px', background: 'white', borderBottom: `1px solid #e2e8f0` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color, display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.onSurface }}>{col.label}</span>
+            <span style={{ background: '#e2e8f0', color: C.secondary, borderRadius: 100, padding: '1px 7px', fontSize: 11, fontWeight: 600 }}>{cards.length}</span>
+          </div>
+          <button onClick={() => onAddCard(col.id)}
+            style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid #e2e8f0', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', transition: 'all 0.12s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#eef2ff'; e.currentTarget.style.color = '#4338ca'; e.currentTarget.style.borderColor = '#c7d2fe'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+          ><Icon name="add" size={16} /></button>
+        </div>
+        <div style={{ fontSize: 11, color: C.outline, fontWeight: 500 }}>{formatCurrency(total)}</div>
+      </div>
+
+      {/* Cards */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: 7, minHeight: 80 }}>
+        {cards.map(card => (
+          <DealCard key={card.id} card={card} colId={col.id} onDragStart={onDragStart} onClick={onCardClick} tweaks={tweaks} colColor={col.color} />
+        ))}
+        {cards.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '20px 8px', color: '#94a3b8', fontSize: 12 }}>
+            <Icon name="drag_indicator" size={24} color="#cbd5e1" style={{ display: 'block', margin: '0 auto 6px' }} />
+            Arraste um card aqui
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Card Modal ───────────────────────────────────────────────────────────────
+function CardModal({ card, columns, onClose, onSave, onDelete }) {
+  const [form, setForm] = useState({ ...card });
+  const isNew = !card.id;
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const inputStyle = {
+    width: '100%', height: 36, borderRadius: 8, border: '1px solid #e2e8f0',
+    background: '#f8fafc', padding: '0 10px', fontSize: 13, outline: 'none',
+    fontFamily: 'Inter, sans-serif', color: C.onSurface, transition: 'border-color 0.12s, box-shadow 0.12s',
+  };
+  const labelStyle = { fontSize: 11, fontWeight: 600, color: C.secondary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="modal-in" style={{ background: 'white', borderRadius: 16, width: 540, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+        {/* Header */}
+        <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${C.outlineVariant}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 1, borderRadius: '16px 16px 0 0' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.onSurface }}>{isNew ? 'Novo deal' : form.title}</div>
+            {!isNew && <div style={{ fontSize: 11, color: C.outline, marginTop: 1 }}>{form.ticket}</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {!isNew && (
+              <button onClick={() => onDelete(card.id)} style={{ height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid #fecdd3', background: '#fff1f2', color: '#be123c', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="delete" size={14} color="#be123c" />Excluir
+              </button>
+            )}
+            <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.outlineVariant}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.secondary }}>
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Title */}
+          <div>
+            <label style={labelStyle}>Nome do cliente / empresa</label>
+            <input style={inputStyle} value={form.title || ''} onChange={e => set('title', e.target.value)}
+              onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.boxShadow = '0 0 0 3px rgba(124,77,255,0.1)'; e.target.style.background = 'white'; }}
+              onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc'; }}
+            />
+          </div>
+
+          {/* Value + stage row */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Valor (R$)</label>
+              <input style={inputStyle} type="number" value={form.value || ''} onChange={e => set('value', Number(e.target.value))}
+                onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.boxShadow = '0 0 0 3px rgba(124,77,255,0.1)'; e.target.style.background = 'white'; }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc'; }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Etapa</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.colId || card.colId} onChange={e => set('colId', e.target.value)}
+                onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.boxShadow = '0 0 0 3px rgba(124,77,255,0.1)'; e.target.style.background = 'white'; }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc'; }}
+              >
+                {columns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Channel + Priority */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Canal de origem</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.channel || ''} onChange={e => set('channel', e.target.value)}
+                onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.background = 'white'; }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+              >
+                {Object.entries(CHANNEL_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Prioridade</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.priority || ''} onChange={e => set('priority', e.target.value)}
+                onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.background = 'white'; }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+              >
+                {Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Agent + due date */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Responsável</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.agent?.id || ''} onChange={e => set('agent', AGENTS.find(a => a.id === e.target.value))}
+                onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.background = 'white'; }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+              >
+                <option value="">Não atribuído</option>
+                {AGENTS.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Data de vencimento</label>
+              <input style={inputStyle} type="date" value={form.dueDate || ''} onChange={e => set('dueDate', e.target.value)}
+                onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.background = 'white'; }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+              />
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div>
+            <label style={labelStyle}>Progresso — {form.progress || 0}%</label>
+            <input type="range" min={0} max={100} step={5} value={form.progress || 0} onChange={e => set('progress', Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#7C4DFF' }} />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label style={labelStyle}>Etiquetas</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {Object.keys(TAG_META).map(tag => {
+                const active = (form.tags || []).includes(tag);
+                const m = TAG_META[tag];
+                return (
+                  <button key={tag} onClick={() => {
+                    const tags = form.tags || [];
+                    set('tags', active ? tags.filter(t => t !== tag) : [...tags, tag]);
+                  }}
+                    style={{
+                      background: active ? m.bg : 'white', color: active ? m.text : C.secondary,
+                      border: `1px solid ${active ? m.border : '#e2e8f0'}`,
+                      borderRadius: 100, padding: '3px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
+                    }}
+                  >{tag}</button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label style={labelStyle}>Descrição</label>
+            <textarea style={{ ...inputStyle, height: 72, resize: 'none', padding: '8px 10px', lineHeight: '1.5' }} value={form.desc || ''} onChange={e => set('desc', e.target.value)}
+              onFocus={e => { e.target.style.borderColor = '#7C4DFF'; e.target.style.boxShadow = '0 0 0 3px rgba(124,77,255,0.1)'; e.target.style.background = 'white'; }}
+              onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc'; }}
+            />
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
+            <button onClick={onClose} style={{ height: 36, padding: '0 16px', borderRadius: 8, border: `1px solid ${C.outlineVariant}`, background: 'transparent', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: C.secondary }}>
+              Cancelar
+            </button>
+            <button onClick={() => onSave(form)} style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: '#7C4DFF', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(124,77,255,0.3)', transition: 'background 0.12s' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#632ce5'}
+              onMouseLeave={e => e.currentTarget.style.background = '#7C4DFF'}
+            >
+              {isNew ? 'Criar deal' : 'Salvar alterações'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── List View ─────────────────────────────────────────────────────────────────
+function ListView({ columns, cards, onCardClick, tweaks = TWEAK_DEFAULTS }) {
+  const allCards = columns.flatMap(col => (cards[col.id] || []).map(c => ({ ...c, colId: col.id, colLabel: col.label, colColor: col.color })));
+  return (
+    <div style={{ background: 'white', borderRadius: 12, border: `1px solid ${C.outlineVariant}`, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ background: '#f8fafc', borderBottom: `1px solid ${C.outlineVariant}` }}>
+            {['TICKET', 'CLIENTE', 'VALOR', 'ETAPA', 'CANAL', 'PRIORIDADE', 'PRAZO', 'RESPONSÁVEL'].map(h => (
+              <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.secondary, letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {allCards.map((card, i) => (
+            <tr key={card.id} onClick={() => onCardClick({ ...card })}
+              style={{ borderBottom: `1px solid #f1f5f9`, cursor: 'pointer', transition: 'background 0.1s', background: i % 2 === 0 ? 'white' : '#fafbff' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
+              onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#fafbff'}
+            >
+              <td style={{ padding: '10px 14px', fontSize: 11, color: C.outline }}>{card.ticket}</td>
+              <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: C.onSurface, minWidth: 140 }}>{card.title}</td>
+              <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 700, color: '#4338ca', whiteSpace: 'nowrap' }}>{formatCurrency(card.value)}</td>
+              <td style={{ padding: '10px 14px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: card.colColor }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: card.colColor }} />
+                  {card.colLabel}
+                </span>
+              </td>
+              <td style={{ padding: '10px 14px' }}><ChannelBadge channel={card.channel} /></td>
+              <td style={{ padding: '10px 14px' }}><PriorityBadge priority={card.priority} /></td>
+              <td style={{ padding: '10px 14px', fontSize: 11, color: isOverdue(card.dueDate) ? '#dc2626' : C.secondary, fontWeight: isOverdue(card.dueDate) ? 600 : 400 }}>{formatDate(card.dueDate)}</td>
+              <td style={{ padding: '10px 14px' }}>
+                {card.agent ? <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Avatar agent={card.agent} size={22} />
+                  <span style={{ fontSize: 12, color: C.secondary }}>{card.agent.name.split(' ')[0]}</span>
+                </div> : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Timeline / Gantt ─────────────────────────────────────────────────────────
+function TimelineView({ columns, cards, onCardClick }) {
+  const allCards = columns.flatMap(col => (cards[col.id] || []).map(c => ({ ...c, colId: col.id, colLabel: col.label, colColor: col.color })));
+  const today = new Date();
+  // Generate 8 weeks from today
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - 7);
+  const totalDays = 56;
+  const dayWidth = 32;
+
+  const weeks = [];
+  for (let w = 0; w < 8; w++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + w * 7);
+    weeks.push(d);
+  }
+
+  const getBarPos = (card) => {
+    const start = new Date(startDate);
+    const due = card.dueDate ? new Date(card.dueDate) : new Date(today.getTime() + 7 * 86400000);
+    // Estimate start = due - some days based on progress
+    const totalSpanDays = Math.max(7, Math.round((card.progress / 100) * 21 + 7));
+    const cardStart = new Date(due.getTime() - totalSpanDays * 86400000);
+    const leftDays = (cardStart - start) / 86400000;
+    const widthDays = totalSpanDays;
+    return {
+      left: Math.max(0, leftDays * dayWidth),
+      width: Math.max(80, widthDays * dayWidth),
+    };
+  };
+
+  const todayOffset = ((today - startDate) / 86400000) * dayWidth;
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, border: `1px solid ${C.outlineVariant}`, overflow: 'hidden' }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', borderBottom: `1px solid ${C.outlineVariant}` }}>
+        <div style={{ width: 200, flexShrink: 0, padding: '8px 14px', fontSize: 10, fontWeight: 700, color: C.secondary, letterSpacing: '0.06em', textTransform: 'uppercase', borderRight: `1px solid ${C.outlineVariant}` }}>CLIENTE</div>
+        <div style={{ overflowX: 'auto', flex: 1 }}>
+          <div style={{ display: 'flex', minWidth: totalDays * dayWidth }}>
+            {weeks.map((w, i) => (
+              <div key={i} style={{ width: 7 * dayWidth, borderRight: `1px solid #f1f5f9`, padding: '8px 6px', fontSize: 10, fontWeight: 600, color: C.outline }}>
+                {w.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Rows */}
+      <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+        {allCards.map((card, i) => {
+          const { left, width } = getBarPos(card);
+          return (
+            <div key={card.id} style={{ display: 'flex', alignItems: 'center', borderBottom: `1px solid #f8fafc`, background: i % 2 === 0 ? 'white' : '#fafbff' }}>
+              <div style={{ width: 200, flexShrink: 0, padding: '8px 14px', borderRight: `1px solid ${C.outlineVariant}`, cursor: 'pointer' }} onClick={() => onCardClick(card)}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.onSurface }}>{card.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: card.colColor }} />
+                  <span style={{ fontSize: 10, color: C.outline }}>{card.colLabel}</span>
+                </div>
+              </div>
+              <div style={{ flex: 1, overflowX: 'hidden', position: 'relative', height: 48 }}>
+                <div style={{ minWidth: totalDays * dayWidth, height: '100%', position: 'relative' }}>
+                  {/* Today line */}
+                  <div style={{ position: 'absolute', left: todayOffset, top: 0, bottom: 0, width: 1.5, background: '#7C4DFF', opacity: 0.5, zIndex: 2 }} />
+                  {/* Bar */}
+                  <div
+                    onClick={() => onCardClick(card)}
+                    style={{
+                      position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                      left: left, width: width,
+                      height: 22, borderRadius: 6, background: card.colColor, opacity: 0.85,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 8px',
+                      fontSize: 10, fontWeight: 600, color: 'white', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                      transition: 'opacity 0.12s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '0.85'}
+                    title={card.title}
+                  >
+                    {card.title}
+                    {/* Progress inner */}
+                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${card.progress}%`, background: 'rgba(255,255,255,0.25)', borderRadius: 6, pointerEvents: 'none' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── KPI Summary Strip ────────────────────────────────────────────────────────
+function KPIStrip({ columns, cards }) {
+  const allCards = columns.flatMap(col => (cards[col.id] || []));
+  const total = allCards.reduce((s, c) => s + c.value, 0);
+  const won = (cards['fechado'] || []).reduce((s, c) => s + c.value, 0);
+  const atRisk = allCards.filter(c => isOverdue(c.dueDate)).length;
+  const kpis = [
+    { icon: 'monetization_on', label: 'Pipeline total', value: formatCurrency(total), color: '#7C4DFF', bg: '#f5f3ff' },
+    { icon: 'check_circle', label: 'Fechados', value: formatCurrency(won), color: '#10B981', bg: '#ecfdf5' },
+    { icon: 'inventory_2', label: 'Deals ativos', value: String(allCards.length), color: '#4338ca', bg: '#eef2ff' },
+    { icon: 'warning', label: 'Com atraso', value: String(atRisk), color: '#ef4444', bg: '#fff1f2' },
+  ];
+  return (
+    <div style={{ display: 'flex', gap: 12 }}>
+      {kpis.map(k => (
+        <div key={k.label} style={{ flex: 1, background: 'white', border: `1px solid ${C.outlineVariant}`, borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 9, background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name={k.icon} size={18} color={k.color} fill={1} />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.onSurface }}>{k.value}</div>
+            <div style={{ fontSize: 10, color: C.secondary, fontWeight: 500 }}>{k.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Main Pipeline Screen ─────────────────────────────────────────────────────
+function PipelineScreen({ tweaks = TWEAK_DEFAULTS }) {
+  const [columns] = useState(INITIAL_COLUMNS);
+  const [cards, setCards] = useState(INITIAL_CARDS);
+  const [dragCard, setDragCard] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  const [modal, setModal] = useState(null); // { card, colId } or null
+  const [view, setView] = useState('kanban'); // kanban | list | timeline
+  const [search, setSearch] = useState('');
+  const [filterAgent, setFilterAgent] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
+  const [filterChannel, setFilterChannel] = useState('');
+
+  // Drag handlers
+  const handleDragStart = useCallback((e, cardId, colId) => {
+    setDragCard({ cardId, colId });
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => {
+      document.querySelector(`[data-card-id="${cardId}"]`)?.classList.add('card-dragging');
+    }, 0);
+  }, []);
+
+  const handleDragOver = useCallback((e, colId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOver(colId);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOver(null);
+  }, []);
+
+  const handleDrop = useCallback((e, targetColId) => {
+    e.preventDefault();
+    setDragOver(null);
+    if (!dragCard || dragCard.colId === targetColId) { setDragCard(null); return; }
+    setCards(prev => {
+      const src = [...(prev[dragCard.colId] || [])];
+      const dst = [...(prev[targetColId] || [])];
+      const idx = src.findIndex(c => c.id === dragCard.cardId);
+      if (idx === -1) return prev;
+      const [moved] = src.splice(idx, 1);
+      dst.unshift(moved);
+      return { ...prev, [dragCard.colId]: src, [targetColId]: dst };
+    });
+    setDragCard(null);
+  }, [dragCard]);
+
+  // Filter cards
+  const filteredCards = useMemo(() => {
+    const result = {};
+    for (const col of columns) {
+      result[col.id] = (cards[col.id] || []).filter(card => {
+        if (search && !card.title.toLowerCase().includes(search.toLowerCase())) return false;
+        if (filterAgent && card.agent?.id !== filterAgent) return false;
+        if (filterPriority && card.priority !== filterPriority) return false;
+        if (filterChannel && card.channel !== filterChannel) return false;
+        return true;
+      });
+    }
+    return result;
+  }, [cards, columns, search, filterAgent, filterPriority, filterChannel]);
+
+  const handleAddCard = (colId) => {
+    setModal({
+      card: { id: null, title: '', ticket: `#${String(NEXT_ID + 1).padStart(5, '0')}`, value: 0, agent: AGENTS[0], channel: 'WHATSAPP', priority: 'media', tags: [], progress: 0, dueDate: '', desc: '', colId },
+      isNew: true,
+    });
+  };
+
+  const handleCardClick = (card) => {
+    const colId = columns.find(col => (cards[col.id] || []).find(c => c.id === card.id))?.id || card.colId;
+    setModal({ card: { ...card, colId }, isNew: false });
+  };
+
+  const handleSave = (form) => {
+    const targetCol = form.colId || modal.card.colId;
+    if (modal.isNew) {
+      const newCard = { ...form, id: makeId(), ticket: form.ticket || `#${makeId()}` };
+      setCards(prev => ({ ...prev, [targetCol]: [newCard, ...(prev[targetCol] || [])] }));
+    } else {
+      const oldCol = modal.card.colId;
+      setCards(prev => {
+        const updated = { ...prev };
+        // Remove from old col
+        updated[oldCol] = (updated[oldCol] || []).filter(c => c.id !== form.id);
+        // Add to target col (may be same)
+        const targetCards = updated[targetCol] ? [...updated[targetCol]] : [];
+        if (targetCol === oldCol) {
+          updated[targetCol] = (prev[targetCol] || []).map(c => c.id === form.id ? form : c);
+        } else {
+          updated[targetCol] = [form, ...targetCards];
+        }
+        return updated;
+      });
+    }
+    setModal(null);
+  };
+
+  const handleDelete = (cardId) => {
+    setCards(prev => {
+      const updated = {};
+      for (const [k, arr] of Object.entries(prev)) updated[k] = arr.filter(c => c.id !== cardId);
+      return updated;
+    });
+    setModal(null);
+  };
+
+  const hasFilters = search || filterAgent || filterPriority || filterChannel;
+
+  const selectStyle = {
+    height: 34, borderRadius: 8, border: `1px solid ${C.outlineVariant}`,
+    background: 'white', padding: '0 10px', fontSize: 12, color: C.secondary,
+    cursor: 'pointer', outline: 'none', fontFamily: 'Inter, sans-serif',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Page header */}
+      <div style={{ padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', borderBottom: `1px solid ${C.outlineVariant}`, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Icon name="view_kanban" size={22} color="#7C4DFF" fill={1} />
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.onSurface, lineHeight: 1.2 }}>Pipeline de deals</div>
+            <div style={{ fontSize: 11, color: C.outline }}>Gerenciamento de oportunidades de vendas</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* View toggle */}
+          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 9, padding: 3, gap: 2 }}>
+            {[['kanban','view_kanban','Kanban'],['list','view_list','Lista'],['timeline','timeline','Timeline']].map(([v, icon, label]) => (
+              <button key={v} onClick={() => setView(v)} title={label}
+                style={{ height: 28, padding: '0 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.12s', background: view === v ? 'white' : 'transparent', color: view === v ? '#4338ca' : C.secondary, boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                <Icon name={icon} size={14} color={view === v ? '#4338ca' : C.secondary} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => handleAddCard('lead')}
+            style={{ height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: '#7C4DFF', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(124,77,255,0.25)', transition: 'background 0.12s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#632ce5'}
+            onMouseLeave={e => e.currentTarget.style.background = '#7C4DFF'}
+          >
+            <Icon name="add" size={16} color="white" />
+            Novo deal
+          </button>
+        </div>
+      </div>
+
+      {/* Filters bar */}
+      <div style={{ padding: '10px 24px', background: 'white', borderBottom: `1px solid ${C.outlineVariant}`, display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: '0 0 220px' }}>
+          <Icon name="search" size={15} color="#94a3b8" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)' }} />
+          <input placeholder="Buscar por cliente…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', height: 34, borderRadius: 8, border: `1px solid ${C.outlineVariant}`, background: '#f8fafc', paddingLeft: 30, paddingRight: 10, fontSize: 12, outline: 'none', fontFamily: 'Inter, sans-serif', color: C.onSurface }}
+            onFocus={e => { e.target.style.borderColor = '#a5b4fc'; e.target.style.background = 'white'; }}
+            onBlur={e => { e.target.style.borderColor = C.outlineVariant; e.target.style.background = '#f8fafc'; }}
+          />
+        </div>
+        {/* Agent */}
+        <select value={filterAgent} onChange={e => setFilterAgent(e.target.value)} style={selectStyle}>
+          <option value="">Todos responsáveis</option>
+          {AGENTS.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        {/* Priority */}
+        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={selectStyle}>
+          <option value="">Todas prioridades</option>
+          {Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        {/* Channel */}
+        <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} style={selectStyle}>
+          <option value="">Todos canais</option>
+          {Object.entries(CHANNEL_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        {hasFilters && (
+          <button onClick={() => { setSearch(''); setFilterAgent(''); setFilterPriority(''); setFilterChannel(''); }}
+            style={{ height: 34, padding: '0 12px', borderRadius: 8, border: `1px solid #fecdd3`, background: '#fff1f2', color: '#be123c', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Icon name="close" size={14} color="#be123c" />Limpar filtros
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
+        {/* Agent avatars */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {AGENTS.map((a, i) => <div key={a.id} style={{ marginLeft: i > 0 ? -8 : 0 }}><Avatar agent={a} size={28} /></div>)}
+          <span style={{ fontSize: 11, color: C.outline, marginLeft: 6 }}>5 agentes</span>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* KPI strip */}
+        <KPIStrip columns={columns} cards={cards} />
+
+        {/* Views */}
+        {view === 'kanban' && (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 8, flex: 1 }}>
+            {columns.map(col => (
+              <KanbanColumn
+                key={col.id}
+                col={col}
+                cards={filteredCards[col.id] || []}
+                onDragStart={handleDragStart}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onCardClick={handleCardClick}
+                onAddCard={handleAddCard}
+                isDragOver={dragOver === col.id}
+                tweaks={tweaks}
+              />
+            ))}
+          </div>
+        )}
+        {view === 'list' && (
+          <ListView columns={columns} cards={filteredCards} onCardClick={handleCardClick} tweaks={tweaks} />
+        )}
+        {view === 'timeline' && (
+          <TimelineView columns={columns} cards={filteredCards} onCardClick={handleCardClick} />
+        )}
+      </div>
+
+      {/* Modal */}
+      {modal && (
+        <CardModal
+          card={modal.card}
+          columns={columns}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Tweaks Panel ─────────────────────────────────────────────────────────────
+function PipelineTweaks({ tweaks = TWEAK_DEFAULTS, setTweak }) {
+  return (
+    <TweaksPanel title="Tweaks — Pipeline">
+      <TweakSection title="Cards">
+        <TweakToggle label="Mostrar barra de progresso" value={tweaks.showProgress} onChange={v => setTweak('showProgress', v)} />
+        <TweakToggle label="Mostrar avatar do responsável" value={tweaks.showAvatar} onChange={v => setTweak('showAvatar', v)} />
+      </TweakSection>
+      <TweakSection title="Layout">
+        <TweakRadio label="Densidade" value={tweaks.density} options={[{value:'compact',label:'Compacto'},{value:'comfortable',label:'Confortável'}]} onChange={v => setTweak('density', v)} />
+      </TweakSection>
+    </TweaksPanel>
+  );
+}
+
+// ─── App Root ─────────────────────────────────────────────────────────────────
+function App() {
+  const { tweaks: rawTweaks, setTweak } = useTweaks(TWEAK_DEFAULTS);
+  const tweaks = rawTweaks || TWEAK_DEFAULTS;
+  const [screen, setScreen] = useState('pipeline');
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <SideNav screen={screen} onNav={setScreen} />
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {screen === 'pipeline'
+          ? <PipelineScreen tweaks={tweaks} />
+          : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.outline, flexDirection: 'column', gap: 8 }}>
+              <Icon name="construction" size={40} color="#c7d2fe" />
+              <span style={{ fontSize: 14, fontWeight: 500 }}>Tela em construção</span>
+            </div>
+          )
+        }
+      </div>
+      <PipelineTweaks tweaks={tweaks} setTweak={setTweak} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
