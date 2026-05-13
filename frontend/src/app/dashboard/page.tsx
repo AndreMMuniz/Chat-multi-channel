@@ -19,14 +19,14 @@ function DashboardShortcutCard({ card }: { card: SummaryCard }) {
   return (
     <Link
       href={card.href}
-      className="group flex min-h-[176px] flex-col justify-between rounded-[28px] border border-[#E7EBF2] bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+      className="group flex min-h-[168px] flex-col justify-between rounded-[28px] border border-[#E7EBF2] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
             {card.title}
           </p>
-          <p className="mt-4 text-5xl font-semibold leading-none text-slate-900">
+          <p className="mt-4 text-4xl font-semibold leading-none text-slate-900 xl:text-[2.6rem]">
             {card.value.toLocaleString()}
           </p>
         </div>
@@ -154,7 +154,7 @@ export default function DashboardPage() {
               Loading dashboard...
             </div>
           ) : (
-            <div className="grid w-full gap-5 md:grid-cols-2">
+            <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
               {cards.map((card) => (
                 <DashboardShortcutCard key={card.title} card={card} />
               ))}
