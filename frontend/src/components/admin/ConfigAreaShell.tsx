@@ -3,7 +3,6 @@
 const CONFIG_ITEMS = [
   { id: "general",       label: "General",         description: "Platform defaults",               icon: "tune" },
   { id: "visual",        label: "Visual Identity",  description: "Logo and color system",           icon: "palette" },
-  { id: "channels",      label: "Channels",         description: "Telegram, WhatsApp, Email, SMS",  icon: "hub" },
   { id: "ai",            label: "AI Configuration", description: "Providers and global model",      icon: "smart_toy" },
   { id: "api",           label: "API Settings",     description: "Webhooks and integration details", icon: "api" },
   { id: "quick-replies", label: "Quick Replies",    description: "Manage canned responses",         icon: "quick_phrases" },
@@ -24,7 +23,7 @@ export default function ConfigAreaShell({
         <div className="border-b border-[#E9ECEF] px-5 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Config</p>
           <h2 className="mt-2 text-lg font-semibold text-slate-900">Platform Setup</h2>
-          <p className="mt-1 text-sm text-slate-500">Keep system configuration, channels, and branding organized.</p>
+          <p className="mt-1 text-sm text-slate-500">Keep system configuration, branding, and operational references organized.</p>
         </div>
         <nav className="flex flex-col gap-1 p-3">
           {CONFIG_ITEMS.map((item) => {

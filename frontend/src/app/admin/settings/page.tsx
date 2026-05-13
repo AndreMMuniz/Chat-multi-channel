@@ -6,7 +6,7 @@ import { settingsApi } from "@/lib/api/index";
 import type { Settings } from "@/types/settings";
 import QuickRepliesPage from "@/app/admin/quick-replies/page";
 
-type TabId = "general" | "visual" | "channels" | "ai" | "api" | "quick-replies";
+type TabId = "general" | "visual" | "ai" | "api" | "quick-replies";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -97,8 +97,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [telegramTestResult, setTelegramTestResult] = useState<{ ok: boolean; username?: string; error?: string } | null>(null);
-  const [testingTelegram, setTestingTelegram] = useState(false);
 
   useEffect(() => {
     settingsApi
@@ -160,27 +158,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleTelegramTest = async () => {
-    if (!settings?.telegram_bot_token) return;
-
-    setTestingTelegram(true);
-    setTelegramTestResult(null);
-
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/telegram/test-connection`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ token: settings.telegram_bot_token }),
-      });
-      const json = await res.json();
-      setTelegramTestResult(json.data ?? json);
-    } catch {
-      setTelegramTestResult({ ok: false, error: "Connection failed" });
-    } finally {
-      setTestingTelegram(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -218,8 +195,6 @@ export default function SettingsPage() {
   const smsConfigured = !!(s.twilio_account_sid && s.twilio_auth_token);
   const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://your-backend.railway.app";
   const whatsappWebhookUrl = `${backendUrl}/api/v1/whatsapp/webhook`;
-  const anyChannelConfigured = telegramConfigured || whatsappConfigured || emailConfigured || smsConfigured;
-
   return (
     <ConfigAreaShell activeSection={activeTab} onSectionChange={(section) => setActiveTab(section as TabId)}>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50">
@@ -299,102 +274,6 @@ export default function SettingsPage() {
                 </SectionCard>
               )}
 
-              {activeTab === "channels" && (
-                <div className="space-y-5">
-                  <p className="text-sm text-slate-500">
-                    Configure each communication channel as a first-class section of the platform.
-                  </p>
-
-                  <ApiGroup icon="send" label="Telegram" color="border-b border-sky-100 bg-sky-50 text-sky-800" configured={telegramConfigured}>
-                    <div className="md:col-span-2">
-                      <Field label="Bot Token" hint="Get from @BotFather: /newbot or /token">
-                        <PasswordInput value={s.telegram_bot_token} onChange={set("telegram_bot_token")} placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" />
-                      </Field>
-                    </div>
-                    <div className="md:col-span-2 flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleTelegramTest}
-                        disabled={!s.telegram_bot_token || testingTelegram}
-                        className="flex h-9 items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-50"
-                      >
-                        {testingTelegram ? (
-                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-400/30 border-t-sky-600" />
-                        ) : (
-                          <span className="material-symbols-outlined text-[16px]">wifi_tethering</span>
-                        )}
-                        Test Connection
-                      </button>
-                      {telegramTestResult && (
-                        <span className={`flex items-center gap-1.5 text-sm font-medium ${telegramTestResult.ok ? "text-emerald-600" : "text-red-500"}`}>
-                          <span className="material-symbols-outlined text-[16px]">{telegramTestResult.ok ? "check_circle" : "error"}</span>
-                          {telegramTestResult.ok ? `Connected as @${telegramTestResult.username}` : telegramTestResult.error}
-                        </span>
-                      )}
-                    </div>
-                  </ApiGroup>
-
-                  <ApiGroup
-                    icon="chat"
-                    label="WhatsApp - Meta Cloud API"
-                    color="border-b border-green-100 bg-green-50 text-green-800"
-                    configured={whatsappConfigured}
-                  >
-                    <Field label="Phone Number ID">
-                      <TextInput value={s.whatsapp_phone_id} onChange={set("whatsapp_phone_id")} placeholder="123456789012345" />
-                    </Field>
-                    <Field label="Business Account ID">
-                      <TextInput value={s.whatsapp_account_id} onChange={set("whatsapp_account_id")} placeholder="987654321098765" />
-                    </Field>
-                    <Field label="Access Token" hint="Permanent token from Meta Business Suite">
-                      <PasswordInput value={s.whatsapp_access_token} onChange={set("whatsapp_access_token")} placeholder="EAABs..." />
-                    </Field>
-                    <Field label="Webhook Verify Token" hint="Custom string used to verify the webhook">
-                      <PasswordInput value={s.whatsapp_webhook_token} onChange={set("whatsapp_webhook_token")} placeholder="my_secret_token" />
-                    </Field>
-                  </ApiGroup>
-
-                  <ApiGroup icon="mail" label="Email - IMAP / SMTP" color="border-b border-blue-100 bg-blue-50 text-blue-800" configured={emailConfigured}>
-                    <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-900">
-                      Configure the shared inbox that omnicrm.chat should monitor for inbound email. For production,
-                      create the mailbox <strong>test@omnicrm.chat</strong> in your email provider and enter its IMAP/SMTP
-                      credentials here. New messages received in that inbox are polled automatically by the backend and
-                      converted into conversations.
-                    </div>
-                    <Field label="IMAP Host">
-                      <TextInput value={s.email_imap_host} onChange={set("email_imap_host")} placeholder="imap.gmail.com" />
-                    </Field>
-                    <Field label="IMAP Port">
-                      <TextInput type="number" value={s.email_imap_port} onChange={set("email_imap_port")} placeholder="993" />
-                    </Field>
-                    <Field label="SMTP Host">
-                      <TextInput value={s.email_smtp_host} onChange={set("email_smtp_host")} placeholder="smtp.gmail.com" />
-                    </Field>
-                    <Field label="SMTP Port">
-                      <TextInput type="number" value={s.email_smtp_port} onChange={set("email_smtp_port")} placeholder="587" />
-                    </Field>
-                    <Field label="Email Address">
-                      <TextInput type="email" value={s.email_address} onChange={set("email_address")} placeholder="test@omnicrm.chat" />
-                    </Field>
-                    <Field label="Password / App Password" hint="Use the mailbox password or provider app password for test@omnicrm.chat">
-                      <PasswordInput value={s.email_password} onChange={set("email_password")} placeholder="••••••••••••" />
-                    </Field>
-                  </ApiGroup>
-
-                  <ApiGroup icon="sms" label="SMS - Twilio" color="border-b border-red-100 bg-red-50 text-red-800" configured={smsConfigured}>
-                    <Field label="Account SID">
-                      <TextInput value={s.twilio_account_sid} onChange={set("twilio_account_sid")} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-                    </Field>
-                    <Field label="Auth Token">
-                      <PasswordInput value={s.twilio_auth_token} onChange={set("twilio_auth_token")} placeholder="••••••••••••••••" />
-                    </Field>
-                    <Field label="Twilio Phone Number" hint="E.164 format: +15005550006">
-                      <TextInput value={s.twilio_phone_number} onChange={set("twilio_phone_number")} placeholder="+15005550006" />
-                    </Field>
-                  </ApiGroup>
-                </div>
-              )}
-
               {activeTab === "ai" && (
                 <SectionCard title="AI Configuration">
                   <div className="space-y-6">
@@ -429,7 +308,7 @@ export default function SettingsPage() {
               {activeTab === "api" && (
                 <div className="space-y-5">
                   <p className="text-sm text-slate-500">
-                    Keep shared webhook and integration details in one place. Channel credentials stay under Channels.
+                    Keep shared webhook and integration details in one place. Channel credentials are managed in the backend environment.
                   </p>
 
                   <ApiGroup
@@ -461,36 +340,8 @@ export default function SettingsPage() {
                       </div>
                     </Field>
                     <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 md:col-span-2">
-                      Keep channel secrets inside Channels and treat this section as operational reference for deployments and third-party setup.
+                      Treat this section as operational reference for deployments and third-party setup. Channel credentials stay outside the admin UI.
                     </div>
-                  </ApiGroup>
-
-                  <ApiGroup
-                    icon="shield_lock"
-                    label="Integration Status"
-                    color="border-b border-slate-200 bg-slate-100 text-slate-800"
-                    configured={anyChannelConfigured}
-                  >
-                    <Field label="Telegram">
-                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
-                        {telegramConfigured ? "Configured in Channels" : "Not configured"}
-                      </div>
-                    </Field>
-                    <Field label="WhatsApp">
-                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
-                        {whatsappConfigured ? "Configured in Channels" : "Not configured"}
-                      </div>
-                    </Field>
-                    <Field label="Email">
-                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
-                        {emailConfigured ? "Configured in Channels" : "Not configured"}
-                      </div>
-                    </Field>
-                    <Field label="SMS">
-                      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700">
-                        {smsConfigured ? "Configured in Channels" : "Not configured"}
-                      </div>
-                    </Field>
                   </ApiGroup>
                 </div>
               )}
