@@ -9,6 +9,8 @@ or a background task in main.py). This file exposes the core logic.
 
 import smtplib
 import imaplib
+import asyncio
+import ssl
 import email as email_lib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -31,6 +33,7 @@ class EmailService:
         imap_port: int,
         address: str,
         password: str,
+        smtp_timeout_seconds: int = 8,
     ):
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
@@ -38,6 +41,8 @@ class EmailService:
         self.imap_port = imap_port
         self.address = address
         self.password = password
+        self.smtp_timeout_seconds = smtp_timeout_seconds
+        self.last_error: Optional[str] = None
 
     @classmethod
     def from_settings(cls, db: Session) -> Optional["EmailService"]:
@@ -52,6 +57,7 @@ class EmailService:
             imap_port=settings.EMAIL_IMAP_PORT,
             address=settings.EMAIL_ADDRESS,
             password=settings.EMAIL_PASSWORD,
+            smtp_timeout_seconds=settings.EMAIL_SMTP_TIMEOUT_SECONDS,
         )
 
     # ── Outbound ──────────────────────────────────────────────────────────────
@@ -62,21 +68,48 @@ class EmailService:
             print("EmailService: smtp_host not configured")
             return False
         try:
-            msg = MIMEMultipart()
-            msg["From"] = self.address
-            msg["To"] = to
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
-
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.ehlo()
-                server.starttls()
-                server.login(self.address, self.password)
-                server.sendmail(self.address, to, msg.as_string())
+            self.last_error = None
+            await asyncio.wait_for(
+                asyncio.to_thread(self._send_email_blocking, to, subject, body),
+                timeout=self.smtp_timeout_seconds + 2,
+            )
             return True
         except Exception as e:
+            self.last_error = str(e)
             print(f"EmailService send error: {e}")
             return False
+
+    def _send_email_blocking(self, to: str, subject: str, body: str) -> None:
+        msg = MIMEMultipart()
+        msg["From"] = self.address
+        msg["To"] = to
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        tls_context = ssl.create_default_context()
+
+        if self.smtp_port == 465:
+            with smtplib.SMTP_SSL(
+                self.smtp_host,
+                self.smtp_port,
+                timeout=self.smtp_timeout_seconds,
+                context=tls_context,
+            ) as server:
+                server.login(self.address, self.password)
+                server.sendmail(self.address, to, msg.as_string())
+            return
+
+        with smtplib.SMTP(
+            self.smtp_host,
+            self.smtp_port,
+            timeout=self.smtp_timeout_seconds,
+        ) as server:
+            server.ehlo()
+            if self.smtp_port in {25, 587, 2525}:
+                server.starttls(context=tls_context)
+                server.ehlo()
+            server.login(self.address, self.password)
+            server.sendmail(self.address, to, msg.as_string())
 
     # ── Inbound polling ───────────────────────────────────────────────────────
 

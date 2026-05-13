@@ -71,7 +71,8 @@ class ChannelService:
             raise ChannelDeliveryError("email:not_configured")
         ok = await svc.send_email(contact.email, "Reply from support", content)
         if not ok:
-            raise ChannelDeliveryError("email:send_failed")
+            reason = svc.last_error or "unknown_error"
+            raise ChannelDeliveryError(f"email:send_failed:{reason}")
 
     async def _send_sms(self, contact: Contact, content: str) -> None:
         if not contact.phone:

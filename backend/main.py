@@ -1,6 +1,7 @@
 import asyncio
 import os
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -169,12 +170,47 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS — restrict to ALLOWED_ORIGINS in production, permissive in development
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-origins: list[str] = (
-    [o.strip() for o in _raw_origins.split(",") if o.strip()]
-    if _raw_origins
-    else ["http://localhost:3000", "http://localhost:3001"]
-)
+def _normalize_origin(value: str) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def _expand_origin_variants(origin: str) -> list[str]:
+    parsed = urlparse(origin)
+    host = parsed.hostname or ""
+    current = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+    if not host or host in {"localhost", "127.0.0.1"} or ":" in parsed.netloc:
+        return [current]
+
+    alternate_host = host[4:] if host.startswith("www.") else f"www.{host}"
+    alternate = f"{parsed.scheme}://{alternate_host}".rstrip("/")
+    return list(dict.fromkeys([current, alternate]))
+
+
+def _build_allowed_origins() -> list[str]:
+    configured = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+    configured.append(settings.FRONTEND_URL)
+
+    normalized: list[str] = []
+    for candidate in configured:
+        origin = _normalize_origin(candidate)
+        if not origin:
+            continue
+        normalized.extend(_expand_origin_variants(origin))
+
+    if normalized:
+        return list(dict.fromkeys(normalized))
+
+    return ["http://localhost:3000", "http://localhost:3001"]
+
+
+origins = _build_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,

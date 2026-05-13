@@ -28,6 +28,7 @@ class Settings(BaseModel):
     EMAIL_IMAP_PORT: int = int(os.getenv("EMAIL_IMAP_PORT", "993"))
     EMAIL_SMTP_HOST: str = os.getenv("EMAIL_SMTP_HOST", "")
     EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT", "587"))
+    EMAIL_SMTP_TIMEOUT_SECONDS: int = int(os.getenv("EMAIL_SMTP_TIMEOUT_SECONDS", "8"))
 
     # Deployment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
