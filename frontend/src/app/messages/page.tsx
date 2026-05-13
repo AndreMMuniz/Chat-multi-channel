@@ -923,6 +923,7 @@ export default function ChatPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const messageActionsRef = useRef<HTMLDivElement | null>(null);
+  const lastAIFetchedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!openMessageMenuId) return;
@@ -1052,6 +1053,8 @@ export default function ChatPage() {
   const availableChannels = Object.keys(CHANNEL_META) as ChannelType[];
   const hasActiveFilters = Boolean(searchQuery.trim()) || selectedChannel !== 'ALL' || selectedTag !== 'ALL';
   const selectedTagLabel = selectedTag === 'ALL' ? null : TAG_META[selectedTag].label;
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const canUseAISuggestions = Boolean(activeConversation && lastMessage?.inbound);
   const emptyStateMessage = !hasActiveFilters
     ? 'No conversations yet'
     : selectedTag !== 'ALL'
@@ -1307,6 +1310,22 @@ export default function ChatPage() {
   }, [activeConversation?.id, messages, scrollToBottom]);
 
   useEffect(() => {
+    if (!activeConversation || !lastMessage || !canUseAISuggestions) {
+      lastAIFetchedKeyRef.current = null;
+      setShowAIDesktop(false);
+      setAiSheetOpen(false);
+      clearAI();
+      return;
+    }
+
+    const nextKey = `${activeConversation.id}:${lastMessage.id}`;
+    if (lastAIFetchedKeyRef.current === nextKey) return;
+
+    lastAIFetchedKeyRef.current = nextKey;
+    fetchAICached(activeConversation.id);
+  }, [activeConversation, lastMessage, canUseAISuggestions, fetchAICached, clearAI]);
+
+  useEffect(() => {
     if (!activeConversation) return;
 
     const conversationId = activeConversation.id;
@@ -1390,10 +1409,10 @@ export default function ChatPage() {
   const handleSelectConversation = useCallback(async (conv: Conversation) => {
     cancelAttachment();
     clearAI();
+    lastAIFetchedKeyRef.current = null;
     await activateConversation(conv);
-    fetchAICached(conv.id);
     setMobileView('chat');
-  }, [activateConversation, fetchAICached, clearAI]);
+  }, [activateConversation, clearAI]);
 
   useEffect(() => {
     const queryConversationId = searchParams.get('conversationId');
@@ -1800,16 +1819,22 @@ export default function ChatPage() {
                   {/* Status select — uses inline styles + appearance-none so browser can't override bg/color */}
                   {/* AI toggle — desktop */}
                   <button
-                    title="Sugestões de IA"
-                    onClick={() => setShowAIDesktop(v => !v)}
+                    title={canUseAISuggestions ? "Sugestões de IA" : "AI suggestions are only available after an inbound customer message"}
+                    disabled={!canUseAISuggestions}
+                    onClick={() => {
+                      if (!canUseAISuggestions) return;
+                      setShowAIDesktop(v => !v);
+                    }}
                     className={cn(
                       "hidden md:flex w-8 h-8 items-center justify-center rounded-lg border transition-colors",
-                      showAIDesktop
-                        ? "bg-[#f5f3ff] text-[#7C4DFF] border-[#e9d5ff]"
-                        : "text-[#94a3b8] border-[#E9ECEF] hover:text-slate-700 hover:bg-slate-50"
+                      !canUseAISuggestions
+                        ? "cursor-not-allowed border-[#E9ECEF] text-[#cbd5e1] bg-[#f8fafc]"
+                        : showAIDesktop
+                          ? "bg-[#f5f3ff] text-[#7C4DFF] border-[#e9d5ff]"
+                          : "text-[#94a3b8] border-[#E9ECEF] hover:text-slate-700 hover:bg-slate-50"
                     )}
                   >
-                    <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: `'FILL' ${showAIDesktop ? 1 : 0}` }}>auto_awesome</span>
+                    <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: `'FILL' ${showAIDesktop && canUseAISuggestions ? 1 : 0}` }}>auto_awesome</span>
                   </button>
                   <button
                     title="Marcar como não lida"
@@ -2150,27 +2175,40 @@ export default function ChatPage() {
                     </button>
                     {/* AI toggle — desktop */}
                     <button
-                      title="Sugestões de IA"
-                      onClick={() => setShowAIDesktop(v => !v)}
+                      title={canUseAISuggestions ? "Sugestões de IA" : "AI suggestions are only available after an inbound customer message"}
+                      disabled={!canUseAISuggestions}
+                      onClick={() => {
+                        if (!canUseAISuggestions) return;
+                        setShowAIDesktop(v => !v);
+                      }}
                       className="hidden md:flex w-8 h-8 items-center justify-center rounded-[7px] transition-colors"
-                      style={showAIDesktop ? { background: '#f5f3ff', color: '#7C4DFF' } : { color: '#94a3b8' }}
+                      style={!canUseAISuggestions
+                        ? { background: '#f8fafc', color: '#cbd5e1', cursor: 'not-allowed' }
+                        : showAIDesktop
+                          ? { background: '#f5f3ff', color: '#7C4DFF' }
+                          : { color: '#94a3b8' }}
                     >
                       <span className="material-symbols-outlined text-[18px]"
-                        style={{ fontVariationSettings: `'FILL' ${showAIDesktop ? 1 : 0}` }}>auto_awesome</span>
+                        style={{ fontVariationSettings: `'FILL' ${showAIDesktop && canUseAISuggestions ? 1 : 0}` }}>auto_awesome</span>
                     </button>
                     {/* Mobile AI sheet button */}
                     <button
                       data-testid="ai-sparkles-button"
                       type="button"
                       onClick={() => {
+                        if (!canUseAISuggestions) return;
                         if (activeConversation && suggestions.length === 0 && !aiGenerating && !aiLoading) {
                           generateAI(activeConversation.id);
                         }
                         setAiSheetOpen(true);
                       }}
-                      disabled={aiGenerating || aiLoading}
+                      disabled={!canUseAISuggestions || aiGenerating || aiLoading}
                       className={cn("md:hidden w-8 h-8 flex items-center justify-center rounded-[7px] transition-all",
-                        aiGenerating || aiLoading ? "text-[#7C4DFF]" : "text-[#94a3b8] hover:text-[#7C4DFF]")}
+                        !canUseAISuggestions
+                          ? "text-[#cbd5e1]"
+                          : aiGenerating || aiLoading
+                            ? "text-[#7C4DFF]"
+                            : "text-[#94a3b8] hover:text-[#7C4DFF]")}
                     >
                       {aiGenerating || aiLoading
                         ? <span className="w-3.5 h-3.5 border-2 border-[#7C4DFF]/30 border-t-[#7C4DFF] rounded-full animate-spin" />
@@ -2209,7 +2247,7 @@ export default function ChatPage() {
               </div>
 
               {/* AI Panel — desktop, below composer */}
-              {showAIDesktop && (
+              {showAIDesktop && canUseAISuggestions && (
                 <div className="hidden md:block border-t border-[#E9ECEF] bg-white">
                   <div className="pt-2.5 px-3.5 pb-2 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -2228,7 +2266,7 @@ export default function ChatPage() {
                     </div>
                     <button
                       onClick={() => generateAI(activeConversation!.id)}
-                      disabled={aiGenerating || aiLoading}
+                      disabled={!canUseAISuggestions || aiGenerating || aiLoading}
                       className="flex items-center gap-1.5 h-[26px] px-2.5 rounded-[7px] border border-[#e9d5ff] bg-white text-[11px] font-semibold text-[#7C4DFF] hover:bg-[#f5f3ff] disabled:opacity-50 transition-colors"
                     >
                       <span className={cn("material-symbols-outlined text-[13px]", (aiGenerating || aiLoading) && "animate-spin")}>
@@ -2244,6 +2282,7 @@ export default function ChatPage() {
                     {!aiGenerating && !aiLoading && suggestions.length === 0 && (
                       <button
                         onClick={() => generateAI(activeConversation!.id)}
+                        disabled={!canUseAISuggestions}
                         className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-xs text-slate-400 hover:border-[#7C4DFF] hover:text-[#7C4DFF] transition-colors flex items-center justify-center gap-2"
                       >
                         <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
@@ -2276,7 +2315,7 @@ export default function ChatPage() {
               )}
 
               {/* Mobile AI Suggestions Sheet — bottom drawer, md:hidden */}
-              {aiSheetOpen && (
+              {aiSheetOpen && canUseAISuggestions && (
                 <div className="fixed inset-0 z-50 md:hidden">
                   {/* Backdrop */}
                   <div
