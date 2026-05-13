@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
@@ -45,11 +45,17 @@ async def list_clients(
 
     if search:
         pattern = f"%{search}%"
+        query = query.outerjoin(Contact, Contact.client_id == Client.id)
         query = query.filter(
-            Client.name.ilike(pattern)
-            | Client.email.ilike(pattern)
-            | Client.company_name.ilike(pattern)
-        )
+            or_(
+                Client.name.ilike(pattern),
+                Client.company_name.ilike(pattern),
+                Contact.name.ilike(pattern),
+                Contact.email.ilike(pattern),
+                Contact.phone.ilike(pattern),
+                Contact.channel_identifier.ilike(pattern),
+            )
+        ).distinct()
     if client_type:
         query = query.filter(Client.client_type == client_type)
     if country:

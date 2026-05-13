@@ -1069,9 +1069,13 @@ export default function ChatPage() {
 
     const timeout = window.setTimeout(() => {
       setExistingClientLoading(true);
+      const rawName = activeConversation.contact.name?.trim() ?? '';
+      const extractedEmail = rawName.match(/<([^>]+)>/)?.[1]?.trim() ?? '';
+      const cleanedName = rawName.replace(/<[^>]+>/g, '').trim();
       const fallbackSearch =
         activeConversation.contact.email?.trim()
-        || activeConversation.contact.name?.trim()
+        || extractedEmail
+        || cleanedName
         || activeConversation.contact.channel_identifier?.trim()
         || '';
 
