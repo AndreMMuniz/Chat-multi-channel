@@ -5,6 +5,7 @@ import { useState, useCallback, useRef } from "react";
 import { conversationsApi, uploadApi } from "@/lib/api/index";
 import type { DeliveryStatus } from "@/types/chat";
 import { getStoredUser } from "@/lib/api";
+import { getCachedMessagesForConversation, saveMessagesToSessionCache } from "@/lib/messagesSessionCache";
 import type { Message, MessageType, SendMessageRequest } from "@/types/chat";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -56,25 +57,43 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
   const [sendStatus, setSendStatus] = useState<Record<string, MessageSendStatus>>({});
   // Stores pending payloads for retry keyed by tempId
   const pendingRef = useRef<Record<string, { conversationId: string; payload: Omit<SendMessageRequest, "conversation_id"> }>>({});
+  const currentConversationIdRef = useRef<string | null>(null);
+  const requestConversationIdRef = useRef<string | null>(null);
+  const userId = getStoredUser<{ id: string }>()?.id ?? null;
 
   const fetchMessages = useCallback(async (conversationId: string) => {
+    currentConversationIdRef.current = conversationId;
+    requestConversationIdRef.current = conversationId;
+
+    const cached = getCachedMessagesForConversation(userId, conversationId);
+    if (cached.length > 0) {
+      setMessages(cached);
+      scrollToBottom();
+    }
+
     try {
       const { data } = await conversationsApi.getMessages(conversationId);
+      if (requestConversationIdRef.current !== conversationId) return;
       const sorted = [...data].sort((a, b) => a.conversation_sequence - b.conversation_sequence);
       setMessages(sorted);
+      saveMessagesToSessionCache(userId, conversationId, sorted);
       scrollToBottom();
     } catch (err) {
       console.error("fetchMessages:", err);
     }
-  }, [scrollToBottom]);
+  }, [scrollToBottom, userId]);
 
   const appendMessage = useCallback((msg: Message) => {
     setMessages(prev => {
       if (prev.some(m => m.id === msg.id)) return prev;
-      return [...prev, msg].sort((a, b) => a.conversation_sequence - b.conversation_sequence);
+      const next = [...prev, msg].sort((a, b) => a.conversation_sequence - b.conversation_sequence);
+      if (currentConversationIdRef.current === msg.conversation_id) {
+        saveMessagesToSessionCache(userId, msg.conversation_id, next);
+      }
+      return next;
     });
     scrollToBottom();
-  }, [scrollToBottom]);
+  }, [scrollToBottom, userId]);
 
   // ── Core send ──────────────────────────────────────────────────────────────
 
@@ -99,7 +118,11 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
 
     // Store payload for potential retry
     pendingRef.current[tempId] = { conversationId, payload };
-    setMessages(prev => [...prev, optimistic]);
+    setMessages(prev => {
+      const next = [...prev, optimistic];
+      saveMessagesToSessionCache(userId, conversationId, next);
+      return next;
+    });
     setSendStatus(prev => ({ ...prev, [tempId]: "sending" }));
     scrollToBottom();
 
@@ -117,20 +140,26 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
       });
       setMessages(prev => {
         if (prev.some(m => m.id === real.id)) return prev.filter(m => m.id !== tempId);
-        return prev
+        const next = prev
           .map(m => (m.id === tempId ? real : m))
           .sort((a, b) => a.conversation_sequence - b.conversation_sequence);
+        saveMessagesToSessionCache(userId, conversationId, next);
+        return next;
       });
     } catch {
       setSendStatus(prev => ({ ...prev, [tempId]: "failed" }));
     }
-  }, [scrollToBottom]);
+  }, [scrollToBottom, userId]);
 
   const retryMessage = useCallback(async (conversationId: string, messageId: string) => {
     // If it's a temp (optimistic) message, re-send via client-side pending payload
     const pending = pendingRef.current[messageId];
     if (pending) {
-      setMessages(prev => prev.filter(m => m.id !== messageId));
+      setMessages(prev => {
+        const next = prev.filter(m => m.id !== messageId);
+        saveMessagesToSessionCache(userId, conversationId, next);
+        return next;
+      });
       setSendStatus(prev => { const n = { ...prev }; delete n[messageId]; return n; });
       delete pendingRef.current[messageId];
       sendCore(conversationId, pending.payload);
@@ -140,12 +169,16 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
     setSendStatus(prev => ({ ...prev, [messageId]: "sending" }));
     try {
       const updated = await conversationsApi.retryMessage(conversationId, messageId);
-      setMessages(prev => prev.map(m => m.id === messageId ? updated : m));
+      setMessages(prev => {
+        const next = prev.map(m => m.id === messageId ? updated : m);
+        saveMessagesToSessionCache(userId, conversationId, next);
+        return next;
+      });
       setSendStatus(prev => { const n = { ...prev }; delete n[messageId]; return n; });
     } catch {
       setSendStatus(prev => ({ ...prev, [messageId]: "failed" }));
     }
-  }, [sendCore]);
+  }, [sendCore, userId]);
 
   // ── Public send actions ────────────────────────────────────────────────────
 

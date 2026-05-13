@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { getStoredUser } from "@/lib/api";
 import { conversationsApi } from "@/lib/api/index";
+import { readMessagesSessionCache, saveConversationsToSessionCache } from "@/lib/messagesSessionCache";
 import type { Conversation, Message, UpdateConversationRequest } from "@/types/chat";
 
 export interface UseConversationsReturn {
@@ -27,7 +29,9 @@ export interface UseConversationsReturn {
 }
 
 export function useConversations(): UseConversationsReturn {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const userId = getStoredUser<{ id: string }>()?.id ?? null;
+  const cached = readMessagesSessionCache(userId);
+  const [conversations, setConversations] = useState<Conversation[]>(cached?.conversations ?? []);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(false);
   const [notifCounts, setNotifCounts] = useState<Record<string, number>>({});
@@ -39,6 +43,10 @@ export function useConversations(): UseConversationsReturn {
     activeConversationRef.current = conv;
     setActiveConversation(conv);
   };
+
+  useEffect(() => {
+    saveConversationsToSessionCache(userId, conversations);
+  }, [conversations, userId]);
 
   const fetchConversations = useCallback(async () => {
     setLoading(true);

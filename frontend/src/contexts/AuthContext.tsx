@@ -10,6 +10,7 @@ import {
 } from "react";
 import { getStoredUser, getToken } from "@/lib/api";
 import { authApi } from "@/lib/api/index";
+import { clearMessagesSessionCache } from "@/lib/messagesSessionCache";
 import type { StoredUser } from "@/types/auth";
 
 // ── Shape ─────────────────────────────────────────────────────────────────────
@@ -44,9 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    clearMessagesSessionCache(user?.id);
     await authApi.logout();
     setUser(null);
-  }, []);
+  }, [user?.id]);
 
   return (
     <AuthContext.Provider
