@@ -913,6 +913,7 @@ export default function ChatPage() {
   const [deleteMessageModal, setDeleteMessageModal] = useState<DeleteMessageState | null>(null);
   const [deletingMessage, setDeletingMessage] = useState(false);
   const [handledQueryConversationId, setHandledQueryConversationId] = useState<string | null>(null);
+  const [showConnectionBanner, setShowConnectionBanner] = useState(false);
 
   useEffect(() => {
     quickRepliesApi.listQuickReplies().then(r => setAllQuickReplies(r.data ?? [])).catch(() => {});
@@ -1405,6 +1406,19 @@ export default function ChatPage() {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
+  useEffect(() => {
+    if (connectionState === 'connected' || connectionState === 'connecting') {
+      setShowConnectionBanner(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setShowConnectionBanner(true);
+    }, 2500);
+
+    return () => window.clearTimeout(timeout);
+  }, [connectionState]);
+
 
   // ── Conversation selection ────────────────────────────────────────────────
   const handleSelectConversation = useCallback(async (conv: Conversation) => {
@@ -1530,13 +1544,15 @@ export default function ChatPage() {
       </header>
 
       {/* Connection state banner — P0-2 */}
-      {connectionState !== 'connected' && (
+      {showConnectionBanner && (
         <div className={cn(
           "shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium",
-          connectionState === 'reconnecting' ? "bg-yellow-50 text-yellow-700 border-b border-yellow-200" : "bg-red-50 text-red-700 border-b border-red-200"
+          connectionState === 'disconnected'
+            ? "bg-rose-50 text-rose-700 border-b border-rose-200"
+            : "bg-amber-50 text-amber-700 border-b border-amber-200"
         )}>
           <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-          {connectionState === 'connecting' ? 'Connecting to server…' : 'Connection lost — reconnecting…'}
+          {connectionState === 'disconnected' ? 'Connection lost. Trying to reconnect…' : 'Reconnecting in background…'}
         </div>
       )}
 

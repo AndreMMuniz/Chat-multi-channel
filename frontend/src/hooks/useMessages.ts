@@ -66,10 +66,8 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
     requestConversationIdRef.current = conversationId;
 
     const cached = getCachedMessagesForConversation(userId, conversationId);
-    if (cached.length > 0) {
-      setMessages(cached);
-      scrollToBottom();
-    }
+    setMessages(cached);
+    if (cached.length > 0) scrollToBottom();
 
     try {
       const { data } = await conversationsApi.getMessages(conversationId);
@@ -139,7 +137,11 @@ export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
         return next;
       });
       setMessages(prev => {
-        if (prev.some(m => m.id === real.id)) return prev.filter(m => m.id !== tempId);
+        if (prev.some(m => m.id === real.id)) {
+          const next = prev.filter(m => m.id !== tempId);
+          saveMessagesToSessionCache(userId, conversationId, next);
+          return next;
+        }
         const next = prev
           .map(m => (m.id === tempId ? real : m))
           .sort((a, b) => a.conversation_sequence - b.conversation_sequence);
