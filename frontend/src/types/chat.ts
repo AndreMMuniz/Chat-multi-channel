@@ -133,6 +133,13 @@ export interface DashboardStats {
   ai_adoption_pct: number;
 }
 
+export interface DashboardSummary {
+  open_conversations: number;
+  proposals: number;
+  your_tasks: number;
+  your_projects: number;
+}
+
 export interface AgentStat {
   id: string;
   full_name: string;

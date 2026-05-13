@@ -8,10 +8,62 @@ from sqlalchemy import func, text
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.core.limiter import limiter
-from app.models.models import Conversation, Message, ConversationStatus, ChannelType, AISuggestion, User
+from app.models.models import (
+    AISuggestion,
+    ChannelType,
+    Conversation,
+    ConversationStatus,
+    Message,
+    Project,
+    ProjectStatus,
+    ProjectTask,
+    ProjectTaskStatus,
+    Proposal,
+    ProposalStatus,
+    User,
+)
 from app.schemas.common import create_response
 
 router = APIRouter()
+
+
+@router.get("/dashboard-summary")
+@limiter.limit("60/minute")
+async def get_dashboard_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> Dict[str, Any]:
+    open_conversations = db.query(func.count(Conversation.id)).filter(
+        Conversation.status == ConversationStatus.OPEN
+    ).scalar() or 0
+
+    proposals = db.query(func.count(Proposal.id)).filter(
+        Proposal.status.in_([
+            ProposalStatus.DRAFT,
+            ProposalStatus.SENT,
+            ProposalStatus.APPROVED,
+        ])
+    ).scalar() or 0
+
+    your_tasks = db.query(func.count(ProjectTask.id)).filter(
+        ProjectTask.owner_user_id == current_user.id,
+        ProjectTask.status.in_([
+            ProjectTaskStatus.OPEN,
+            ProjectTaskStatus.IN_PROGRESS,
+        ])
+    ).scalar() or 0
+
+    your_projects = db.query(func.count(Project.id)).filter(
+        Project.status == ProjectStatus.OPEN
+    ).scalar() or 0
+
+    return create_response({
+        "open_conversations": open_conversations,
+        "proposals": proposals,
+        "your_tasks": your_tasks,
+        "your_projects": your_projects,
+    })
 
 
 @router.get("/stats")
