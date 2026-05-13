@@ -222,8 +222,8 @@ export default function SettingsPage() {
 
   return (
     <ConfigAreaShell activeSection={activeTab} onSectionChange={(section) => setActiveTab(section as TabId)}>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
-        <header className="h-16 shrink-0 border-b border-[#E9ECEF] bg-white px-6 flex items-center">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50">
+        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center border-b border-[#E9ECEF] bg-white px-6">
           <h1 className="text-[18px] font-semibold text-slate-900">Platform Configuration</h1>
         </header>
 
@@ -233,9 +233,9 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className={activeTab === "quick-replies" ? "hidden" : "min-h-0 flex-1 overflow-y-auto"}>
+        <div className={activeTab === "quick-replies" ? "hidden" : "flex-1"}>
           <form onSubmit={handleSave}>
-            <div className="mx-auto max-w-3xl space-y-6 p-6">
+            <div className="mx-auto max-w-3xl space-y-6 p-6 pb-12">
               {error && (
                 <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
                   <span className="material-symbols-outlined">error</span>
