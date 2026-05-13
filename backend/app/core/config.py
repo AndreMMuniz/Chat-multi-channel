@@ -21,6 +21,14 @@ class Settings(BaseModel):
     # Telegram
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
+    # Email (shared inbox / SMTP + IMAP)
+    EMAIL_ADDRESS: str = os.getenv("EMAIL_ADDRESS", "")
+    EMAIL_PASSWORD: str = os.getenv("EMAIL_PASSWORD", "")
+    EMAIL_IMAP_HOST: str = os.getenv("EMAIL_IMAP_HOST", "")
+    EMAIL_IMAP_PORT: int = int(os.getenv("EMAIL_IMAP_PORT", "993"))
+    EMAIL_SMTP_HOST: str = os.getenv("EMAIL_SMTP_HOST", "")
+    EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT", "587"))
+
     # Deployment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")

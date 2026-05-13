@@ -16,7 +16,8 @@ from email.header import decode_header
 from typing import Optional, List, Tuple
 from sqlalchemy.orm import Session
 
-from app.models.models import Contact, Conversation, ChannelType, GeneralSettings
+from app.core.config import settings
+from app.models.models import Contact, Conversation, ChannelType
 
 
 class EmailService:
@@ -40,17 +41,17 @@ class EmailService:
 
     @classmethod
     def from_settings(cls, db: Session) -> Optional["EmailService"]:
-        """Instantiate from GeneralSettings. Returns None if not configured."""
-        cfg = db.query(GeneralSettings).first()
-        if not cfg or not cfg.email_address or not cfg.email_password:
+        """Instantiate from environment-backed settings. Returns None if not configured."""
+        del db
+        if not settings.EMAIL_ADDRESS or not settings.EMAIL_PASSWORD:
             return None
         return cls(
-            smtp_host=cfg.email_smtp_host or "",
-            smtp_port=cfg.email_smtp_port or 587,
-            imap_host=cfg.email_imap_host or "",
-            imap_port=cfg.email_imap_port or 993,
-            address=cfg.email_address,
-            password=cfg.email_password,
+            smtp_host=settings.EMAIL_SMTP_HOST,
+            smtp_port=settings.EMAIL_SMTP_PORT,
+            imap_host=settings.EMAIL_IMAP_HOST,
+            imap_port=settings.EMAIL_IMAP_PORT,
+            address=settings.EMAIL_ADDRESS,
+            password=settings.EMAIL_PASSWORD,
         )
 
     # ── Outbound ──────────────────────────────────────────────────────────────

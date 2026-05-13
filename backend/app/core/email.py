@@ -3,14 +3,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from sqlalchemy.orm import Session
-from app.models.models import GeneralSettings
+from app.core.config import settings
 
 
 def _get_smtp_settings(db: Session):
-    settings = db.query(GeneralSettings).first()
-    if not settings:
-        return None
-    if not all([settings.email_smtp_host, settings.email_smtp_port, settings.email_address, settings.email_password]):
+    del db
+    if not all([settings.EMAIL_SMTP_HOST, settings.EMAIL_SMTP_PORT, settings.EMAIL_ADDRESS, settings.EMAIL_PASSWORD]):
         return None
     return settings
 
@@ -20,7 +18,7 @@ def send_approval_email(to_email: str, full_name: str, db: Session) -> bool:
     if not settings:
         return False
 
-    app_name = settings.app_name or "Omnichat"
+    app_name = "omnicrm.chat"
     app_url = os.getenv("FRONTEND_URL", "")
 
     html = f"""
@@ -40,15 +38,15 @@ def send_approval_email(to_email: str, full_name: str, db: Session) -> bool:
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Your {app_name} account has been approved"
-    msg["From"] = settings.email_address
+    msg["From"] = settings.EMAIL_ADDRESS
     msg["To"] = to_email
     msg.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP(settings.email_smtp_host, int(settings.email_smtp_port)) as server:
+        with smtplib.SMTP(settings.EMAIL_SMTP_HOST, int(settings.EMAIL_SMTP_PORT)) as server:
             server.starttls()
-            server.login(settings.email_address, settings.email_password)
-            server.sendmail(settings.email_address, to_email, msg.as_string())
+            server.login(settings.EMAIL_ADDRESS, settings.EMAIL_PASSWORD)
+            server.sendmail(settings.EMAIL_ADDRESS, to_email, msg.as_string())
         return True
     except Exception:
         return False
