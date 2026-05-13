@@ -46,11 +46,11 @@ export function useConversations(): UseConversationsReturn {
 
   const activeConversationRef = useRef<Conversation | null>(null);
 
-  const setActive = (conv: Conversation | null) => {
+  const setActive = useCallback((conv: Conversation | null) => {
     activeConversationRef.current = conv;
     setActiveConversation(conv);
     saveActiveConversationToSessionCache(userId, conv?.id ?? null);
-  };
+  }, [userId]);
 
   useEffect(() => {
     saveConversationsToSessionCache(userId, conversations);
@@ -62,8 +62,10 @@ export function useConversations(): UseConversationsReturn {
     if (refreshed) {
       activeConversationRef.current = refreshed;
       setActiveConversation(refreshed);
+      return;
     }
-  }, [conversations]);
+    setActive(null);
+  }, [conversations, setActive]);
 
   const fetchConversations = useCallback(async () => {
     setLoading(true);
@@ -99,7 +101,7 @@ export function useConversations(): UseConversationsReturn {
         // non-critical
       }
     }
-  }, []);
+  }, [setActive]);
 
   const updateConversation = useCallback(async (id: string, data: UpdateConversationRequest) => {
     try {
@@ -113,7 +115,7 @@ export function useConversations(): UseConversationsReturn {
     } catch (err) {
       console.error("updateConversation:", err);
     }
-  }, []);
+  }, [setActive]);
 
   const onNewMessage = useCallback(
     (msg: Message, refetchIfMissing: () => void) => {

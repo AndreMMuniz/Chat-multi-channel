@@ -13,6 +13,7 @@ import { MdOutlineEmail } from 'react-icons/md';
 import { TbSparkles } from 'react-icons/tb';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import Modal from '@/components/shared/Modal';
+import { useAuth } from '@/hooks/useAuth';
 import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
 import { conversationsApi, usersApi, quickRepliesApi, projectsApi, clientsApi } from '@/lib/api/index';
@@ -862,6 +863,7 @@ function DeleteMessageModal({
 export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   // ── UI-only state ─────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1012,6 +1014,7 @@ export default function ChatPage() {
     connectionState,
     activateConversation,
   } = useMessagesSessionContext();
+  const canDeleteConversations = Boolean(user?.user_type?.can_delete_conversations);
 
   // Story 3.3 — sort by SLA risk: breached first, then by wait time desc
   const sortedConversations = [...conversations].sort((a, b) => {
@@ -1888,22 +1891,25 @@ export default function ChatPage() {
                   >
                     <span className="material-symbols-outlined text-[16px]">mark_email_unread</span>
                   </button>
-                  <button
-                    title="Excluir conversa"
-                    onClick={async () => {
-                      if (!window.confirm('Delete this conversation and all its messages? This cannot be undone.')) return;
-                      try {
-                        await conversationsApi.deleteConversation(activeConversation.id);
-                        handleMobileBack();
-                        await fetchConversations();
-                      } catch {
-                        alert('Failed to delete conversation. Check your permissions.');
-                      }
-                    }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E9ECEF] text-[#94a3b8] hover:text-red-500 hover:bg-red-50 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                  </button>
+                  {canDeleteConversations ? (
+                    <button
+                      title="Excluir conversa"
+                      onClick={async () => {
+                        if (!window.confirm('Delete this conversation and all its messages? This cannot be undone.')) return;
+                        try {
+                          await conversationsApi.deleteConversation(activeConversation.id);
+                          handleMobileBack();
+                          await fetchConversations();
+                          setContextActionHint({ message: 'Conversation deleted.' });
+                        } catch (error) {
+                          alert(error instanceof Error ? error.message : 'Failed to delete conversation.');
+                        }
+                      }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E9ECEF] text-[#94a3b8] hover:text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                  ) : null}
                 </div>
               </div>
               
