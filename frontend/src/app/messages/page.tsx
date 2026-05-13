@@ -17,6 +17,7 @@ import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
 import { conversationsApi, usersApi, quickRepliesApi, projectsApi, clientsApi } from '@/lib/api/index';
 import type { ChannelType, Conversation, ConversationTag, Message } from '@/types/chat';
+import type { ClientListDto } from '@/types/client';
 import type { ProjectDto, ProjectPriority, ProjectStage, ProjectStageKey, ProjectTaskDto, ProjectTaskStatus } from '@/types/project';
 import AudioMessage from '@/components/AudioMessage';
 import { useState as useLocalState, useEffect as useLocalEffect } from 'react';
@@ -884,6 +885,11 @@ export default function ChatPage() {
   const [clientHistory, setClientHistory] = useState<import('@/lib/api/conversations').ConversationSummary[]>([]);
   const [clientHistoryLoading, setClientHistoryLoading] = useState(false);
   const [showQuickClientForm, setShowQuickClientForm] = useState(false);
+  const [showExistingClientPicker, setShowExistingClientPicker] = useState(false);
+  const [existingClientSearch, setExistingClientSearch] = useState('');
+  const [existingClientResults, setExistingClientResults] = useState<ClientListDto[]>([]);
+  const [existingClientLoading, setExistingClientLoading] = useState(false);
+  const [existingClientError, setExistingClientError] = useState<string | null>(null);
   const [quickClientForm, setQuickClientForm] = useState({ name: '', company_name: '' });
   const [quickClientSaving, setQuickClientSaving] = useState(false);
   const [quickClientError, setQuickClientError] = useState<string | null>(null);
@@ -1025,9 +1031,17 @@ export default function ChatPage() {
       setClientAlreadyLinked(false);
       setClientHistory([]);
       setShowQuickClientForm(false);
+      setShowExistingClientPicker(false);
+      setExistingClientSearch('');
+      setExistingClientResults([]);
+      setExistingClientError(null);
       return;
     }
     setShowQuickClientForm(false);
+    setShowExistingClientPicker(false);
+    setExistingClientSearch('');
+    setExistingClientResults([]);
+    setExistingClientError(null);
     const convId = activeConversation.id;
     setClientDetecting(true);
     conversationsApi.detectClientForConversation(convId)
@@ -1049,6 +1063,42 @@ export default function ChatPage() {
       .finally(() => setClientDetecting(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation?.id]);
+
+  useEffect(() => {
+    if (!showExistingClientPicker || !activeConversation?.contact_id) return;
+
+    const timeout = window.setTimeout(() => {
+      setExistingClientLoading(true);
+      const fallbackSearch =
+        activeConversation.contact.email?.trim()
+        || activeConversation.contact.name?.trim()
+        || activeConversation.contact.channel_identifier?.trim()
+        || '';
+
+      clientsApi.listClients({
+        limit: 8,
+        search: existingClientSearch.trim() || fallbackSearch || undefined,
+      })
+        .then((response) => {
+          setExistingClientResults(response.data ?? []);
+          setExistingClientError(null);
+        })
+        .catch(() => {
+          setExistingClientResults([]);
+          setExistingClientError('Failed to load clients.');
+        })
+        .finally(() => setExistingClientLoading(false));
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    activeConversation?.contact.channel_identifier,
+    activeConversation?.contact.email,
+    activeConversation?.contact.name,
+    activeConversation?.contact_id,
+    existingClientSearch,
+    showExistingClientPicker,
+  ]);
 
   const availableChannels = Object.keys(CHANNEL_META) as ChannelType[];
   const hasActiveFilters = Boolean(searchQuery.trim()) || selectedChannel !== 'ALL' || selectedTag !== 'ALL';
@@ -2523,6 +2573,7 @@ export default function ChatPage() {
                             <button
                               onClick={() => {
                                 setShowQuickClientForm(true);
+                                setShowExistingClientPicker(false);
                                 setQuickClientForm({
                                   name: activeConversation.contact.name ?? '',
                                   company_name: '',
@@ -2595,7 +2646,86 @@ export default function ChatPage() {
                           <p className="text-[11px] text-slate-400 text-center">No client linked.</p>
                           <button
                             onClick={() => {
+                              setShowExistingClientPicker((prev) => !prev);
+                              setShowQuickClientForm(false);
+                              setQuickClientError(null);
+                              setExistingClientSearch('');
+                              setExistingClientError(null);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 text-[11px] text-slate-600 hover:bg-slate-50 py-2 transition-colors"
+                          >
+                            {showExistingClientPicker ? 'Hide existing clients' : 'Link to existing client'}
+                          </button>
+                          {showExistingClientPicker && (
+                            <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                              <input
+                                value={existingClientSearch}
+                                onChange={(e) => setExistingClientSearch(e.target.value)}
+                                placeholder="Search by client name or company"
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-700 outline-none focus:border-slate-400"
+                              />
+                              {existingClientError && (
+                                <p className="text-[11px] text-red-500 bg-red-50 rounded-lg px-2 py-1">{existingClientError}</p>
+                              )}
+                              {existingClientLoading ? (
+                                <div className="flex items-center justify-center gap-2 py-2 text-[11px] text-slate-400">
+                                  <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                                  Loading clients...
+                                </div>
+                              ) : existingClientResults.length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {existingClientResults.map((client) => (
+                                    <button
+                                      key={client.id}
+                                      type="button"
+                                      disabled={clientLinking}
+                                      onClick={async () => {
+                                        if (!activeConversation.contact_id) return;
+                                        setClientLinking(true);
+                                        setExistingClientError(null);
+                                        try {
+                                          await conversationsApi.linkContactToClient(activeConversation.contact_id, client.id);
+                                          setClientAlreadyLinked(true);
+                                          setClientMatches([{
+                                            id: client.id,
+                                            name: client.name,
+                                            company_name: client.company_name ?? null,
+                                            match_field: 'linked',
+                                          }]);
+                                          setShowExistingClientPicker(false);
+                                          setClientHistoryLoading(true);
+                                          const response = await conversationsApi.getClientConversations(client.id, { limit: 20 });
+                                          setClientHistory((response.data ?? []).filter(c => c.id !== activeConversation.id));
+                                        } catch (err: unknown) {
+                                          setExistingClientError(err instanceof Error ? err.message : 'Failed to link client.');
+                                        } finally {
+                                          setClientLinking(false);
+                                          setClientHistoryLoading(false);
+                                        }
+                                      }}
+                                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-60"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="truncate text-[12px] font-medium text-slate-800">{client.name}</p>
+                                        {client.company_name && (
+                                          <p className="truncate text-[11px] text-slate-500">{client.company_name}</p>
+                                        )}
+                                      </div>
+                                      <span className="text-[11px] font-medium text-slate-500">
+                                        {clientLinking ? 'Linking...' : 'Link'}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="py-2 text-center text-[11px] text-slate-400">No clients found.</p>
+                              )}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => {
                               setShowQuickClientForm(true);
+                              setShowExistingClientPicker(false);
                               setQuickClientForm({
                                 name: activeConversation.contact.name ?? '',
                                 company_name: '',
