@@ -3,7 +3,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { getStoredUser } from "@/lib/api";
 import { conversationsApi } from "@/lib/api/index";
-import { readMessagesSessionCache, saveConversationsToSessionCache } from "@/lib/messagesSessionCache";
+import {
+  readMessagesSessionCache,
+  saveActiveConversationToSessionCache,
+  saveConversationsToSessionCache,
+} from "@/lib/messagesSessionCache";
 import type { Conversation, Message, UpdateConversationRequest } from "@/types/chat";
 
 export interface UseConversationsReturn {
@@ -32,7 +36,10 @@ export function useConversations(): UseConversationsReturn {
   const userId = getStoredUser<{ id: string }>()?.id ?? null;
   const cached = readMessagesSessionCache(userId);
   const [conversations, setConversations] = useState<Conversation[]>(cached?.conversations ?? []);
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [activeConversation, setActiveConversation] = useState<Conversation | null>(() => {
+    if (!cached?.activeConversationId) return null;
+    return cached.conversations.find((conversation) => conversation.id === cached.activeConversationId) ?? null;
+  });
   const [loading, setLoading] = useState(false);
   const [notifCounts, setNotifCounts] = useState<Record<string, number>>({});
   const [activeViewers, setActiveViewers] = useState<string[]>([]);
@@ -42,11 +49,21 @@ export function useConversations(): UseConversationsReturn {
   const setActive = (conv: Conversation | null) => {
     activeConversationRef.current = conv;
     setActiveConversation(conv);
+    saveActiveConversationToSessionCache(userId, conv?.id ?? null);
   };
 
   useEffect(() => {
     saveConversationsToSessionCache(userId, conversations);
   }, [conversations, userId]);
+
+  useEffect(() => {
+    if (!activeConversationRef.current?.id) return;
+    const refreshed = conversations.find((conversation) => conversation.id === activeConversationRef.current?.id);
+    if (refreshed) {
+      activeConversationRef.current = refreshed;
+      setActiveConversation(refreshed);
+    }
+  }, [conversations]);
 
   const fetchConversations = useCallback(async () => {
     setLoading(true);

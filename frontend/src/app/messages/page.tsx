@@ -13,17 +13,14 @@ import { MdOutlineEmail } from 'react-icons/md';
 import { TbSparkles } from 'react-icons/tb';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import Modal from '@/components/shared/Modal';
-import { useConversations } from '@/hooks/useConversations';
-import { useMessages } from '@/hooks/useMessages';
-import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAISuggestions } from '@/hooks/useAISuggestions';
 import { useQuickReplySearch } from '@/hooks/useQuickReplies';
 import { conversationsApi, usersApi, quickRepliesApi, projectsApi, clientsApi } from '@/lib/api/index';
-import type { SequencedEvent } from '@/types/api';
 import type { ChannelType, Conversation, ConversationTag, Message } from '@/types/chat';
 import type { ProjectDto, ProjectPriority, ProjectStage, ProjectStageKey, ProjectTaskDto, ProjectTaskStatus } from '@/types/project';
 import AudioMessage from '@/components/AudioMessage';
 import { useState as useLocalState, useEffect as useLocalEffect } from 'react';
+import { useMessagesSessionContext } from '@/contexts/MessagesSessionContext';
 
 // ── Assignment Panel (Story 3.5) ──────────────────────────────────────────────
 
@@ -987,19 +984,27 @@ export default function ChatPage() {
 
   // ── Domain hooks ──────────────────────────────────────────────────────────
   const {
-    conversations,
-    activeConversation,
-    activeConversationRef,
-    fetchConversations,
-    selectConversation,
-    updateConversation,
-    notifCounts,
-    activeViewers,
-    onNewMessage,
-    onConversationNotification,
-    onPresenceUpdate,
-    onConversationUpdated,
-  } = useConversations();
+    conversationsState: {
+      conversations,
+      activeConversation,
+      fetchConversations,
+      updateConversation,
+      notifCounts,
+      activeViewers,
+    },
+    messagesState: {
+      messages,
+      sendStatus,
+      sending,
+      fetchMessages,
+      sendText,
+      sendFile,
+      sendAudio,
+      retryMessage,
+    },
+    connectionState,
+    activateConversation,
+  } = useMessagesSessionContext();
 
   // Story 3.3 — sort by SLA risk: breached first, then by wait time desc
   const sortedConversations = [...conversations].sort((a, b) => {
@@ -1284,18 +1289,6 @@ export default function ChatPage() {
   }, [linkedProjectsByMessageId, openCreateCardModalForMessage, openCreateTaskModalForMessage, router]);
 
   const {
-    messages,
-    sendStatus,
-    sending,
-    fetchMessages,
-    sendText,
-    sendFile,
-    sendAudio,
-    retryMessage,
-    appendMessage,
-  } = useMessages(scrollToBottom);
-
-  const {
     suggestions,
     source: aiSource,
     generatedAt: aiGeneratedAt,
@@ -1307,6 +1300,11 @@ export default function ChatPage() {
   } = useAISuggestions();
 
   const { matches: qrMatches, open: qrOpen, search: qrSearch, close: qrClose } = useQuickReplySearch();
+
+  useEffect(() => {
+    if (!activeConversation || messages.length === 0) return;
+    scrollToBottom();
+  }, [activeConversation?.id, messages, scrollToBottom]);
 
   useEffect(() => {
     if (!activeConversation) return;
@@ -1374,38 +1372,6 @@ export default function ChatPage() {
   }, [activeConversation, deleteMessageModal, fetchConversations, fetchMessages]);
 
   // ── WebSocket event dispatcher ─────────────────────────────────────────────
-  const handleWsEvent = useCallback((event: SequencedEvent) => {
-    if (event.type === 'new_message') {
-      const msg = event.data as unknown as Message;
-      onNewMessage(msg, fetchConversations);
-      if (activeConversationRef.current?.id === msg.conversation_id) {
-        appendMessage(msg);
-      }
-    } else if (event.type === 'conversation_notification') {
-      onConversationNotification(event.conversation_id);
-    } else if (event.type === 'presence_update') {
-      const { conversation_id, viewers } = event.data as { conversation_id: string; viewers: string[] };
-      onPresenceUpdate(conversation_id, viewers);
-    } else if (event.type === 'message_deleted') {
-      if (activeConversationRef.current?.id === event.conversation_id) {
-        fetchMessages(event.conversation_id);
-      }
-      fetchConversations();
-    } else if (event.type === 'conversation_updated') {
-      onConversationUpdated();
-    } else if (event.type === 'sla_risk_alert') {
-      const d = event.data as { count: number; threshold_minutes: number };
-      setSlaAlert({ count: d.count, threshold: d.threshold_minutes });
-    } else if (event.type === 'delivery_failure_alert') {
-      const d = event.data as { channel: string; failure_count: number };
-      setDeliveryAlert({ channel: d.channel, count: d.failure_count });
-    }
-  }, [onNewMessage, onConversationNotification, onPresenceUpdate, onConversationUpdated, fetchConversations, fetchMessages, appendMessage, activeConversationRef]);
-
-  const { subscribe, unsubscribe, connectionState } = useWebSocket(handleWsEvent);
-
-  useEffect(() => { fetchConversations(); }, [fetchConversations]);
-
   useEffect(() => {
     if (connectionState === 'connected' || connectionState === 'connecting') {
       setShowConnectionBanner(false);
@@ -1422,15 +1388,12 @@ export default function ChatPage() {
 
   // ── Conversation selection ────────────────────────────────────────────────
   const handleSelectConversation = useCallback(async (conv: Conversation) => {
-    if (activeConversationRef.current) unsubscribe(activeConversationRef.current.id);
     cancelAttachment();
     clearAI();
-    await selectConversation(conv);
-    subscribe(conv.id);
-    await fetchMessages(conv.id);
+    await activateConversation(conv);
     fetchAICached(conv.id);
     setMobileView('chat');
-  }, [selectConversation, fetchMessages, subscribe, unsubscribe, activeConversationRef, fetchAICached, clearAI]);
+  }, [activateConversation, fetchAICached, clearAI]);
 
   useEffect(() => {
     const queryConversationId = searchParams.get('conversationId');

@@ -10,6 +10,7 @@ type MessagesSessionCache = {
   version: number;
   conversations: Conversation[];
   messagesByConversation: Record<string, Message[]>;
+  activeConversationId: string | null;
   updatedAt: string;
 };
 
@@ -38,6 +39,7 @@ function emptyCache(): MessagesSessionCache {
     version: CACHE_VERSION,
     conversations: [],
     messagesByConversation: {},
+    activeConversationId: null,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -69,6 +71,7 @@ export function readMessagesSessionCache(userId: string | null | undefined): Mes
           normalizeMessages(messages ?? []),
         ])
       ),
+      activeConversationId: parsed.activeConversationId ?? null,
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
 
@@ -115,6 +118,17 @@ export function saveMessagesToSessionCache(
       ...current.messagesByConversation,
       [conversationId]: normalizeMessages(messages),
     },
+    updatedAt: new Date().toISOString(),
+  }));
+}
+
+export function saveActiveConversationToSessionCache(
+  userId: string | null | undefined,
+  activeConversationId: string | null,
+) {
+  writeMessagesSessionCache(userId, (current) => ({
+    ...current,
+    activeConversationId,
     updatedAt: new Date().toISOString(),
   }));
 }

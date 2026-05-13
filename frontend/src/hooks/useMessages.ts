@@ -51,7 +51,7 @@ export interface UseMessagesReturn {
   appendMessage: (msg: Message) => void;
 }
 
-export function useMessages(scrollToBottom: () => void): UseMessagesReturn {
+export function useMessages(scrollToBottom: () => void = () => {}): UseMessagesReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
   const [sendStatus, setSendStatus] = useState<Record<string, MessageSendStatus>>({});
