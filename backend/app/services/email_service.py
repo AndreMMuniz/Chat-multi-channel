@@ -12,6 +12,7 @@ import imaplib
 import asyncio
 import ssl
 import email as email_lib
+from email.utils import parseaddr
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
@@ -70,8 +71,13 @@ class EmailService:
 
     async def send_email(self, to: str, subject: str, body: str) -> bool:
         """Send email via SMTP. Returns True on success."""
+        normalized_to = self._normalize_email_address(to)
+        if not normalized_to:
+            self.last_error = "invalid_recipient_email"
+            return False
+
         if self.brevo_api_key:
-            return await self._send_via_brevo(to, subject, body)
+            return await self._send_via_brevo(normalized_to, subject, body)
 
         if not self.smtp_host:
             self.last_error = "smtp_host_not_configured"
@@ -80,7 +86,7 @@ class EmailService:
         try:
             self.last_error = None
             await asyncio.wait_for(
-                asyncio.to_thread(self._send_email_blocking, to, subject, body),
+                asyncio.to_thread(self._send_email_blocking, normalized_to, subject, body),
                 timeout=self.smtp_timeout_seconds + 2,
             )
             return True
@@ -206,10 +212,26 @@ class EmailService:
             await self._handle_inbound(db, from_addr, body)
 
     async def _handle_inbound(self, db: Session, from_addr: str, text: str) -> None:
-        contact = db.query(Contact).filter(Contact.email == from_addr).first()
+        sender_name, sender_email = self._parse_sender(from_addr)
+        lookup_email = sender_email or from_addr.strip()
+
+        contact = db.query(Contact).filter(Contact.email == lookup_email).first()
+        if not contact and sender_email:
+            contact = db.query(Contact).filter(Contact.channel_identifier == sender_email).first()
         if not contact:
-            contact = Contact(name=from_addr, email=from_addr, channel_identifier=from_addr)
+            contact = Contact(
+                name=sender_name or lookup_email,
+                email=lookup_email if sender_email else None,
+                channel_identifier=lookup_email,
+            )
             db.add(contact)
+            db.commit()
+            db.refresh(contact)
+        elif sender_email and (contact.email != sender_email or contact.channel_identifier != sender_email or (sender_name and contact.name != sender_name)):
+            contact.email = sender_email
+            contact.channel_identifier = sender_email
+            if sender_name:
+                contact.name = sender_name
             db.commit()
             db.refresh(contact)
 
@@ -256,3 +278,22 @@ class EmailService:
             if payload:
                 return payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
         return ""
+
+    @staticmethod
+    def _normalize_email_address(value: str | None) -> str | None:
+        if not value:
+            return None
+        _, email_address = parseaddr(value.strip())
+        normalized = email_address.strip().lower()
+        if not normalized or "@" not in normalized:
+            return None
+        return normalized
+
+    @classmethod
+    def _parse_sender(cls, value: str | None) -> tuple[str | None, str | None]:
+        if not value:
+            return None, None
+        name, email_address = parseaddr(value.strip())
+        normalized_email = cls._normalize_email_address(email_address or value)
+        normalized_name = name.strip() if name and name.strip() else None
+        return normalized_name, normalized_email

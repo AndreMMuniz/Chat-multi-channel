@@ -63,13 +63,14 @@ class ChannelService:
             raise ChannelDeliveryError("whatsapp:send_failed")
 
     async def _send_email(self, contact: Contact, content: str) -> None:
-        if not contact.email:
+        recipient = contact.email or contact.channel_identifier
+        if not recipient:
             raise ChannelDeliveryError("email:missing_address")
         from app.services.email_service import EmailService
         svc = EmailService.from_settings(self.db)
         if not svc:
             raise ChannelDeliveryError("email:not_configured")
-        ok = await svc.send_email(contact.email, "Reply from support", content)
+        ok = await svc.send_email(recipient, "Reply from support", content)
         if not ok:
             reason = svc.last_error or "unknown_error"
             raise ChannelDeliveryError(f"email:send_failed:{reason}")
