@@ -18,6 +18,7 @@ from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
 from typing import Optional, List, Tuple
 import httpx
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -215,9 +216,7 @@ class EmailService:
         sender_name, sender_email = self._parse_sender(from_addr)
         lookup_email = sender_email or from_addr.strip()
 
-        contact = db.query(Contact).filter(Contact.email == lookup_email).first()
-        if not contact and sender_email:
-            contact = db.query(Contact).filter(Contact.channel_identifier == sender_email).first()
+        contact = self._find_contact_by_sender(db, lookup_email, sender_email)
         if not contact:
             contact = Contact(
                 name=sender_name or lookup_email,
@@ -297,3 +296,26 @@ class EmailService:
         normalized_email = cls._normalize_email_address(email_address or value)
         normalized_name = name.strip() if name and name.strip() else None
         return normalized_name, normalized_email
+
+    @staticmethod
+    def _find_contact_by_sender(db: Session, lookup_email: str, sender_email: str | None) -> Contact | None:
+        normalized_lookup = (sender_email or lookup_email or "").strip().lower()
+        if not normalized_lookup:
+            return None
+
+        contact = db.query(Contact).filter(
+            or_(
+                func.lower(Contact.email) == normalized_lookup,
+                func.lower(Contact.channel_identifier) == normalized_lookup,
+            )
+        ).first()
+        if contact:
+            return contact
+
+        pattern = f"%{normalized_lookup}%"
+        return db.query(Contact).filter(
+            or_(
+                func.lower(Contact.email).like(pattern),
+                func.lower(Contact.channel_identifier).like(pattern),
+            )
+        ).first()
