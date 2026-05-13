@@ -215,18 +215,37 @@ class EmailService:
     async def _handle_inbound(self, db: Session, from_addr: str, text: str) -> None:
         sender_name, sender_email = self._parse_sender(from_addr)
         lookup_email = sender_email or from_addr.strip()
+        normalized_thread = (sender_email or lookup_email).strip().lower()
 
-        contact = self._find_contact_by_sender(db, lookup_email, sender_email)
-        if not contact:
-            contact = Contact(
-                name=sender_name or lookup_email,
-                email=lookup_email if sender_email else None,
-                channel_identifier=lookup_email,
+        conversation = self._find_email_conversation_by_sender(db, normalized_thread)
+        if not conversation:
+            contact = self._find_contact_by_sender(db, lookup_email, sender_email)
+            if not contact:
+                contact = Contact(
+                    name=sender_name or lookup_email,
+                    email=lookup_email if sender_email else None,
+                    channel_identifier=lookup_email,
+                )
+                db.add(contact)
+                db.commit()
+                db.refresh(contact)
+
+            conversation = Conversation(
+                contact_id=contact.id,
+                channel=ChannelType.EMAIL,
+                thread_id=normalized_thread,
             )
-            db.add(contact)
+            db.add(conversation)
             db.commit()
-            db.refresh(contact)
-        elif sender_email and (contact.email != sender_email or contact.channel_identifier != sender_email or (sender_name and contact.name != sender_name)):
+            db.refresh(conversation)
+        else:
+            contact = conversation.contact
+
+        if contact and sender_email and (
+            contact.email != sender_email
+            or contact.channel_identifier != sender_email
+            or (sender_name and contact.name != sender_name)
+        ):
             contact.email = sender_email
             contact.channel_identifier = sender_email
             if sender_name:
@@ -234,17 +253,8 @@ class EmailService:
             db.commit()
             db.refresh(contact)
 
-        conversation = db.query(Conversation).filter(
-            Conversation.contact_id == contact.id,
-            Conversation.channel == ChannelType.EMAIL,
-        ).first()
-        if not conversation:
-            conversation = Conversation(
-                contact_id=contact.id,
-                channel=ChannelType.EMAIL,
-                thread_id=from_addr,
-            )
-            db.add(conversation)
+        if conversation.thread_id != normalized_thread:
+            conversation.thread_id = normalized_thread
             db.commit()
             db.refresh(conversation)
 
@@ -319,3 +329,41 @@ class EmailService:
                 func.lower(Contact.channel_identifier).like(pattern),
             )
         ).first()
+
+    @staticmethod
+    def _find_email_conversation_by_sender(db: Session, normalized_sender: str) -> Conversation | None:
+        if not normalized_sender:
+            return None
+
+        conversation = (
+            db.query(Conversation)
+            .join(Contact, Contact.id == Conversation.contact_id)
+            .filter(
+                Conversation.channel == ChannelType.EMAIL,
+                or_(
+                    func.lower(Conversation.thread_id) == normalized_sender,
+                    func.lower(Contact.email) == normalized_sender,
+                    func.lower(Contact.channel_identifier) == normalized_sender,
+                ),
+            )
+            .order_by(Conversation.updated_at.desc(), Conversation.created_at.desc())
+            .first()
+        )
+        if conversation:
+            return conversation
+
+        pattern = f"%{normalized_sender}%"
+        return (
+            db.query(Conversation)
+            .join(Contact, Contact.id == Conversation.contact_id)
+            .filter(
+                Conversation.channel == ChannelType.EMAIL,
+                or_(
+                    func.lower(Conversation.thread_id).like(pattern),
+                    func.lower(Contact.email).like(pattern),
+                    func.lower(Contact.channel_identifier).like(pattern),
+                ),
+            )
+            .order_by(Conversation.updated_at.desc(), Conversation.created_at.desc())
+            .first()
+        )
