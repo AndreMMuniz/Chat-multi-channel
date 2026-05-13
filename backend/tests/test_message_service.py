@@ -150,7 +150,6 @@ class TestSendFromDashboard:
 
         assert msg.inbound is True
 
-
 # ── retry_message ─────────────────────────────────────────────────────────────
 
 class TestRetryMessage:

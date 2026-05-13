@@ -12,6 +12,7 @@ import imaplib
 import asyncio
 import ssl
 import email as email_lib
+import re
 from email.utils import parseaddr
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -213,6 +214,7 @@ class EmailService:
             await self._handle_inbound(db, from_addr, body)
 
     async def _handle_inbound(self, db: Session, from_addr: str, text: str) -> None:
+        visible_text, full_context_text = self._split_visible_and_context(text)
         sender_name, sender_email = self._parse_sender(from_addr)
         lookup_email = sender_email or from_addr.strip()
         normalized_thread = (sender_email or lookup_email).strip().lower()
@@ -259,7 +261,11 @@ class EmailService:
             db.refresh(conversation)
 
         from app.services.message_service import MessageService
-        await MessageService(db).receive_from_channel(conversation, text)
+        await MessageService(db).receive_from_channel(
+            conversation,
+            visible_text,
+            agent_content=full_context_text,
+        )
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -287,6 +293,39 @@ class EmailService:
             if payload:
                 return payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
         return ""
+
+    @classmethod
+    def _split_visible_and_context(cls, text: str | None) -> tuple[str, str]:
+        normalized = cls._normalize_body_text(text)
+        if not normalized:
+            return "", ""
+
+        separators = (
+            r"(^|\n)\s*On\s.+?\bwrote:\s*",
+            r"(^|\n)\s*Em\s.+?\bescreveu:\s*",
+            r"\s+On\s.+?<[^>\n]+>\s+wrote:\s*",
+            r"\s+Em\s.+?<[^>\n]+>\s+escreveu:\s*",
+            r"(^|\n)\s*>+",
+        )
+
+        for pattern in separators:
+            match = re.search(pattern, normalized, flags=re.IGNORECASE | re.DOTALL)
+            if not match:
+                continue
+            visible = normalized[:match.start()].strip()
+            if visible:
+                return visible, normalized
+
+        return normalized, normalized
+
+    @staticmethod
+    def _normalize_body_text(text: str | None) -> str:
+        if not text:
+            return ""
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        normalized = re.sub(r"[ \t]+\n", "\n", normalized)
+        normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+        return normalized
 
     @staticmethod
     def _normalize_email_address(value: str | None) -> str | None:

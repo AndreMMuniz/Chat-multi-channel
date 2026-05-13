@@ -114,16 +114,22 @@ class MessageService:
         content: str,
         message_type: str = "TEXT",
         idempotency_key: Optional[str] = None,
+        agent_content: Optional[str] = None,
     ) -> Message:
         message = self._creation.create_message(
             conversation=conversation, content=content, inbound=True,
             message_type=message_type, idempotency_key=idempotency_key,
         )
         await self._broadcast.broadcast_new_message(message)
-        await self._enqueue_for_agent(message, conversation)
+        await self._enqueue_for_agent(message, conversation, agent_content=agent_content)
         return message
 
-    async def _enqueue_for_agent(self, message: Message, conversation: Conversation) -> None:
+    async def _enqueue_for_agent(
+        self,
+        message: Message,
+        conversation: Conversation,
+        agent_content: Optional[str] = None,
+    ) -> None:
         try:
             from src.shared.queue import agent_queue
             from src.shared.models import AgentTask, ChannelType as AgentChannel
@@ -132,7 +138,7 @@ class MessageService:
                 message_id=str(message.id),
                 conversation_id=str(conversation.id),
                 channel=AgentChannel(conversation.channel.value.upper()),
-                content=message.content or "",
+                content=agent_content if agent_content is not None else (message.content or ""),
             )
             agent_queue().put_nowait(task)
         except Exception:
