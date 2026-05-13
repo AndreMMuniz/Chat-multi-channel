@@ -1795,37 +1795,6 @@ export default function ChatPage() {
                     </span>
                   )}
                   {/* Status select — uses inline styles + appearance-none so browser can't override bg/color */}
-                  {(() => {
-                    const statusStyles: Record<string, { bg: string; color: string; border: string }> = {
-                      OPEN:    { bg: '#fff7ed', color: '#f97316', border: '#fed7aa' },
-                      PENDING: { bg: '#fffbeb', color: '#f59e0b', border: '#fde68a' },
-                      CLOSED:  { bg: '#f0fdf4', color: '#10b981', border: '#bbf7d0' },
-                    };
-                    const s = statusStyles[activeConversation.status] ?? statusStyles.OPEN;
-                    return (
-                      <div className="relative flex items-center">
-                        <select
-                          value={activeConversation.status}
-                          onChange={e => updateConversation(activeConversation.id, { status: e.target.value as import('@/types/chat').ConversationStatus })}
-                          style={{
-                            height: 30, paddingLeft: 10, paddingRight: 26,
-                            borderRadius: 999, fontSize: 11, fontWeight: 600,
-                            border: `1px solid ${s.border}`,
-                            background: s.bg, color: s.color,
-                            cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
-                            appearance: 'none', WebkitAppearance: 'none',
-                          }}
-                        >
-                          <option value="OPEN">Open</option>
-                          <option value="PENDING">Pending</option>
-                          <option value="CLOSED">Closed</option>
-                        </select>
-                        <span className="material-symbols-outlined pointer-events-none absolute right-1.5 text-[14px]" style={{ color: s.color }}>
-                          expand_more
-                        </span>
-                      </div>
-                    );
-                  })()}
                   {/* AI toggle — desktop */}
                   <button
                     title="Sugestões de IA"
