@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { projectsApi } from "@/lib/api/index";
 import type {
@@ -60,6 +60,7 @@ function isOverdue(date?: string | null, status?: ProjectTaskStatus) {
 
 export default function TasksPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [tasks, setTasks] = useState<ProjectTaskDto[]>([]);
   const [projects, setProjects] = useState<ProjectDto[]>([]);
@@ -74,6 +75,19 @@ export default function TasksPage() {
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const currentUserId = user?.id ?? null;
+
+  useEffect(() => {
+    const scope = searchParams.get("scope");
+    const status = searchParams.get("status");
+
+    if (scope && ["assigned", "created", "overdue", "scheduled", "done"].includes(scope)) {
+      setActiveScope(scope as ScopeId);
+    }
+
+    if (status && ["open", "in_progress", "done", "cancelled"].includes(status)) {
+      setStatusFilter(status as ProjectTaskStatus);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let isMounted = true;

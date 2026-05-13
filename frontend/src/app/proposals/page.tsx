@@ -190,6 +190,7 @@ export default function ProposalsPage() {
   const shouldOpenCreate = searchParams.get("create") === "1";
   const prefillClientId = searchParams.get("clientId") ?? "";
   const prefillTitle = searchParams.get("title") ?? "";
+  const requestedStatus = searchParams.get("status");
 
   const [proposals, setProposals] = useState<ProposalDto[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<ProposalDetailDto | null>(null);
@@ -229,6 +230,21 @@ export default function ProposalsPage() {
     setIsCreateModalOpen(true);
     setAppliedCreatePrefill(true);
   }, [appliedCreatePrefill, prefillClientId, prefillTitle, shouldOpenCreate]);
+
+  useEffect(() => {
+    if (!requestedStatus) return;
+    if (
+      requestedStatus === "draft" ||
+      requestedStatus === "sent" ||
+      requestedStatus === "approved" ||
+      requestedStatus === "rejected" ||
+      requestedStatus === "archived" ||
+      requestedStatus === "expired" ||
+      requestedStatus === "cancelled"
+    ) {
+      setStatusFilter(requestedStatus);
+    }
+  }, [requestedStatus]);
 
   const loadProposals = useCallback(async (preserveSelection: boolean) => {
     try {

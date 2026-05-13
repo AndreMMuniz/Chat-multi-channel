@@ -1553,6 +1553,7 @@ export default function ProjectsPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityId | "ALL">("ALL");
   const [channelFilter, setChannelFilter] = useState<ChannelId | "ALL">("ALL");
   const [originFilter, setOriginFilter] = useState<OriginId | "ALL">("ALL");
+  const [scopeFilter, setScopeFilter] = useState<"ALL" | "open">("ALL");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -1632,12 +1633,22 @@ export default function ProjectsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const scope = searchParams.get("scope");
+    if (scope === "open") {
+      setScopeFilter("open");
+      return;
+    }
+    setScopeFilter("ALL");
+  }, [searchParams]);
+
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     ownerFilter !== "ALL" ||
     priorityFilter !== "ALL" ||
     channelFilter !== "ALL" ||
-    originFilter !== "ALL";
+    originFilter !== "ALL" ||
+    scopeFilter !== "ALL";
 
   const filteredCards = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -1662,10 +1673,11 @@ export default function ProjectsPage() {
       const matchesPriority = priorityFilter === "ALL" || card.priority === priorityFilter;
       const matchesChannel = channelFilter === "ALL" || card.channel === channelFilter;
       const matchesOrigin = originFilter === "ALL" || card.origin === originFilter;
+      const matchesScope = scopeFilter === "ALL" || card.stage !== "closed";
 
-      return matchesQuery && matchesOwner && matchesPriority && matchesChannel && matchesOrigin;
+      return matchesQuery && matchesOwner && matchesPriority && matchesChannel && matchesOrigin && matchesScope;
     });
-  }, [cards, channelFilter, originFilter, ownerFilter, priorityFilter, searchQuery]);
+  }, [cards, channelFilter, originFilter, ownerFilter, priorityFilter, scopeFilter, searchQuery]);
 
   const cardsByStage = useMemo(() => {
     return stageOptions.reduce<Record<StageId, ProjectCard[]>>((acc, stage) => {
@@ -1742,6 +1754,7 @@ export default function ProjectsPage() {
     setPriorityFilter("ALL");
     setChannelFilter("ALL");
     setOriginFilter("ALL");
+    setScopeFilter("ALL");
   };
 
   const isEditing = Boolean(form?.id);

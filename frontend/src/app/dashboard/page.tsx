@@ -98,7 +98,7 @@ export default function DashboardPage() {
     {
       title: "Proposals",
       value: summary?.proposals ?? 0,
-      href: "/proposals",
+      href: "/proposals?status=draft",
       hint: "Drafts and active negotiations.",
       cta: "Open proposals",
       icon: "request_quote",
@@ -107,7 +107,7 @@ export default function DashboardPage() {
     {
       title: "Your tasks",
       value: summary?.your_tasks ?? 0,
-      href: "/tasks",
+      href: "/tasks?scope=assigned&status=open",
       hint: "Pending items assigned to you.",
       cta: "View tasks",
       icon: "task",
@@ -116,7 +116,7 @@ export default function DashboardPage() {
     {
       title: "Your projects",
       value: summary?.your_projects ?? 0,
-      href: "/projects",
+      href: "/projects?scope=open",
       hint: "Open cards in progress.",
       cta: "View projects",
       icon: "view_kanban",
