@@ -355,6 +355,12 @@ export default function SettingsPage() {
                   </ApiGroup>
 
                   <ApiGroup icon="mail" label="Email - IMAP / SMTP" color="border-b border-blue-100 bg-blue-50 text-blue-800" configured={emailConfigured}>
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-900">
+                      Configure the shared inbox that omnicrm.chat should monitor for inbound email. For production,
+                      create the mailbox <strong>test@omnicrm.chat</strong> in your email provider and enter its IMAP/SMTP
+                      credentials here. New messages received in that inbox are polled automatically by the backend and
+                      converted into conversations.
+                    </div>
                     <Field label="IMAP Host">
                       <TextInput value={s.email_imap_host} onChange={set("email_imap_host")} placeholder="imap.gmail.com" />
                     </Field>
@@ -368,9 +374,9 @@ export default function SettingsPage() {
                       <TextInput type="number" value={s.email_smtp_port} onChange={set("email_smtp_port")} placeholder="587" />
                     </Field>
                     <Field label="Email Address">
-                      <TextInput type="email" value={s.email_address} onChange={set("email_address")} placeholder="noreply@company.com" />
+                      <TextInput type="email" value={s.email_address} onChange={set("email_address")} placeholder="test@omnicrm.chat" />
                     </Field>
-                    <Field label="Password / App Password" hint="For Gmail, use an App Password">
+                    <Field label="Password / App Password" hint="Use the mailbox password or provider app password for test@omnicrm.chat">
                       <PasswordInput value={s.email_password} onChange={set("email_password")} placeholder="••••••••••••" />
                     </Field>
                   </ApiGroup>
