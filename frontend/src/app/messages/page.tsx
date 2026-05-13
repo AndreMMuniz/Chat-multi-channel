@@ -1601,24 +1601,23 @@ export default function ChatPage() {
                   );
                 })}
               </div>
-              {/* Tag filter chips */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
-                <button onClick={() => setSelectedTag('ALL')}
-                  className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors cursor-pointer"
-                  style={selectedTag === 'ALL' ? { background: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
-                  All tags
-                </button>
-                {TAG_OPTIONS.map((tag) => {
-                  const m = TAG_META[tag];
-                  const active = selectedTag === tag;
-                  return (
-                    <button key={tag} onClick={() => setSelectedTag(tag)}
-                      className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors cursor-pointer"
-                      style={active ? { background: m.activeBg, color: m.activeText, borderColor: m.activeBorder } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
-                      {m.label}
-                    </button>
-                  );
-                })}
+              {/* Tag filter dropdown */}
+              <div className="relative">
+                <select
+                  value={selectedTag}
+                  onChange={(event) => setSelectedTag(event.target.value as ConversationTag | 'ALL')}
+                  className="h-8 w-full appearance-none rounded-full border border-[#c7d2fe] bg-[#eef2ff] px-3 pr-8 text-[11px] font-semibold text-[#4338ca] outline-none transition-colors"
+                >
+                  <option value="ALL">All tags</option>
+                  {TAG_OPTIONS.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {TAG_META[tag].label}
+                    </option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-[#4338ca]">
+                  expand_more
+                </span>
               </div>
             </div>
           </div>
