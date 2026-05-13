@@ -1807,15 +1807,6 @@ export default function ChatPage() {
                 {/* Header actions */}
                 <div className="flex items-center gap-2">
                   {/* Presence indicator (right-side, matches prototype) */}
-                  {activeViewers.length > 0 && (
-                    <span className="hidden md:flex items-center gap-[5px] rounded-full"
-                      style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '3px 9px' }}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
-                      <span className="text-[11px] font-semibold text-[#c2410c]">
-                        {activeViewers.length === 1 ? `${activeViewers[0]} is viewing` : `${activeViewers.length} viewing`}
-                      </span>
-                    </span>
-                  )}
                   {/* Status select — uses inline styles + appearance-none so browser can't override bg/color */}
                   {/* AI toggle — desktop */}
                   <button
