@@ -1586,13 +1586,17 @@ export default function ChatPage() {
                 </button>
                 {availableChannels.map((ch) => {
                   const m = CHANNEL_META[ch];
+                  const Icon = m.icon;
                   const active = selectedChannel === ch;
                   return (
-                    <button key={ch} onClick={() => setSelectedChannel(ch)}
-                      className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                    <button
+                      key={ch}
+                      onClick={() => setSelectedChannel(ch)}
+                      title={m.label}
+                      aria-label={m.label}
+                      className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer flex items-center justify-center"
                       style={active ? { background: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' } : { background: 'white', color: '#575f67', borderColor: '#e2e8f0' }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: m.dot, display: 'inline-block', flexShrink: 0 }} />
-                      {m.label}
+                      <Icon className={cn('text-[14px]', active ? 'text-[#4338ca]' : m.iconClass)} />
                     </button>
                   );
                 })}
