@@ -2026,7 +2026,7 @@ export default function ChatPage() {
                           </div>
                         )}
                       </div>
-                      {!msg.inbound && sendStatus[msg.id] !== 'failed' && (
+                      {!msg.inbound && sendStatus[msg.id] !== 'failed' && msg.delivery_status !== 'failed' && (
                         <div className="flex items-center gap-[3px]">
                           <span className="material-symbols-outlined text-[12px]"
                             style={{ fontVariationSettings: "'FILL' 1", color: msg.delivery_status === 'delivered' ? '#7C4DFF' : '#94a3b8' }}>

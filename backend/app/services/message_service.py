@@ -66,7 +66,12 @@ class MessageService:
         message.delivery_status = DeliveryStatus.PENDING
         self.db.commit()
 
-        await self._delivery.dispatch_to_channel(conversation, message.content, message)
+        try:
+            await self._delivery.dispatch_to_channel(conversation, message.content, message)
+        except Exception:
+            pass
+
+        self.db.refresh(message)
         await self._broadcast.broadcast_new_message(message)
         return message
 
@@ -99,6 +104,7 @@ class MessageService:
         except Exception:
             pass  # failure already persisted and broadcast inside dispatch_to_channel
 
+        self.db.refresh(message)
         await self._broadcast.broadcast_new_message(message)
         return message
 
