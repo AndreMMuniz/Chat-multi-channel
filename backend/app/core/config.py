@@ -29,6 +29,7 @@ class Settings(BaseModel):
     EMAIL_SMTP_HOST: str = os.getenv("EMAIL_SMTP_HOST", "")
     EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT", "587"))
     EMAIL_SMTP_TIMEOUT_SECONDS: int = int(os.getenv("EMAIL_SMTP_TIMEOUT_SECONDS", "8"))
+    BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
 
     # Deployment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")

@@ -16,6 +16,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
 from typing import Optional, List, Tuple
+import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -34,6 +35,7 @@ class EmailService:
         address: str,
         password: str,
         smtp_timeout_seconds: int = 8,
+        brevo_api_key: str = "",
     ):
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
@@ -42,13 +44,16 @@ class EmailService:
         self.address = address
         self.password = password
         self.smtp_timeout_seconds = smtp_timeout_seconds
+        self.brevo_api_key = brevo_api_key
         self.last_error: Optional[str] = None
 
     @classmethod
     def from_settings(cls, db: Session) -> Optional["EmailService"]:
         """Instantiate from environment-backed settings. Returns None if not configured."""
         del db
-        if not settings.EMAIL_ADDRESS or not settings.EMAIL_PASSWORD:
+        has_brevo = bool(settings.BREVO_API_KEY and settings.EMAIL_ADDRESS)
+        has_smtp = bool(settings.EMAIL_ADDRESS and settings.EMAIL_PASSWORD)
+        if not has_brevo and not has_smtp:
             return None
         return cls(
             smtp_host=settings.EMAIL_SMTP_HOST,
@@ -58,13 +63,18 @@ class EmailService:
             address=settings.EMAIL_ADDRESS,
             password=settings.EMAIL_PASSWORD,
             smtp_timeout_seconds=settings.EMAIL_SMTP_TIMEOUT_SECONDS,
+            brevo_api_key=settings.BREVO_API_KEY,
         )
 
     # ── Outbound ──────────────────────────────────────────────────────────────
 
     async def send_email(self, to: str, subject: str, body: str) -> bool:
         """Send email via SMTP. Returns True on success."""
+        if self.brevo_api_key:
+            return await self._send_via_brevo(to, subject, body)
+
         if not self.smtp_host:
+            self.last_error = "smtp_host_not_configured"
             print("EmailService: smtp_host not configured")
             return False
         try:
@@ -77,6 +87,47 @@ class EmailService:
         except Exception as e:
             self.last_error = str(e)
             print(f"EmailService send error: {e}")
+            return False
+
+    async def _send_via_brevo(self, to: str, subject: str, body: str) -> bool:
+        self.last_error = None
+        if not self.address:
+            self.last_error = "missing_sender_address"
+            return False
+
+        payload = {
+            "sender": {
+                "name": self.address.split("@")[0],
+                "email": self.address,
+            },
+            "to": [{"email": to}],
+            "subject": subject,
+            "textContent": body,
+        }
+
+        headers = {
+            "accept": "application/json",
+            "api-key": self.brevo_api_key,
+            "content-type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=max(float(self.smtp_timeout_seconds), 8.0)) as client:
+                response = await client.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    json=payload,
+                    headers=headers,
+                )
+            if response.is_success:
+                return True
+
+            detail = response.text.strip() or f"http_{response.status_code}"
+            self.last_error = f"brevo_api:{response.status_code}:{detail[:200]}"
+            print(f"EmailService Brevo send error: {self.last_error}")
+            return False
+        except Exception as e:
+            self.last_error = f"brevo_api:{e}"
+            print(f"EmailService Brevo send error: {e}")
             return False
 
     def _send_email_blocking(self, to: str, subject: str, body: str) -> None:
